@@ -34,7 +34,72 @@ This project uses [uv workspaces](https://docs.astral.sh/uv/concepts/projects/wo
 2. Install dependencies: `uv sync`
 3. Run migrations: `python manage.py migrate`
 4. Create superuser: `python manage.py createsuperuser`
-5. Run development server: `python manage.py runserver`
+5. **Configure API Key** (see Configuration section below)
+6. Populate test data: `python manage.py populate_test_database`
+7. Run development server: `python manage.py runserver`
+
+## Configuration
+
+### API Key Setup
+
+The AI tutoring functionality requires an OpenAI API key. You have two options:
+
+#### Option 1: Through Admin Interface (Recommended)
+
+1. Start the development server: `python manage.py runserver`
+2. Go to the admin interface: `http://localhost:8000/admin/`
+3. Navigate to **LLM > LLM Configs**
+4. Edit the "Test GPT-4 Config" entry
+5. Replace `test-api-key-placeholder` with your actual OpenAI API key
+6. Save the configuration
+
+#### Option 2: Update Test Database Population
+
+If you want to set the API key during initial setup:
+
+1. Edit `src/llteacher/management/commands/populate_test_database.py`
+2. Find the line with `api_key='test-api-key-placeholder'`
+3. Replace the placeholder with your actual OpenAI API key
+4. Run: `python manage.py populate_test_database --reset`
+
+### Getting an OpenAI API Key
+
+1. Go to [OpenAI's website](https://platform.openai.com/)
+2. Sign up or log in to your account
+3. Navigate to the API section
+4. Generate a new API key
+5. Copy the key (it starts with `sk-`)
+
+### Testing Your Configuration
+
+1. Go to the admin interface: `http://localhost:8000/admin/`
+2. Navigate to **LLM > LLM Configs**
+3. Click on your configuration
+4. Use the "Test Configuration" feature (if available)
+5. Or create a conversation as a student to test the AI responses
+
+### Important Notes
+
+- **Never commit real API keys to version control**
+- The test database includes a placeholder API key that won't work
+- You must replace it with a real key for AI functionality to work
+- API keys should be kept secure and not shared
+
+### Troubleshooting
+
+**"No valid LLM configuration available"**
+- Check that you have a default LLM config marked as active
+- Verify your API key is correctly set (not the placeholder)
+
+**"Technical issue" errors in conversations**
+- Check the Django logs for specific API errors
+- Verify your OpenAI API key has sufficient credits
+- Ensure the API key has the correct permissions
+
+**AI responses not generating**
+- Confirm the LLM config is set as default (`is_default=True`)
+- Check that the configuration is active (`is_active=True`)
+- Verify the model name (e.g., 'gpt-4', 'gpt-3.5-turbo') is correct
 
 ## Development
 
