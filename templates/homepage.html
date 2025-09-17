@@ -3,93 +3,63 @@
 {% block title %}Welcome to LLTeacher{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-lg-8">
-        <div class="jumbotron bg-light p-5 rounded-3 mb-4">
-            <h1 class="display-4">Welcome to LLTeacher</h1>
-            <p class="lead">A next-generation teaching platform powered by AI to enhance learning experiences.</p>
-            <hr class="my-4">
-            <p>Create interactive homeworks, engage in AI-powered conversations, and track student progress all in one place.</p>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-4 mb-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <i class="bi bi-journal-text display-4 text-primary mb-3"></i>
-                        <h5 class="card-title">Interactive Homeworks</h5>
-                        <p class="card-text">Create and manage dynamic homework assignments with AI assistance.</p>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="text-center mb-4">
+                <h1 class="display-4 mb-3">Welcome to LLTeacher</h1>
+                <p class="lead text-muted">A next-generation teaching platform powered by AI to enhance learning experiences.</p>
+            </div>
+            
+            {% if not user.is_authenticated %}
+            <!-- Login Form -->
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0 text-center">Login to Get Started</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'accounts:login' %}">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        
+                        <input type="hidden" name="next" value="/">
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Login</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light text-center">
+                    <p class="mb-2">Don't have an account?</p>
+                    <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary">Create Account</a>
+                </div>
+            </div>
+            {% else %}
+            <!-- Welcome Back Message -->
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0 text-center">Welcome Back!</h4>
+                </div>
+                <div class="card-body text-center">
+                    <p class="card-text fs-5">Hello, <strong>{{ user.username }}</strong>!</p>
+                    <p class="card-text text-muted">Ready to continue your teaching journey?</p>
+                    <div class="d-grid gap-2 col-8 mx-auto">
+                        <a href="{% url 'homeworks:list' %}" class="btn btn-success btn-lg">View Homeworks</a>
+                        <a href="{% url 'accounts:profile' %}" class="btn btn-outline-success">My Profile</a>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <i class="bi bi-chat-dots display-4 text-success mb-3"></i>
-                        <h5 class="card-title">AI Conversations</h5>
-                        <p class="card-text">Engage students with intelligent tutoring conversations.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <i class="bi bi-graph-up display-4 text-info mb-3"></i>
-                        <h5 class="card-title">Progress Tracking</h5>
-                        <p class="card-text">Monitor student progress and performance analytics.</p>
-                    </div>
-                </div>
-            </div>
+            {% endif %}
         </div>
-    </div>
-    
-    <div class="col-lg-4">
-        {% if not user.is_authenticated %}
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0 text-center">Login to Get Started</h4>
-            </div>
-            <div class="card-body">
-                <form method="post" action="{% url 'accounts:login' %}">
-                    {% csrf_token %}
-                    
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                    
-                    <input type="hidden" name="next" value="/">
-                    
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Login</button>
-                    </div>
-                </form>
-            </div>
-            <div class="card-footer bg-light text-center">
-                <p class="mb-2">Don't have an account?</p>
-                <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary btn-sm">Create Account</a>
-            </div>
-        </div>
-        {% else %}
-        <div class="card">
-            <div class="card-header bg-success text-white">
-                <h4 class="mb-0 text-center">Welcome Back!</h4>
-            </div>
-            <div class="card-body text-center">
-                <p class="card-text">Hello, <strong>{{ user.username }}</strong>!</p>
-                <p class="card-text">Ready to continue your teaching journey?</p>
-                <div class="d-grid gap-2">
-                    <a href="{% url 'homeworks:list' %}" class="btn btn-success">View Homeworks</a>
-                    <a href="{% url 'accounts:profile' %}" class="btn btn-outline-success">My Profile</a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

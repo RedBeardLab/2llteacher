@@ -125,7 +125,7 @@ class Command(BaseCommand):
         
         llm_config = LLMConfig.objects.create(
             name='Test GPT-4 Config',
-            model_name='gpt-4',
+            model_name='gpt-5',
             api_key='test-api-key-placeholder',
             base_prompt='''You are an AI tutor helping students learn programming.
 
