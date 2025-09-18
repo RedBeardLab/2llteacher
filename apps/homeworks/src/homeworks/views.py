@@ -253,12 +253,16 @@ class HomeworkCreateView(View):
         
         # Check form validity
         if form.is_valid() and section_formset.is_valid():
-            # Create homework using service
-            homework = form.save(commit=False)
-            homework.created_by = request.user.teacher_profile
-            homework.save()
+            # Extract homework data from form
+            homework_data = HomeworkCreateData(
+                title=form.cleaned_data['title'],
+                description=form.cleaned_data['description'],
+                due_date=form.cleaned_data['due_date'],
+                sections=[],
+                llm_config=form.cleaned_data['llm_config'].id if form.cleaned_data['llm_config'] else None
+            )
             
-            # Create sections
+            # Extract sections data from formset
             section_data = []
             for section_form in section_formset.forms:
                 if section_form.cleaned_data and not section_form.cleaned_data.get('DELETE', False):
@@ -270,15 +274,10 @@ class HomeworkCreateView(View):
                         solution=section_form.cleaned_data['solution']
                     ))
             
-            # Use service to create homework with sections
-            homework_data = HomeworkCreateData(
-                title=homework.title,
-                description=homework.description,
-                due_date=homework.due_date,
-                sections=section_data,
-                llm_config=homework.llm_config.id if homework.llm_config else None
-            )
+            # Add sections to homework data
+            homework_data.sections = section_data
             
+            # Use service to create homework with sections (single creation point)
             result = HomeworkService.create_homework_with_sections(
                 homework_data,
                 request.user.teacher_profile

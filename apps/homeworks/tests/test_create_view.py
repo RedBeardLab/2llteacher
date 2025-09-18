@@ -252,3 +252,69 @@ class HomeworkCreateViewTests(TestCase):
         data = response.context['data']
         self.assertFalse(data.is_submitted)
         self.assertIsNotNone(data.errors)
+    
+    def test_process_form_submission_creates_single_homework(self):
+        """Test that _process_form_submission creates only one homework, not two.
+        
+        This is an integration test that verifies the bug where homework creation
+        was happening twice - once directly in the view and once in the service.
+        """
+        from homeworks.models import Homework
+        
+        # Count homeworks before
+        initial_count = Homework.objects.count()
+        
+        # Create a request with valid form data
+        post_data = {
+            'title': 'Integration Test Homework',
+            'description': 'Test Description for Integration',
+            'due_date': (timezone.now() + timedelta(days=7)).strftime('%Y-%m-%dT%H:%M'),
+            'sections-TOTAL_FORMS': '2',
+            'sections-INITIAL_FORMS': '0',
+            'sections-MIN_NUM_FORMS': '0',
+            'sections-MAX_NUM_FORMS': '1000',
+            'sections-0-title': 'Test Section 1',
+            'sections-0-content': 'Test Content 1',
+            'sections-0-order': '1',
+            'sections-0-solution': 'Test Solution 1',
+            'sections-1-title': 'Test Section 2',
+            'sections-1-content': 'Test Content 2',
+            'sections-1-order': '2',
+            'sections-1-solution': 'Test Solution 2'
+        }
+        
+        request = self.factory.post('/homeworks/create/', post_data)
+        request.user = self.teacher_user
+        
+        # Create view instance and process form submission
+        view = HomeworkCreateView()
+        result = view._process_form_submission(request)
+        
+        # Verify only one homework was created
+        final_count = Homework.objects.count()
+        self.assertEqual(final_count, initial_count + 1, 
+                        f"Should create exactly one homework, but created {final_count - initial_count}")
+        
+        # Verify the homework has the correct properties
+        if result.is_submitted:
+            homework = Homework.objects.latest('created_at')
+            self.assertEqual(homework.title, 'Integration Test Homework')
+            self.assertEqual(homework.description, 'Test Description for Integration')
+            self.assertEqual(homework.created_by, self.teacher)
+            
+            # Verify the homework has sections
+            sections = homework.sections.all().order_by('order')
+            self.assertEqual(sections.count(), 2, "Homework should have exactly 2 sections")
+            
+            # Verify section details
+            self.assertEqual(sections[0].title, 'Test Section 1')
+            self.assertEqual(sections[0].content, 'Test Content 1')
+            self.assertEqual(sections[0].order, 1)
+            self.assertIsNotNone(sections[0].solution)
+            self.assertEqual(sections[0].solution.content, 'Test Solution 1')
+            
+            self.assertEqual(sections[1].title, 'Test Section 2')
+            self.assertEqual(sections[1].content, 'Test Content 2')
+            self.assertEqual(sections[1].order, 2)
+            self.assertIsNotNone(sections[1].solution)
+            self.assertEqual(sections[1].solution.content, 'Test Solution 2')
