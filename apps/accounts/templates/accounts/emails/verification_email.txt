@@ -1,0 +1,26 @@
+LLTeacher - Email Verification Required
+
+Hello {{ user.first_name|default:user.username }},
+
+Thank you for registering with LLTeacher! To complete your account setup and start using our AI-assisted learning platform, please verify your email address.
+
+Please click the following link to verify your email:
+{{ protocol }}://{{ domain }}{% url 'accounts:verify_email' token=token %}
+
+IMPORTANT INFORMATION:
+- This verification link will expire in 7 days
+- You must verify your email before you can fully access your account
+- If you didn't create an account with LLTeacher, please ignore this email
+
+Once verified, you'll be able to:
+- Access homework assignments and sections
+- Start AI-assisted conversations
+- Submit your work for review
+- Track your learning progress
+
+---
+LLTeacher Team
+University of Washington
+
+This is an automated message, please do not reply to this email.
+Need help? Contact your instructor or visit our support resources.

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Email Verified - LLTeacher{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Email Verified Successfully</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-check-circle fa-4x text-success"></i>
+                    </div>
+                    
+                    <h5 class="mb-3">Welcome to LLTeacher!</h5>
+                    
+                    <p class="text-muted mb-4">
+                        Your email address has been successfully verified. You now have full access to your LLTeacher account.
+                    </p>
+                    
+                    <div class="alert alert-success">
+                        <strong>Account Activated!</strong> You can now:
+                        <ul class="mb-0 mt-2 text-start">
+                            <li>Access homework assignments and sections</li>
+                            <li>Start AI-assisted conversations</li>
+                            <li>Submit your work for review</li>
+                            <li>Track your learning progress</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        {% if user.is_authenticated %}
+                            <a href="/" class="btn btn-primary">
+                                <i class="fas fa-home"></i> Go to Dashboard
+                            </a>
+                        {% else %}
+                            <a href="{% url 'accounts:login' %}" class="btn btn-primary">
+                                <i class="fas fa-sign-in-alt"></i> Log In to Continue
+                            </a>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            Ready to start learning? Explore your assignments and begin your AI-assisted journey!
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

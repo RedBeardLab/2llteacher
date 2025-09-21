@@ -3,6 +3,7 @@ Tests for streaming LLM responses.
 
 Testing the streaming functionality with a simple approach.
 """
+
 import json
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
@@ -18,144 +19,133 @@ User = get_user_model()
 
 class StreamingLLMTest(TestCase):
     """Test the streaming LLM response functionality."""
-    
+
     def setUp(self):
         """Set up test data."""
         self.client = Client()
-        
+
         # Create test user
         self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123'
+            username="testuser", email="test@example.com", password="testpass123"
         )
-        
+
         # Create student profile
         self.student_profile = Student.objects.create(user=self.user)
-        
+
         # Create teacher for homework
         self.teacher_user = User.objects.create_user(
-            username='teacher',
-            email='teacher@example.com',
-            password='teacherpass123'
+            username="teacher", email="teacher@example.com", password="teacherpass123"
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
-        
+
         # Create homework and section
         from datetime import datetime
+
         self.homework = Homework.objects.create(
-            title='Test Homework',
-            description='Test description',
+            title="Test Homework",
+            description="Test description",
             created_by=self.teacher,
-            due_date=datetime(2024, 12, 31)
+            due_date=datetime(2024, 12, 31),
         )
-        
+
         self.section = Section.objects.create(
             homework=self.homework,
-            title='Test Section',
-            content='Test section content',
-            order=1
+            title="Test Section",
+            content="Test section content",
+            order=1,
         )
-        
+
         # Create conversation
         self.conversation = Conversation.objects.create(
-            user=self.user,
-            section=self.section
+            user=self.user, section=self.section
         )
-        
+
         # Login user
-        self.client.login(username='testuser', password='testpass123')
-    
-    
-    @patch('llm.services.LLMService.stream_response')
+        self.client.login(username="testuser", password="testpass123")
+
+    @patch("llm.services.LLMService.stream_response")
     def test_streaming_llm_response(self, mock_stream):
         """Test streaming LLM response functionality."""
         # Mock the streaming response
-        mock_stream.return_value = iter(['Hello', ' there', '! How', ' can I', ' help?'])
-        
-        url = reverse('conversations:api_stream', kwargs={'conversation_id': self.conversation.id})
-        
+        mock_stream.return_value = iter(
+            ["Hello", " there", "! How", " can I", " help?"]
+        )
+
+        url = reverse(
+            "conversations:api_stream", kwargs={"conversation_id": self.conversation.id}
+        )
+
         data = {
-            'content': 'Hello, I need help with this section',
-            'message_type': 'student'
+            "content": "Hello, I need help with this section",
+            "message_type": "student",
         }
-        
+
         # Test POST request (streaming)
         response = self.client.post(
-            url,
-            data=json.dumps(data),
-            content_type='application/json'
+            url, data=json.dumps(data), content_type="application/json"
         )
-        
+
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'text/event-stream')
-        
+        self.assertEqual(response["Content-Type"], "text/event-stream")
+
         # Consume the streaming response to trigger message creation
-        response_content = b''.join(response)
-        
+        response_content = b"".join(response)
+
         # Verify that messages were created
         messages = Message.objects.filter(conversation=self.conversation)
         self.assertEqual(messages.count(), 2)  # User message + AI message
-        
+
         # Verify user message
-        user_message = messages.filter(message_type='student').first()
+        user_message = messages.filter(message_type="student").first()
         self.assertIsNotNone(user_message)
-        self.assertEqual(user_message.content, 'Hello, I need help with this section')
-        
+        self.assertEqual(user_message.content, "Hello, I need help with this section")
+
         # Verify AI message
-        ai_message = messages.filter(message_type='ai').first()
+        ai_message = messages.filter(message_type="ai").first()
         self.assertIsNotNone(ai_message)
-        self.assertEqual(ai_message.content, 'Hello there! How can I help?')
-        
+        self.assertEqual(ai_message.content, "Hello there! How can I help?")
+
         # Verify the streaming response contains expected events
-        response_text = response_content.decode('utf-8')
-        self.assertIn('user_message', response_text)
-        self.assertIn('ai_message_start', response_text)
-        self.assertIn('ai_token', response_text)
-        self.assertIn('ai_message_complete', response_text)
-    
+        response_text = response_content.decode("utf-8")
+        self.assertIn("user_message", response_text)
+        self.assertIn("ai_message_start", response_text)
+        self.assertIn("ai_token", response_text)
+        self.assertIn("ai_message_complete", response_text)
+
     def test_streaming_permission_denied(self):
         """Test streaming with wrong user permissions."""
         # Create another user
         _other_user = User.objects.create_user(
-            username='otheruser',
-            email='other@example.com',
-            password='otherpass123'
+            username="otheruser", email="other@example.com", password="otherpass123"
         )
-        
+
         # Login as other user
-        self.client.login(username='otheruser', password='otherpass123')
-        
-        url = reverse('conversations:api_stream', kwargs={'conversation_id': self.conversation.id})
-        
-        data = {
-            'content': 'This should fail',
-            'message_type': 'student'
-        }
-        
-        response = self.client.post(
-            url,
-            data=json.dumps(data),
-            content_type='application/json'
+        self.client.login(username="otheruser", password="otherpass123")
+
+        url = reverse(
+            "conversations:api_stream", kwargs={"conversation_id": self.conversation.id}
         )
-        
+
+        data = {"content": "This should fail", "message_type": "student"}
+
+        response = self.client.post(
+            url, data=json.dumps(data), content_type="application/json"
+        )
+
         self.assertEqual(response.status_code, 200)  # SSE always returns 200
         # The error would be in the stream content
-    
+
     def test_streaming_empty_content(self):
         """Test streaming with empty message content."""
-        url = reverse('conversations:api_stream', kwargs={'conversation_id': self.conversation.id})
-        
-        data = {
-            'content': '',
-            'message_type': 'student'
-        }
-        
-        response = self.client.post(
-            url,
-            data=json.dumps(data),
-            content_type='application/json'
+        url = reverse(
+            "conversations:api_stream", kwargs={"conversation_id": self.conversation.id}
         )
-        
+
+        data = {"content": "", "message_type": "student"}
+
+        response = self.client.post(
+            url, data=json.dumps(data), content_type="application/json"
+        )
+
         self.assertEqual(response.status_code, 200)  # SSE always returns 200
         # The error would be in the stream content

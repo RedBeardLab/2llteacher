@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Verification Email Sent - LLTeacher{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Check Your Email</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-envelope fa-4x text-primary"></i>
+                    </div>
+                    
+                    <h5 class="mb-3">Verification Email Sent</h5>
+                    
+                    <p class="text-muted mb-4">
+                        We've sent a verification email to <strong>{{ user.email }}</strong>. 
+                        Please check your inbox and click the verification link to activate your account.
+                    </p>
+                    
+                    <div class="alert alert-info">
+                        <strong>Next Steps:</strong>
+                        <ol class="mb-0 mt-2 text-start">
+                            <li>Check your email inbox (and spam folder)</li>
+                            <li>Click the verification link in the email</li>
+                            <li>Return here to log in and start learning</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <small>
+                            <strong>Note:</strong> The verification link will expire in 7 days. 
+                            You must verify your email to access all features.
+                        </small>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mb-3">
+                        <a href="{% url 'accounts:login' %}" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt"></i> Go to Login
+                        </a>
+                    </div>
+                    
+                    <div class="text-center">
+                        <small class="text-muted">
+                            Didn't receive the email? 
+                            <a href="{% url 'accounts:resend_verification' %}" class="text-decoration-none">
+                                Resend verification email
+                            </a>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

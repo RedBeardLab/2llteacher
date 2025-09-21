@@ -4,6 +4,7 @@ Homework Service
 This module provides services for managing homework assignments and their sections.
 Following a testable-first approach with typed data contracts.
 """
+
 from dataclasses import dataclass
 from typing import Any, List
 from uuid import UUID
@@ -13,6 +14,7 @@ from django.db import transaction
 
 # Import for type hints
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from accounts.models import Teacher, Student
     from .models import Homework
@@ -20,18 +22,21 @@ if TYPE_CHECKING:
 
 class SectionStatus(str, Enum):
     """Enumeration of possible section status values."""
-    NOT_STARTED = 'not_started'
-    IN_PROGRESS = 'in_progress'
-    IN_PROGRESS_OVERDUE = 'in_progress_overdue'
-    SUBMITTED = 'submitted'
-    OVERDUE = 'overdue'
+
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    IN_PROGRESS_OVERDUE = "in_progress_overdue"
+    SUBMITTED = "submitted"
+    OVERDUE = "overdue"
 
 
 class ParticipationStatus(StrEnum):
     """Enumeration of possible student participation status values."""
-    NO_INTERACTION = 'no_interaction'
-    PARTIAL = 'partial'
-    ACTIVE = 'active'
+
+    NO_INTERACTION = "no_interaction"
+    PARTIAL = "partial"
+    ACTIVE = "active"
+
 
 # Data Contracts
 @dataclass
@@ -41,6 +46,7 @@ class SectionCreateData:
     order: int
     solution: str | None = None
 
+
 @dataclass
 class HomeworkCreateData:
     title: str
@@ -49,6 +55,7 @@ class HomeworkCreateData:
     sections: list[SectionCreateData]
     llm_config: UUID | None = None
 
+
 @dataclass
 class HomeworkCreateResult:
     homework_id: UUID
@@ -56,9 +63,11 @@ class HomeworkCreateResult:
     success: bool = True
     error: str | None = None
 
+
 @dataclass
 class SectionData:
     """Unified data structure for section information used across services and views."""
+
     id: UUID
     title: str
     content: str
@@ -69,21 +78,24 @@ class SectionData:
     # Progress tracking fields (available when progress is calculated)
     status: SectionStatus | None = None
     conversation_id: UUID | None = None
-    
+
     @property
     def has_solution(self) -> bool:
         """Check if section has a solution."""
         return self.solution_content is not None
+
 
 @dataclass
 class HomeworkProgressData:
     homework_id: UUID
     sections_progress: list[SectionData]
 
+
 # Missing data contracts that need to be defined
 @dataclass
 class HomeworkDetailData:
     """Data contract for detailed homework information including sections"""
+
     id: UUID
     title: str
     description: str
@@ -94,9 +106,11 @@ class HomeworkDetailData:
     llm_config: UUID | None = None
     sections: list[SectionData] | None = None
 
+
 @dataclass
 class HomeworkUpdateData:
     """Data contract for updating homework"""
+
     title: str | None = None
     description: str | None = None
     due_date: Any | None = None  # datetime
@@ -105,9 +119,11 @@ class HomeworkUpdateData:
     sections_to_create: list[SectionCreateData] | None = None
     sections_to_delete: list[UUID] | None = None
 
+
 @dataclass
 class HomeworkUpdateResult:
     """Result of updating a homework assignment"""
+
     success: bool = True
     error: str | None = None
     homework_id: UUID | None = None
@@ -120,6 +136,7 @@ class HomeworkUpdateResult:
 @dataclass
 class StudentConversationData:
     """Data structure for a student's conversation in the submissions view."""
+
     conversation_id: UUID
     section_title: str
     section_order: int
@@ -134,11 +151,14 @@ class StudentConversationData:
 @dataclass
 class StudentSectionStatus:
     """Data structure for a student's status on a specific section."""
+
     section_id: UUID
     section_title: str
     section_order: int
     has_conversation: bool
-    conversations: list[StudentConversationData]  # All conversations for this section, sorted chronologically
+    conversations: list[
+        StudentConversationData
+    ]  # All conversations for this section, sorted chronologically
     is_missing: bool  # True if student has no conversations for this section
     latest_conversation_date: datetime | None
     submission_count: int  # Number of submitted conversations for this section
@@ -147,12 +167,15 @@ class StudentSectionStatus:
 @dataclass
 class StudentSubmissionSummary:
     """Data structure for a student's overall submission summary."""
+
     student_id: UUID
     student_name: str
     student_username: str
     student_email: str
     has_interactions: bool
-    section_statuses: list[StudentSectionStatus]  # All sections, ordered by section number
+    section_statuses: list[
+        StudentSectionStatus
+    ]  # All sections, ordered by section number
     total_conversations: int
     submitted_count: int
     sections_started: int
@@ -164,6 +187,7 @@ class StudentSubmissionSummary:
 @dataclass
 class HomeworkSubmissionsData:
     """Data structure for the homework submissions view."""
+
     homework_id: UUID
     homework_title: str
     homework_due_date: datetime
@@ -174,37 +198,40 @@ class HomeworkSubmissionsData:
     inactive_students: int
     total_submissions: int
 
+
 class HomeworkService:
     """
     Service class for homework-related business logic.
-    
+
     This service follows a testable-first approach with clear data contracts
     and properly typed methods for easier testing and maintenance.
     """
-    
+
     @staticmethod
-    def create_homework_with_sections(data: HomeworkCreateData, teacher: 'Teacher') -> HomeworkCreateResult:
+    def create_homework_with_sections(
+        data: HomeworkCreateData, teacher: "Teacher"
+    ) -> HomeworkCreateResult:
         """
         Create a new homework assignment with multiple sections.
-        
+
         Args:
             data: Typed data object containing homework details
             teacher: Teacher object who is creating the homework
-            
+
         Returns:
             HomeworkCreateResult object with operation results
         """
         from .models import Homework, Section, SectionSolution
-        
+
         # Validate data
         if not data.title.strip():
             return HomeworkCreateResult(
                 homework_id=None,  # type: ignore
                 section_ids=[],
                 success=False,
-                error="Title cannot be empty"
+                error="Title cannot be empty",
             )
-        
+
         try:
             with transaction.atomic():
                 # Create homework
@@ -213,9 +240,9 @@ class HomeworkService:
                     description=data.description,
                     due_date=data.due_date,
                     created_by=teacher,
-                    llm_config_id=data.llm_config
+                    llm_config_id=data.llm_config,
                 )
-                
+
                 # Create sections
                 section_ids: list[UUID] = []
                 for section_data in data.sections:
@@ -224,9 +251,9 @@ class HomeworkService:
                         homework=homework,
                         title=section_data.title,
                         content=section_data.content,
-                        order=section_data.order
+                        order=section_data.order,
                     )
-                    
+
                     # Create solution if provided
                     if section_data.solution:
                         solution = SectionSolution.objects.create(
@@ -234,12 +261,11 @@ class HomeworkService:
                         )
                         section.solution = solution
                         section.save()
-                    
+
                     section_ids.append(section.id)
-                
+
                 return HomeworkCreateResult(
-                    homework_id=homework.id,
-                    section_ids=section_ids
+                    homework_id=homework.id, section_ids=section_ids
                 )
         except Exception as e:
             # Return failure result with error
@@ -247,51 +273,53 @@ class HomeworkService:
                 homework_id=None,  # type: ignore
                 section_ids=[],
                 success=False,
-                error=str(e)
+                error=str(e),
             )
-    
+
     @staticmethod
-    def get_student_homework_progress(student: 'Student', homework: 'Homework') -> HomeworkProgressData:
+    def get_student_homework_progress(
+        student: "Student", homework: "Homework"
+    ) -> HomeworkProgressData:
         """
         Get a student's progress on a specific homework assignment.
-        
+
         Args:
             student: Student object
             homework: Homework object
-            
+
         Returns:
             HomeworkProgressData with progress information
         """
         # Import here to avoid circular imports
         from conversations.models import Submission, Conversation
-        
-        sections = homework.sections.select_related('solution').order_by('order')
+
+        sections = homework.sections.select_related("solution").order_by("order")
         progress_items: list[SectionData] = []
-        
+
         for section in sections:
             try:
                 # Check if student has submitted this section
                 submission = Submission.objects.filter(
                     conversation__user=student.user,
                     conversation__section=section,
-                    conversation__is_deleted=False
+                    conversation__is_deleted=False,
                 ).first()
-                
+
                 if submission:
                     status: SectionStatus = SectionStatus.SUBMITTED
                     conversation_id: UUID | None = submission.conversation.id
                 else:
                     # Check if student has started working (has conversations)
                     conversation = Conversation.objects.filter(
-                        user=student.user,
-                        section=section,
-                        is_deleted=False
+                        user=student.user, section=section, is_deleted=False
                     ).first()
-                    
+
                     if conversation:
                         # Student has started working
                         if homework.is_overdue:
-                            status = SectionStatus.IN_PROGRESS_OVERDUE  # Started but overdue
+                            status = (
+                                SectionStatus.IN_PROGRESS_OVERDUE
+                            )  # Started but overdue
                         else:
                             status = SectionStatus.IN_PROGRESS  # Started and on time
                         conversation_id = conversation.id
@@ -300,67 +328,73 @@ class HomeworkService:
                         if homework.is_overdue:
                             status = SectionStatus.OVERDUE  # Never started and overdue
                         else:
-                            status = SectionStatus.NOT_STARTED  # Never started, still time
+                            status = (
+                                SectionStatus.NOT_STARTED
+                            )  # Never started, still time
                         conversation_id = None
             except Exception:
                 status = SectionStatus.NOT_STARTED
                 conversation_id = None
-            
+
             # Create progress data for this section with complete section information
-            progress_items.append(SectionData(
-                id=section.id,
-                title=section.title,
-                content=section.content,
-                order=section.order,
-                solution_content=section.solution.content if section.solution else None,
-                created_at=section.created_at,
-                updated_at=section.updated_at,
-                status=status,
-                conversation_id=conversation_id
-            ))
-        
+            progress_items.append(
+                SectionData(
+                    id=section.id,
+                    title=section.title,
+                    content=section.content,
+                    order=section.order,
+                    solution_content=section.solution.content
+                    if section.solution
+                    else None,
+                    created_at=section.created_at,
+                    updated_at=section.updated_at,
+                    status=status,
+                    conversation_id=conversation_id,
+                )
+            )
+
         # Create and return the overall progress data
         return HomeworkProgressData(
-            homework_id=homework.id,
-            sections_progress=progress_items
+            homework_id=homework.id, sections_progress=progress_items
         )
-    
+
     @staticmethod
     def get_homework_with_sections(homework_id: UUID) -> HomeworkDetailData | None:
         """
         Get detailed homework data with all its sections.
-        
+
         Args:
             homework_id: UUID of the homework to retrieve
-            
+
         Returns:
             HomeworkDetailData if found, None otherwise
         """
         from .models import Homework
-        
+
         try:
             # Get homework with optimized query using select_related and prefetch_related
-            homework = Homework.objects.select_related(
-                'created_by', 
-                'llm_config'
-            ).prefetch_related(
-                'sections__solution'
-            ).get(id=homework_id)
-            
+            homework = (
+                Homework.objects.select_related("created_by", "llm_config")
+                .prefetch_related("sections__solution")
+                .get(id=homework_id)
+            )
+
             # Prepare sections data
             sections: List[SectionData] = []
-            for section in homework.sections.order_by('order'):
+            for section in homework.sections.order_by("order"):
                 section_data = SectionData(
                     id=section.id,
                     title=section.title,
                     content=section.content,
                     order=section.order,
-                    solution_content=section.solution.content if section.solution else None,
+                    solution_content=section.solution.content
+                    if section.solution
+                    else None,
                     created_at=section.created_at,
-                    updated_at=section.updated_at
+                    updated_at=section.updated_at,
                 )
                 sections.append(section_data)
-            
+
             # Create and return the detailed data
             return HomeworkDetailData(
                 id=homework.id,
@@ -371,32 +405,34 @@ class HomeworkService:
                 created_at=homework.created_at,
                 updated_at=homework.updated_at,
                 llm_config=homework.llm_config.id if homework.llm_config else None,
-                sections=sections
+                sections=sections,
             )
         except Homework.DoesNotExist:
             return None
         except Exception:
             return None
-    
+
     @staticmethod
-    def update_homework(homework_id: UUID, data: HomeworkUpdateData) -> HomeworkUpdateResult:
+    def update_homework(
+        homework_id: UUID, data: HomeworkUpdateData
+    ) -> HomeworkUpdateResult:
         """
         Update a homework assignment and its sections.
-        
+
         Args:
             homework_id: UUID of the homework to update
             data: Typed data object containing update information
-            
+
         Returns:
             HomeworkUpdateResult with operation results
         """
         from .models import Homework, Section, SectionSolution
-        
+
         try:
             with transaction.atomic():
                 # Get the homework
                 homework = Homework.objects.get(id=homework_id)
-                
+
                 # Update basic fields if provided
                 if data.title is not None:
                     homework.title = data.title
@@ -406,25 +442,27 @@ class HomeworkService:
                     homework.due_date = data.due_date
                 if data.llm_config is not None:
                     homework.llm_config_id = data.llm_config
-                
+
                 # Save homework changes
                 homework.save()
-                
+
                 # Initialize tracking lists for sections
                 updated_section_ids: List[UUID] = []
                 created_section_ids: List[UUID] = []
                 deleted_section_ids: List[UUID] = []
-                
+
                 # Delete sections if requested
                 if data.sections_to_delete:
                     for section_id in data.sections_to_delete:
                         try:
-                            section = Section.objects.get(id=section_id, homework=homework)
+                            section = Section.objects.get(
+                                id=section_id, homework=homework
+                            )
                             section.delete()
                             deleted_section_ids.append(section_id)
                         except Section.DoesNotExist:
                             pass  # Skip if section doesn't exist
-                
+
                 # Create new sections if requested
                 if data.sections_to_create:
                     for section_data in data.sections_to_create:
@@ -433,9 +471,9 @@ class HomeworkService:
                             homework=homework,
                             title=section_data.title,
                             content=section_data.content,
-                            order=section_data.order
+                            order=section_data.order,
                         )
-                        
+
                         # Create solution if provided
                         if section_data.solution:
                             solution = SectionSolution.objects.create(
@@ -443,29 +481,28 @@ class HomeworkService:
                             )
                             section.solution = solution
                             section.save()
-                        
+
                         created_section_ids.append(section.id)
-                
+
                 # Update existing sections if requested
                 if data.sections_to_update:
                     for section_update in data.sections_to_update:
                         try:
                             section = Section.objects.get(
-                                id=section_update.get('id'), 
-                                homework=homework
+                                id=section_update.get("id"), homework=homework
                             )
-                            
+
                             # Update section fields
-                            if 'title' in section_update:
-                                section.title = section_update['title']
-                            if 'content' in section_update:
-                                section.content = section_update['content']
-                            if 'order' in section_update:
-                                section.order = section_update['order']
-                            
+                            if "title" in section_update:
+                                section.title = section_update["title"]
+                            if "content" in section_update:
+                                section.content = section_update["content"]
+                            if "order" in section_update:
+                                section.order = section_update["order"]
+
                             # Update solution if provided
-                            if 'solution' in section_update:
-                                solution_content = section_update['solution']
+                            if "solution" in section_update:
+                                solution_content = section_update["solution"]
                                 if solution_content:
                                     # Create or update solution
                                     if section.solution:
@@ -481,44 +518,40 @@ class HomeworkService:
                                     if section.solution:
                                         section.solution.delete()
                                         section.solution = None
-                            
+
                             section.save()
                             updated_section_ids.append(section.id)
                         except Section.DoesNotExist:
                             pass  # Skip if section doesn't exist
-                
+
                 # Return success result with tracking information
                 return HomeworkUpdateResult(
                     success=True,
                     homework_id=homework.id,
                     updated_section_ids=updated_section_ids,
                     created_section_ids=created_section_ids,
-                    deleted_section_ids=deleted_section_ids
+                    deleted_section_ids=deleted_section_ids,
                 )
         except Homework.DoesNotExist:
             return HomeworkUpdateResult(
-                success=False,
-                error=f"Homework with id {homework_id} not found"
+                success=False, error=f"Homework with id {homework_id} not found"
             )
         except Exception as e:
-            return HomeworkUpdateResult(
-                success=False,
-                error=str(e)
-            )
-    
+            return HomeworkUpdateResult(success=False, error=str(e))
+
     @staticmethod
     def delete_homework(homework_id: UUID) -> bool:
         """
         Delete a homework and all related sections.
-        
+
         Args:
             homework_id: UUID of the homework to delete
-            
+
         Returns:
             True if deleted successfully, False otherwise
         """
         from .models import Homework
-        
+
         try:
             homework = Homework.objects.get(id=homework_id)
             homework.delete()  # This will cascade delete all sections and solutions
@@ -527,71 +560,75 @@ class HomeworkService:
             return False
         except Exception:
             return False
-    
+
     @staticmethod
     def get_homework_submissions(homework_id: UUID) -> HomeworkSubmissionsData | None:
         """
         Get all student submissions for a homework, including students with no interactions.
         Shows section-by-section breakdown with conversations sorted by section order first, then chronologically.
-        
+
         Args:
             homework_id: UUID of the homework to get submissions for
-            
+
         Returns:
             HomeworkSubmissionsData with all students and their section-by-section interactions, or None if homework not found
         """
         from .models import Homework
         from accounts.models import Student
         from conversations.models import Conversation, Submission
-        
+
         try:
             # Get the homework with sections ordered by section order
-            homework = Homework.objects.select_related('created_by').prefetch_related(
-                'sections'
-            ).get(id=homework_id)
-            
+            homework = (
+                Homework.objects.select_related("created_by")
+                .prefetch_related("sections")
+                .get(id=homework_id)
+            )
+
             # Get all sections for this homework, ordered by section order
-            homework_sections = list(homework.sections.order_by('order'))
-            
+            homework_sections = list(homework.sections.order_by("order"))
+
             # Get all students in the system
-            all_students = Student.objects.select_related('user').all()
-            
+            all_students = Student.objects.select_related("user").all()
+
             # Get all conversations for this homework (including soft-deleted ones)
-            conversations = Conversation.objects.filter(
-                section__homework=homework
-            ).select_related(
-                'user__student_profile', 'section'
-            ).prefetch_related('messages')
-            
+            conversations = (
+                Conversation.objects.filter(section__homework=homework)
+                .select_related("user__student_profile", "section")
+                .prefetch_related("messages")
+            )
+
             # Get all submissions for this homework
             submissions = Submission.objects.filter(
                 conversation__section__homework=homework
-            ).select_related('conversation')
-            
+            ).select_related("conversation")
+
             # Create a map of conversation_id -> submission for quick lookup
             submission_map = {sub.conversation.id: sub for sub in submissions}
-            
+
             # Group conversations by student and section
             student_section_conversations_map = {}
             for conv in conversations:
                 student_id = conv.user.student_profile.id
                 section_id = conv.section.id
-                
+
                 if student_id not in student_section_conversations_map:
                     student_section_conversations_map[student_id] = {}
                 if section_id not in student_section_conversations_map[student_id]:
                     student_section_conversations_map[student_id][section_id] = []
-                
+
                 student_section_conversations_map[student_id][section_id].append(conv)
-            
+
             # Create student summaries
             student_summaries = []
             total_submissions = 0
             active_students = 0
-            
+
             for student in all_students:
-                student_conversations = student_section_conversations_map.get(student.id, {})
-                
+                student_conversations = student_section_conversations_map.get(
+                    student.id, {}
+                )
+
                 # Create section statuses for all sections
                 section_statuses = []
                 total_conversations = 0
@@ -599,24 +636,24 @@ class HomeworkService:
                 sections_started = 0
                 missing_sections = 0
                 last_activity = None
-                
+
                 for section in homework_sections:
                     section_conversations = student_conversations.get(section.id, [])
                     has_conversation = len(section_conversations) > 0
-                    
+
                     if not has_conversation:
                         missing_sections += 1
                     else:
                         sections_started += 1
-                    
+
                     # Process conversations for this section
                     conversation_data = []
                     section_submissions = 0
                     latest_conversation_date = None
-                    
+
                     for conv in section_conversations:
                         total_conversations += 1
-                        
+
                         # Check if this conversation has a submission
                         submission = submission_map.get(conv.id)
                         is_submitted = submission is not None
@@ -624,42 +661,51 @@ class HomeworkService:
                             section_submissions += 1
                             submitted_count += 1
                             total_submissions += 1
-                        
+
                         # Track latest conversation date for this section
-                        if latest_conversation_date is None or conv.updated_at > latest_conversation_date:
+                        if (
+                            latest_conversation_date is None
+                            or conv.updated_at > latest_conversation_date
+                        ):
                             latest_conversation_date = conv.updated_at
-                        
+
                         # Track overall last activity
                         if last_activity is None or conv.updated_at > last_activity:
                             last_activity = conv.updated_at
-                        
-                        conversation_data.append(StudentConversationData(
-                            conversation_id=conv.id,
-                            section_title=conv.section.title,
-                            section_order=conv.section.order,
-                            created_at=conv.created_at,
-                            updated_at=conv.updated_at,
-                            message_count=conv.message_count,
-                            is_submitted=is_submitted,
-                            is_deleted=conv.is_deleted,
-                            submission_date=submission.submitted_at if submission else None
-                        ))
-                    
+
+                        conversation_data.append(
+                            StudentConversationData(
+                                conversation_id=conv.id,
+                                section_title=conv.section.title,
+                                section_order=conv.section.order,
+                                created_at=conv.created_at,
+                                updated_at=conv.updated_at,
+                                message_count=conv.message_count,
+                                is_submitted=is_submitted,
+                                is_deleted=conv.is_deleted,
+                                submission_date=submission.submitted_at
+                                if submission
+                                else None,
+                            )
+                        )
+
                     # Sort conversations within this section chronologically (newest first)
                     conversation_data.sort(key=lambda x: x.created_at, reverse=True)
-                    
+
                     # Create section status
-                    section_statuses.append(StudentSectionStatus(
-                        section_id=section.id,
-                        section_title=section.title,
-                        section_order=section.order,
-                        has_conversation=has_conversation,
-                        conversations=conversation_data,
-                        is_missing=not has_conversation,
-                        latest_conversation_date=latest_conversation_date,
-                        submission_count=section_submissions
-                    ))
-                
+                    section_statuses.append(
+                        StudentSectionStatus(
+                            section_id=section.id,
+                            section_title=section.title,
+                            section_order=section.order,
+                            has_conversation=has_conversation,
+                            conversations=conversation_data,
+                            is_missing=not has_conversation,
+                            latest_conversation_date=latest_conversation_date,
+                            submission_count=section_submissions,
+                        )
+                    )
+
                 # Determine participation status
                 has_interactions = total_conversations > 0
                 if not has_interactions:
@@ -670,38 +716,47 @@ class HomeworkService:
                 else:
                     participation_status = ParticipationStatus.PARTIAL
                     active_students += 1
-                
+
                 # Create student summary
-                student_name = f"{student.user.first_name} {student.user.last_name}".strip()
+                student_name = (
+                    f"{student.user.first_name} {student.user.last_name}".strip()
+                )
                 if not student_name:
                     student_name = student.user.username
-                
-                student_summaries.append(StudentSubmissionSummary(
-                    student_id=student.id,
-                    student_name=student_name,
-                    student_username=student.user.username,
-                    student_email=student.user.email,
-                    has_interactions=has_interactions,
-                    section_statuses=section_statuses,
-                    total_conversations=total_conversations,
-                    submitted_count=submitted_count,
-                    sections_started=sections_started,
-                    missing_sections=missing_sections,
-                    last_activity=last_activity,
-                    participation_status=participation_status
-                ))
-            
+
+                student_summaries.append(
+                    StudentSubmissionSummary(
+                        student_id=student.id,
+                        student_name=student_name,
+                        student_username=student.user.username,
+                        student_email=student.user.email,
+                        has_interactions=has_interactions,
+                        section_statuses=section_statuses,
+                        total_conversations=total_conversations,
+                        submitted_count=submitted_count,
+                        sections_started=sections_started,
+                        missing_sections=missing_sections,
+                        last_activity=last_activity,
+                        participation_status=participation_status,
+                    )
+                )
+
             # Sort students: no_interaction first (with warnings), then by last activity (newest first)
-            student_summaries.sort(key=lambda s: (
-                s.participation_status != ParticipationStatus.NO_INTERACTION,  # False sorts first
-                -(s.last_activity or datetime.min).timestamp() if s.last_activity else 0  # Negative for reverse order
-            ))
-            
+            student_summaries.sort(
+                key=lambda s: (
+                    s.participation_status
+                    != ParticipationStatus.NO_INTERACTION,  # False sorts first
+                    -(s.last_activity or datetime.min).timestamp()
+                    if s.last_activity
+                    else 0,  # Negative for reverse order
+                )
+            )
+
             # Calculate statistics
             total_students = len(all_students)
             inactive_students = total_students - active_students
             total_sections = len(homework_sections)
-            
+
             return HomeworkSubmissionsData(
                 homework_id=homework.id,
                 homework_title=homework.title,
@@ -711,9 +766,9 @@ class HomeworkService:
                 total_students=total_students,
                 active_students=active_students,
                 inactive_students=inactive_students,
-                total_submissions=total_submissions
+                total_submissions=total_submissions,
             )
-            
+
         except Homework.DoesNotExist:
             return None
         except Exception:

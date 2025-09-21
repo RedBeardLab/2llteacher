@@ -51,6 +51,13 @@
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary">Login</button>
                         </div>
+                        
+                        <!-- Forgot Password Link -->
+                        <div class="text-center mt-3">
+                            <a href="{% url 'accounts:password_reset' %}" class="text-decoration-none small">
+                                Forgot your password?
+                            </a>
+                        </div>
                     </form>
                 </div>
                 <div class="card-footer bg-light text-center">
