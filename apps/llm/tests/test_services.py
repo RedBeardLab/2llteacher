@@ -169,4 +169,132 @@ class TestLLMServiceResponses(LLMServiceTestCase):
         # Check API was called
         mock_client.chat.completions.create.assert_called_once()
 
+    @patch("llm.services.OpenAI")
+    def test_streaming_response_with_retry_success(self, mock_openai_class):
+        """Test streaming response with retry logic - success case."""
+        # Mock OpenAI client and response
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+
+        # Mock streaming response with meaningful content
+        mock_chunk1 = MagicMock()
+        mock_chunk1.choices = [MagicMock()]
+        mock_chunk1.choices[0].delta.content = "Hello "
+        
+        mock_chunk2 = MagicMock()
+        mock_chunk2.choices = [MagicMock()]
+        mock_chunk2.choices[0].delta.content = "world!"
+
+        mock_client.chat.completions.create.return_value = [mock_chunk1, mock_chunk2]
+
+        # Get streaming response
+        response_chunks = list(LLMService.stream_response(
+            self.conversation,
+            "Test question",
+            "student",
+        ))
+
+        # Check result
+        self.assertEqual(response_chunks, ["Hello ", "world!"])
+        mock_openai_class.assert_called_once_with(api_key=self.llm_config.api_key)
+
+    @patch("llm.services.OpenAI")
+    def test_streaming_response_with_retry_empty_response(self, mock_openai_class):
+        """Test streaming response with retry logic - empty response triggers retry."""
+        # Mock OpenAI client
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+
+        # Mock empty streaming responses for first 2 attempts, then success
+        empty_response = []
+        
+        success_chunk = MagicMock()
+        success_chunk.choices = [MagicMock()]
+        success_chunk.choices[0].delta.content = "Success after retry!"
+
+        # First two calls return empty, third returns content
+        mock_client.chat.completions.create.side_effect = [
+            empty_response,  # First attempt - empty
+            empty_response,  # Second attempt - empty  
+            [success_chunk]  # Third attempt - success
+        ]
+
+        # Get streaming response
+        response_chunks = list(LLMService.stream_response(
+            self.conversation,
+            "Test question",
+            "student",
+        ))
+
+        # Check result - should get success message after retries
+        self.assertEqual(response_chunks, ["Success after retry!"])
+        # Should have been called 3 times (2 empty + 1 success)
+        self.assertEqual(mock_client.chat.completions.create.call_count, 3)
+
+    @patch("llm.services.OpenAI")
+    def test_streaming_response_exception_handling_with_retry(self, mock_openai_class):
+        """Test streaming response exception handling with retry logic."""
+        # Mock OpenAI client
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+
+        # Mock exception on first attempt, success on second
+        success_chunk = MagicMock()
+        success_chunk.choices = [MagicMock()]
+        success_chunk.choices[0].delta.content = "Success after retry"
+
+        # First call raises exception, second returns success
+        mock_client.chat.completions.create.side_effect = [
+            Exception("API Error"),  # First attempt - exception
+            [success_chunk]          # Second attempt - success
+        ]
+
+        # Get streaming response
+        response_chunks = list(LLMService.stream_response(
+            self.conversation,
+            "Test question",
+            "student",
+        ))
+
+        # Check result - should get success after retry
+        self.assertEqual(response_chunks, ["Success after retry"])
+        self.assertEqual(mock_client.chat.completions.create.call_count, 2)
+
+    @patch("llm.services.OpenAI")
+    def test_streaming_response_all_exceptions_fail(self, mock_openai_class):
+        """Test streaming response when all retry attempts raise exceptions."""
+        # Mock OpenAI client
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+
+        # Mock exception for all attempts
+        mock_client.chat.completions.create.side_effect = Exception("Persistent API Error")
+
+        # Get streaming response
+        response_chunks = list(LLMService.stream_response(
+            self.conversation,
+            "Test question",
+            "student",
+        ))
+
+        # Check result - should get error message after all retries fail
+        self.assertEqual(len(response_chunks), 1)
+        self.assertIn("technical difficulties", response_chunks[0])
+        self.assertIn("Error ID:", response_chunks[0])
+        # Should have been called 3 times (max retries)
+        self.assertEqual(mock_client.chat.completions.create.call_count, 3)
+
+    def test_is_meaningful_chunk_validation(self):
+        """Test chunk validation logic."""
+        # Test meaningful chunks
+        self.assertTrue(LLMService._is_meaningful_chunk("Hello"))
+        self.assertTrue(LLMService._is_meaningful_chunk("a"))
+        self.assertTrue(LLMService._is_meaningful_chunk("  text  "))
+        
+        # Test non-meaningful chunks
+        self.assertFalse(LLMService._is_meaningful_chunk(""))
+        self.assertFalse(LLMService._is_meaningful_chunk("   "))
+        self.assertFalse(LLMService._is_meaningful_chunk("\n\t  "))
+        self.assertFalse(LLMService._is_meaningful_chunk("  \n  \t  "))
+
     # We no longer need to test _get_api_key as we now get the API key directly from config

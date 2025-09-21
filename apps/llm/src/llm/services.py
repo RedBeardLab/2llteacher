@@ -201,7 +201,7 @@ class LLMService:
             # Make API call
             response = client.chat.completions.create(
                 model=llm_config.model_name,
-                messages=messages,
+                messages=messages,  # type: ignore
                 temperature=llm_config.temperature,
                 max_completion_tokens=llm_config.max_completion_tokens,
             )
@@ -269,8 +269,8 @@ class LLMService:
                 conversation, content, message_type
             )
 
-            # Generate streaming response using OpenAI client
-            yield from LLMService._generate_streaming_openai_response(
+            # Generate streaming response with retry logic
+            yield from LLMService._generate_streaming_openai_response_with_retry(
                 llm_config, context
             )
 
@@ -280,6 +280,81 @@ class LLMService:
                 f"Error generating streaming AI response [ID: {error_id}]: {str(e)}"
             )
             yield f"I'm sorry, there was a technical issue. Please contact your administrator with reference ID: `{error_id}`"
+
+    @staticmethod
+    def _generate_streaming_openai_response_with_retry(
+        llm_config: "LLMConfig", context: ConversationContext, max_retries: int = 3
+    ) -> Iterator[str]:
+        """
+        Generate streaming response with retry logic for empty responses.
+
+        Args:
+            llm_config: LLM configuration object
+            context: Conversation context data
+            max_retries: Maximum number of retry attempts
+
+        Yields:
+            String tokens as they are generated
+        """
+        for attempt in range(max_retries):
+            try:
+                chunk_count = 0
+                meaningful_chunks = 0
+                accumulated_length = 0
+                
+                # Stream and validate chunks as they come
+                stream_generator = LLMService._generate_streaming_openai_response(llm_config, context)
+                
+                for chunk in stream_generator:
+                    chunk_count += 1
+                    accumulated_length += len(chunk)
+                    
+                    # Only yield meaningful chunks
+                    if LLMService._is_meaningful_chunk(chunk):
+                        meaningful_chunks += 1
+                        yield chunk
+                    # Skip non-meaningful chunks (whitespace, empty, etc.)
+                
+                # After streaming is complete, check if we got meaningful content
+                if meaningful_chunks > 0 and accumulated_length >= 3:
+                    # Success - we already yielded meaningful chunks
+                    return
+                
+                # Log empty response attempt
+                logger.warning(
+                    f"Empty streaming response on attempt {attempt + 1}/{max_retries} "
+                    f"(chunks: {chunk_count}, meaningful: {meaningful_chunks}, length: {accumulated_length})"
+                )
+                
+            except Exception as e:
+                logger.error(
+                    f"Streaming error on attempt {attempt + 1}/{max_retries}: {str(e)}"
+                )
+        
+        # All retries failed - yield error message to user
+        error_id = uuid.uuid4()
+        logger.error(
+            f"All streaming retries failed after {max_retries} attempts [ID: {error_id}]"
+        )
+        yield f"I apologize, but I'm having technical difficulties generating a response. Please try again in a moment. (Error ID: {error_id})"
+
+    @staticmethod
+    def _is_meaningful_chunk(content: str) -> bool:
+        """
+        Validate that chunk contains meaningful content.
+
+        Args:
+            content: Chunk content to validate
+
+        Returns:
+            True if chunk contains meaningful content, False otherwise
+        """
+        if not content:
+            return False
+        
+        # Strip whitespace and check if anything meaningful remains
+        stripped = content.strip()
+        return len(stripped) > 0 and not stripped.isspace()
 
     @staticmethod
     def _generate_streaming_openai_response(
@@ -294,42 +369,39 @@ class LLMService:
 
         Yields:
             String tokens as they are generated
+            
+        Raises:
+            Exception: Any OpenAI API or streaming errors are propagated up
         """
-        try:
-            # Initialize OpenAI client
-            client = OpenAI(api_key=llm_config.api_key)
+        # Initialize OpenAI client
+        client = OpenAI(api_key=llm_config.api_key)
 
-            # Build messages for OpenAI API
-            messages = [{"role": "system", "content": llm_config.base_prompt}]
+        # Build messages for OpenAI API
+        messages = [{"role": "system", "content": llm_config.base_prompt}]
 
-            # Add conversation history
-            for msg in context.messages:
-                messages.append({"role": msg["role"], "content": msg["content"]})
+        # Add conversation history
+        for msg in context.messages:
+            messages.append({"role": msg["role"], "content": msg["content"]})
 
-            # Add current message with context
-            current_prompt = LLMService._build_current_prompt(context)
-            messages.append({"role": "user", "content": current_prompt})
+        # Add current message with context
+        current_prompt = LLMService._build_current_prompt(context)
+        messages.append({"role": "user", "content": current_prompt})
 
-            # Make streaming API call
-            stream = client.chat.completions.create(
-                model=llm_config.model_name,
-                messages=messages,
-                temperature=llm_config.temperature,
-                max_completion_tokens=llm_config.max_completion_tokens,
-                stream=True,  # Enable streaming
-            )
+        # Make streaming API call
+        stream = client.chat.completions.create(
+            model=llm_config.model_name,
+            messages=messages,  # type: ignore
+            temperature=llm_config.temperature,
+            max_completion_tokens=llm_config.max_completion_tokens,
+            stream=True,  # Enable streaming
+        )
 
-            # Yield tokens as they arrive
-            for chunk in stream:
-                if chunk.choices and len(chunk.choices) > 0:
-                    delta = chunk.choices[0].delta
-                    if hasattr(delta, "content") and delta.content:
-                        yield delta.content
-
-        except Exception as e:
-            error_id = uuid.uuid4()
-            logger.error(f"OpenAI streaming API error [ID: {error_id}]: {str(e)}")
-            yield f"I'm sorry, there was a technical issue. Please contact your administrator with reference ID: `{error_id}`"
+        # Yield tokens as they arrive
+        for chunk in stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                if hasattr(delta, "content") and delta.content:
+                    yield delta.content
 
     @staticmethod
     def _build_conversation_context(
