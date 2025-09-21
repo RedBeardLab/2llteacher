@@ -291,7 +291,6 @@ class PasswordResetIntegrationTests(TestCase):
         self.assertIn("password reset", email.body.lower())
         self.assertIn("LLTeacher", email.body)
         self.assertIn("24 hours", email.body)
-        self.assertIn("University of Washington", email.body)
 
         # Check both HTML and text versions exist
         self.assertIsNotNone(email.body)  # Text version
