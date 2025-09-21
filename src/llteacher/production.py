@@ -178,19 +178,92 @@ EMAIL_VERIFICATION_TIMEOUT = int(
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {name} {module} {funcName} {lineno} {message}",
+            "style": "{",
+        },
+        "request": {
+            "format": "{asctime} {levelname} {name} - {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {asctime} {message}",
+            "style": "{",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "verbose",
+            "level": "INFO",
+        },
+        "request_handler": {
+            "class": "logging.StreamHandler",
+            "formatter": "request",
+            "level": "INFO",
+        },
+    },
+    "loggers": {
+        # Django request logging - captures all HTTP requests
+        "django.request": {
+            "handlers": ["request_handler"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Django server logging - development server requests
+        "django.server": {
+            "handlers": ["request_handler"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Django database logging - SQL queries (set to WARNING to avoid spam)
+        "django.db.backends": {
+            "handlers": ["console"],
+            "level": os.getenv("DJANGO_DB_LOG_LEVEL", "WARNING"),
+            "propagate": False,
+        },
+        # Django security logging
+        "django.security": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # General Django framework logging
+        "django": {
+            "handlers": ["console"],
+            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        # Application-specific loggers
+        "accounts": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "conversations": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "homeworks": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "llm": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "services": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
     "root": {
         "handlers": ["console"],
-        "level": "INFO",
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
-        },
+        "level": os.getenv("ROOT_LOG_LEVEL", "INFO"),
     },
 }

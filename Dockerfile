@@ -66,4 +66,10 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 
 # Set entrypoint and default command
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:8000", "--workers", "8", "--timeout", "120", "llteacher.wsgi:application"]
+CMD ["uv", "run", "gunicorn", 
+                    "--bind", "0.0.0.0:8000", 
+                    "--workers", "8", 
+                    "--timeout", "120", 
+                    "--access-logfile", "-", 
+                    "--access-logformat", "%(h)s %(l)s %(u)s %(t)s \"%(r)s\" %(s)s %(b)s \"%(f)s\" \"%(a)s\" %(D)s", 
+                    "llteacher.wsgi:application"]
