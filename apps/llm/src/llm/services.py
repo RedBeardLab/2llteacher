@@ -141,14 +141,9 @@ class LLMService:
 
             # If no config on homework, get default config
             if not llm_config:
-                config_data = LLMService.get_default_config()
-                if not config_data:
+                llm_config = LLMService.get_default_config()
+                if not llm_config:
                     return "I'm sorry, but there's no valid LLM configuration available right now."
-
-                # Get actual LLM config object from data
-                from .models import LLMConfig
-
-                llm_config = LLMConfig.objects.get(id=config_data.id)
 
             # Build conversation context
             context = LLMService._build_conversation_context(
@@ -282,13 +277,9 @@ class LLMService:
 
             # If no config on homework, get default config
             if not llm_config:
-                config_data = LLMService.get_default_config()
-                if not config_data:
+                llm_config = LLMService.get_default_config()
+                if not llm_config:
                     raise StreamingError("No valid LLM configuration available")
-
-                # Get actual LLM config object from data
-                from .models import LLMConfig
-                llm_config = LLMConfig.objects.get(id=config_data.id)
 
             # Build conversation context
             context = LLMService._build_conversation_context(
@@ -523,31 +514,18 @@ class LLMService:
         return "\n\n".join(context_parts)
 
     @staticmethod
-    def get_default_config() -> Optional[LLMConfigData]:
+    def get_default_config() -> Optional["LLMConfig"]:
         """
-        Get the default LLM configuration.
+        Get the default LLM configuration model.
 
         Returns:
-            LLMConfigData if default config found, None otherwise
+            LLMConfig model instance if default config found, None otherwise
         """
         from .models import LLMConfig
 
         try:
             # Get default config
-            config = LLMConfig.objects.get(is_default=True, is_active=True)
-
-            # Convert to data contract
-            return LLMConfigData(
-                id=config.id,
-                name=config.name,
-                model_name=config.model_name,
-                api_key=config.api_key,
-                base_prompt=config.base_prompt,
-                temperature=config.temperature,
-                max_completion_tokens=config.max_completion_tokens,
-                is_default=config.is_default,
-                is_active=config.is_active,
-            )
+            return LLMConfig.objects.get(is_default=True, is_active=True)
         except LLMConfig.DoesNotExist:
             return None
         except Exception as e:

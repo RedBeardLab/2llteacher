@@ -49,7 +49,8 @@ class TestLLMServiceConfig(LLMServiceTestCase):
 
         # Check result
         self.assertIsNotNone(config)
-        self.assertIsInstance(config, LLMConfigData)
+        assert config
+        self.assertIsInstance(config, LLMConfig)
         self.assertEqual(config.id, self.llm_config.id)
         self.assertEqual(config.name, self.llm_config.name)
         self.assertEqual(config.model_name, self.llm_config.model_name)
