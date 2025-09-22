@@ -537,7 +537,7 @@ class ConversationService:
         conversation: "Conversation", user_message, content: str, message_type: str
     ) -> Iterator[StreamEvent]:
         """
-        Process streaming AI response.
+        Process streaming AI response using enhanced streaming with intelligent retry.
 
         Args:
             conversation: Conversation object
@@ -549,7 +549,7 @@ class ConversationService:
             StreamEvent objects for the streaming response
         """
         from .models import Message
-        from llm.services import LLMService
+        from llm.services import LLMService, StreamingError
 
         try:
             # Send user message confirmation
@@ -563,10 +563,10 @@ class ConversationService:
                 },
             )
 
-            # Create AI message placeholder
+            # Create AI message placeholder (empty content initially)
             ai_message = Message.objects.create(
                 conversation=conversation,
-                content="",
+                content="",  # Will be set only on successful completion
                 message_type=Message.MESSAGE_TYPE_AI,
             )
 
@@ -577,38 +577,55 @@ class ConversationService:
                 data={"message_id": str(ai_message.id)},
             )
 
-            # Stream LLM response
-            full_response = ""
-            for token in LLMService.stream_response(
+            # Use enhanced streaming with intelligent retry
+            for stream_token in LLMService.stream_response_with_completion(
                 conversation, content, message_type
             ):
-                full_response += token
+                if stream_token.type == "token":
+                    # Stream token to frontend
+                    yield StreamEvent(
+                        type="ai_token",
+                        timestamp=datetime.now(),
+                        data={
+                            "message_id": str(ai_message.id),
+                            "token": stream_token.content,
+                        },
+                    )
+                elif stream_token.type == "complete":
+                    # Save complete response to database
+                    ai_message.content = stream_token.content
+                    ai_message.save()
+                    
+                    # Signal completion to frontend
+                    yield StreamEvent(
+                        type="ai_message_complete",
+                        timestamp=datetime.now(),
+                        data={
+                            "message_id": str(ai_message.id),
+                            "final_content": stream_token.content,
+                        },
+                    )
+                    return
 
-                # Update AI message in database
-                ai_message.content = full_response
-                ai_message.save()
-
-                # Send token via stream
-                yield StreamEvent(
-                    type="ai_token",
-                    timestamp=datetime.now(),
-                    data={
-                        "message_id": str(ai_message.id),
-                        "token": token,
-                        "content": full_response,
-                    },
-                )
-
-            # Send completion signal
+        except StreamingError as e:
+            # Delete the empty AI message since we failed
+            ai_message.delete()
+            
+            # Send error to frontend
             yield StreamEvent(
-                type="ai_message_complete",
-                timestamp=datetime.now(),
-                data={"message_id": str(ai_message.id), "final_content": full_response},
+                type="error", 
+                timestamp=datetime.now(), 
+                data={"message": str(e)}
             )
-
         except Exception as e:
+            # Delete the empty AI message since we failed
+            ai_message.delete()
+            
+            # Send error to frontend
             yield StreamEvent(
-                type="error", timestamp=datetime.now(), data={"message": str(e)}
+                type="error", 
+                timestamp=datetime.now(), 
+                data={"message": f"Unexpected error: {str(e)}"}
             )
 
     @staticmethod
