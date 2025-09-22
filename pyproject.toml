@@ -19,7 +19,6 @@ dependencies = [
     "conversations",
     "homeworks",
     "llm",
-    "services",
 ]
 
 [build-system]
@@ -32,7 +31,6 @@ members = [
     "apps/conversations",
     "apps/homeworks",
     "apps/llm",
-    "services"
 ]
 
 [tool.uv.sources]

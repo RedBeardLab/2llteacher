@@ -1,1 +1,0 @@
-# Homework service for LLTeacher

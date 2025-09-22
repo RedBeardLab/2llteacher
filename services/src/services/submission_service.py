@@ -1,1 +1,0 @@
-# Submission service for LLTeacher

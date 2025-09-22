@@ -320,7 +320,7 @@ class TestClientSideValidationPatterns(TestCase):
 
             # Verify the HTML contains our pattern and title attributes
             self.assertIn("pattern=", html_output)
-            self.assertIn("uw\.edu", html_output)
+            self.assertIn("uw.edu", html_output)
             self.assertIn("title=", html_output)
             self.assertIn("allowed domains", html_output)
 
