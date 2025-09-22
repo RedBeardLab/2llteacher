@@ -13,7 +13,6 @@ dependencies = [
     "python-dotenv",
     "requests",
     "whitenoise",
-
     # internal app
     "accounts",
     "conversations",
