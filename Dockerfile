@@ -29,7 +29,6 @@ COPY pyproject.toml uv.lock README.md ./
 
 # Copy workspace structure - apps and core components
 COPY apps/ ./apps/
-COPY services/ ./services/
 COPY src/ ./src/
 
 # Install dependencies using uv (workspace-aware)
