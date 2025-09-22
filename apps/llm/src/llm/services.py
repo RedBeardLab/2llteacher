@@ -54,6 +54,29 @@ class LLMConfigData:
     is_default: bool
     is_active: bool
 
+    @classmethod
+    def from_model(cls, llm_config: "LLMConfig") -> "LLMConfigData":
+        """
+        Create LLMConfigData from LLMConfig model instance.
+
+        Args:
+            llm_config: LLMConfig model instance
+
+        Returns:
+            LLMConfigData with all fields copied from model
+        """
+        return cls(
+            id=llm_config.id,
+            name=llm_config.name,
+            model_name=llm_config.model_name,
+            api_key=llm_config.api_key,
+            base_prompt=llm_config.base_prompt,
+            temperature=llm_config.temperature,
+            max_completion_tokens=llm_config.max_completion_tokens,
+            is_default=llm_config.is_default,
+            is_active=llm_config.is_active,
+        )
+
 
 @dataclass
 class LLMResponseResult:
@@ -169,13 +192,13 @@ class LLMService:
 
     @staticmethod
     def _generate_openai_response(
-        llm_config: "LLMConfig", context: ConversationContext
+        llm_config: LLMConfigData, context: ConversationContext
     ) -> LLMResponseResult:
         """
         Generate response using OpenAI client.
 
         Args:
-            llm_config: LLM configuration object
+            llm_config: LLM configuration data
             context: Conversation context data
 
         Returns:
@@ -296,13 +319,13 @@ class LLMService:
 
     @staticmethod
     def _stream_with_intelligent_retry(
-        llm_config: "LLMConfig", context: ConversationContext, max_retries: int = 3
+        llm_config: LLMConfigData, context: ConversationContext, max_retries: int = 3
     ) -> Iterator[StreamToken]:
         """
         Stream with intelligent retry logic based on finish reasons and content validation.
 
         Args:
-            llm_config: LLM configuration object
+            llm_config: LLM configuration data
             context: Conversation context data
             max_retries: Maximum number of retry attempts
 
@@ -383,13 +406,13 @@ class LLMService:
 
     @staticmethod
     def _stream_with_finish_reason_detection(
-        llm_config: "LLMConfig", context: ConversationContext
+        llm_config: LLMConfigData, context: ConversationContext
     ) -> Iterator[tuple[str, FinishReason | None]]:
         """
         Stream tokens while detecting finish reason.
 
         Args:
-            llm_config: LLM configuration object
+            llm_config: LLM configuration data
             context: Conversation context data
 
         Yields:
@@ -514,18 +537,19 @@ class LLMService:
         return "\n\n".join(context_parts)
 
     @staticmethod
-    def get_default_config() -> Optional["LLMConfig"]:
+    def get_default_config() -> Optional[LLMConfigData]:
         """
-        Get the default LLM configuration model.
+        Get the default LLM configuration data.
 
         Returns:
-            LLMConfig model instance if default config found, None otherwise
+            LLMConfigData if default config found, None otherwise
         """
         from .models import LLMConfig
 
         try:
             # Get default config
-            return LLMConfig.objects.get(is_default=True, is_active=True)
+            config = LLMConfig.objects.get(is_default=True, is_active=True)
+            return LLMConfigData.from_model(config)
         except LLMConfig.DoesNotExist:
             return None
         except Exception as e:
@@ -547,18 +571,7 @@ class LLMService:
 
         try:
             config = LLMConfig.objects.get(id=config_id, is_active=True)
-
-            return LLMConfigData(
-                id=config.id,
-                name=config.name,
-                model_name=config.model_name,
-                api_key=config.api_key,
-                base_prompt=config.base_prompt,
-                temperature=config.temperature,
-                max_completion_tokens=config.max_completion_tokens,
-                is_default=config.is_default,
-                is_active=config.is_active,
-            )
+            return LLMConfigData.from_model(config)
         except LLMConfig.DoesNotExist:
             return None
         except Exception as e:
@@ -577,21 +590,7 @@ class LLMService:
 
         try:
             configs = LLMConfig.objects.filter(is_active=True).order_by("name")
-
-            return [
-                LLMConfigData(
-                    id=config.id,
-                    name=config.name,
-                    model_name=config.model_name,
-                    api_key=config.api_key,
-                    base_prompt=config.base_prompt,
-                    temperature=config.temperature,
-                    max_completion_tokens=config.max_completion_tokens,
-                    is_default=config.is_default,
-                    is_active=config.is_active,
-                )
-                for config in configs
-            ]
+            return [LLMConfigData.from_model(config) for config in configs]
         except Exception as e:
             logger.error(f"Error getting all LLM configs: {str(e)}")
             return []
@@ -741,13 +740,8 @@ class LLMService:
                 message_type="student",
             )
 
-            # Get LLM config object
-            from .models import LLMConfig
-
-            llm_config = LLMConfig.objects.get(id=config_id)
-
-            # Generate test response
-            return LLMService._generate_openai_response(llm_config, test_context)
+            # Generate test response using the config data we already have
+            return LLMService._generate_openai_response(config_data, test_context)
 
         except Exception as e:
             logger.error(f"Error testing LLM config: {str(e)}")
