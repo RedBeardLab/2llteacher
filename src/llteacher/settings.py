@@ -61,6 +61,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "llteacher.context_processors.analytics",
             ],
         },
     },
@@ -146,3 +147,7 @@ PASSWORD_RESET_TIMEOUT = int(
 EMAIL_VERIFICATION_TIMEOUT = int(
     os.getenv("EMAIL_VERIFICATION_TIMEOUT", "604800")
 )  # 7 days in seconds
+
+# Analytics Configuration
+MICROSOFT_CLARITY_PROJECT_ID = os.getenv("MICROSOFT_CLARITY_PROJECT_ID", "tfyemkleyr")
+ENABLE_ANALYTICS = os.getenv("ENABLE_ANALYTICS", "True").lower() == "true"
