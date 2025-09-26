@@ -196,6 +196,15 @@ LOGGING = {
             "format": "{levelname} {asctime} {message}",
             "style": "{",
         },
+        "timing": {
+            "format": "{levelname} {asctime} {name} {funcName} {lineno} {message} | "
+                     "event_type={event_type} model={model_name} mode={response_mode} "
+                     "query_prep_ms={query_preparation_ms} api_response_ms={api_response_time_ms} "
+                     "first_token_ms={time_to_first_token_ms} total_ms={total_response_time_ms} "
+                     "tokens={token_count} success={success} section={section_title}",
+            "style": "{",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
     },
     "handlers": {
         "console": {
@@ -206,6 +215,11 @@ LOGGING = {
         "request_handler": {
             "class": "logging.StreamHandler",
             "formatter": "request",
+            "level": "INFO",
+        },
+        "timing_handler": {
+            "class": "logging.StreamHandler",
+            "formatter": "timing",
             "level": "INFO",
         },
     },
@@ -257,7 +271,7 @@ LOGGING = {
             "propagate": False,
         },
         "llm": {
-            "handlers": ["console"],
+            "handlers": ["console", "timing_handler"],
             "level": "INFO",
             "propagate": False,
         },
