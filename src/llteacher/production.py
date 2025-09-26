@@ -197,14 +197,8 @@ LOGGING = {
             "style": "{",
         },
         "timing": {
-            "format": "{levelname} {asctime} {name} {funcName} {lineno} {message} | "
-                     "event_type={event_type} model={model_name} mode={response_mode} "
-                     "query_prep_ms={query_preparation_ms} api_response_ms={api_response_time_ms:-} "
-                     "first_token_ms={time_to_first_token_ms:-} streaming_ms={total_streaming_time_ms:-} "
-                     "total_ms={total_response_time_ms} tokens={token_count} success={success} "
-                     "section={section_title} finish_reason={finish_reason:-} error={error:-}",
-            "style": "{",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(levelname)s %(name)s %(funcName)s %(lineno)s %(message)s",
         },
     },
     "handlers": {

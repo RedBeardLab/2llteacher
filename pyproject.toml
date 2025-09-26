@@ -11,6 +11,7 @@ dependencies = [
     "django>=5.2.4",
     "gunicorn",
     "python-dotenv",
+    "python-json-logger",
     "requests",
     "whitenoise",
     # internal app
