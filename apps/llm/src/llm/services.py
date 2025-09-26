@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, List, TYPE_CHECKING, Iterator
 from uuid import UUID
 import uuid
 import logging
+import time
 from enum import StrEnum
 
 # Handle imports for type checking
@@ -204,6 +205,8 @@ class LLMService:
         Returns:
             LLMResponseResult with response or error
         """
+        start_time = time.perf_counter()
+        
         try:
             # Initialize OpenAI client
             client = OpenAI(api_key=llm_config.api_key)
@@ -219,6 +222,10 @@ class LLMService:
             current_prompt = LLMService._build_current_prompt(context)
             messages.append({"role": "user", "content": current_prompt})
 
+            # Record time after query preparation
+            query_prepared_time = time.perf_counter()
+            query_preparation_ms = int((query_prepared_time - start_time) * 1000)
+
             # Make API call
             response = client.chat.completions.create(
                 model=llm_config.model_name,
@@ -227,15 +234,51 @@ class LLMService:
                 max_completion_tokens=llm_config.max_completion_tokens,
             )
 
+            # Calculate total response time
+            end_time = time.perf_counter()
+            total_response_time_ms = int((end_time - start_time) * 1000)
+            api_response_time_ms = int((end_time - query_prepared_time) * 1000)
+
             # Extract response
             if response.choices and len(response.choices) > 0:
                 response_text = response.choices[0].message.content or ""
                 tokens_used = response.usage.total_tokens if response.usage else 0
 
+                # Log response timing
+                logger.info("LLM response timing", extra={
+                    "event_type": "llm_response_timing",
+                    "model_name": llm_config.model_name,
+                    "response_mode": "non_streaming",
+                    "query_preparation_ms": query_preparation_ms,
+                    "api_response_time_ms": api_response_time_ms,
+                    "total_response_time_ms": total_response_time_ms,
+                    "token_count": tokens_used,
+                    "success": True,
+                    "section_title": context.section_title,
+                    "homework_title": context.homework_title,
+                    "message_type": context.message_type
+                })
+
                 return LLMResponseResult(
                     response_text=response_text, tokens_used=tokens_used, success=True
                 )
             else:
+                # Log failed response timing
+                logger.info("LLM response timing", extra={
+                    "event_type": "llm_response_timing",
+                    "model_name": llm_config.model_name,
+                    "response_mode": "non_streaming",
+                    "query_preparation_ms": query_preparation_ms,
+                    "api_response_time_ms": api_response_time_ms,
+                    "total_response_time_ms": total_response_time_ms,
+                    "token_count": 0,
+                    "success": False,
+                    "error": "No response generated from OpenAI API",
+                    "section_title": context.section_title,
+                    "homework_title": context.homework_title,
+                    "message_type": context.message_type
+                })
+
                 return LLMResponseResult(
                     response_text="",
                     tokens_used=0,
@@ -244,6 +287,24 @@ class LLMService:
                 )
 
         except Exception as e:
+            # Calculate response time even for errors
+            end_time = time.perf_counter()
+            total_response_time_ms = int((end_time - start_time) * 1000)
+
+            # Log error timing
+            logger.info("LLM response timing", extra={
+                "event_type": "llm_response_timing",
+                "model_name": llm_config.model_name,
+                "response_mode": "non_streaming",
+                "total_response_time_ms": total_response_time_ms,
+                "token_count": 0,
+                "success": False,
+                "error": str(e),
+                "section_title": context.section_title,
+                "homework_title": context.homework_title,
+                "message_type": context.message_type
+            })
+
             logger.error(f"OpenAI API error: {str(e)}")
             return LLMResponseResult(
                 response_text="", tokens_used=0, success=False, error=str(e)
@@ -421,6 +482,8 @@ class LLMService:
         Raises:
             Exception: Any OpenAI API or streaming errors are propagated up
         """
+        start_time = time.perf_counter()
+        
         # Initialize OpenAI client
         client = OpenAI(api_key=llm_config.api_key)
 
@@ -435,6 +498,10 @@ class LLMService:
         current_prompt = LLMService._build_current_prompt(context)
         messages.append({"role": "user", "content": current_prompt})
 
+        # Record time after query preparation
+        query_prepared_time = time.perf_counter()
+        query_preparation_ms = int((query_prepared_time - start_time) * 1000)
+
         # Make streaming API call
         stream = client.chat.completions.create(
             model=llm_config.model_name,
@@ -446,12 +513,20 @@ class LLMService:
 
         # Stream tokens and capture finish reason
         finish_reason = None
+        first_token_time = None
+        token_count = 0
+        
         for chunk in stream:
             if chunk.choices and len(chunk.choices) > 0:
                 choice = chunk.choices[0]
                 
                 # Extract token content
                 if hasattr(choice.delta, "content") and choice.delta.content:
+                    # Record time of first token
+                    if first_token_time is None:
+                        first_token_time = time.perf_counter()
+                    
+                    token_count += 1
                     yield choice.delta.content, None
                 
                 # Capture finish reason from final chunk
@@ -464,6 +539,34 @@ class LLMService:
                         # Unknown finish reason
                         logger.warning(f"Unknown finish reason from OpenAI: {finish_reason_str}")
                         finish_reason = None
+        
+        # Calculate timing metrics
+        end_time = time.perf_counter()
+        total_response_time_ms = int((end_time - start_time) * 1000)
+        
+        if first_token_time is not None:
+            time_to_first_token_ms = int((first_token_time - query_prepared_time) * 1000)
+            total_streaming_time_ms = int((end_time - first_token_time) * 1000)
+        else:
+            time_to_first_token_ms = 0
+            total_streaming_time_ms = 0
+
+        # Log streaming timing
+        logger.info("LLM response timing", extra={
+            "event_type": "llm_response_timing",
+            "model_name": llm_config.model_name,
+            "response_mode": "streaming",
+            "query_preparation_ms": query_preparation_ms,
+            "time_to_first_token_ms": time_to_first_token_ms,
+            "total_streaming_time_ms": total_streaming_time_ms,
+            "total_response_time_ms": total_response_time_ms,
+            "token_count": token_count,
+            "success": finish_reason == FinishReason.STOP if finish_reason else False,
+            "finish_reason": finish_reason.value if finish_reason else None,
+            "section_title": context.section_title,
+            "homework_title": context.homework_title,
+            "message_type": context.message_type
+        })
         
         # Yield final finish reason (even if None for interrupted streams)
         yield "", finish_reason
