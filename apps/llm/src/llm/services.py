@@ -208,8 +208,11 @@ class LLMService:
         start_time = time.perf_counter()
         
         try:
-            # Initialize OpenAI client
-            client = OpenAI(api_key=llm_config.api_key)
+            # Initialize OpenAI client with OpenRouter endpoint
+            client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=llm_config.api_key
+            )
 
             # Build messages for OpenAI API with proper typing
             messages = [{"role": "system", "content": llm_config.base_prompt}]
@@ -484,8 +487,11 @@ class LLMService:
         """
         start_time = time.perf_counter()
         
-        # Initialize OpenAI client
-        client = OpenAI(api_key=llm_config.api_key)
+        # Initialize OpenAI client with OpenRouter endpoint
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=llm_config.api_key
+        )
 
         # Build messages for OpenAI API
         messages = [{"role": "system", "content": llm_config.base_prompt}]

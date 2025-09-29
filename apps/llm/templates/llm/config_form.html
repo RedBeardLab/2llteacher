@@ -40,23 +40,62 @@
                                     <label for="model_name" class="form-label">Model Name *</label>
                                     <select class="form-select" id="model_name" name="model_name" required>
                                         <option value="">Select a model...</option>
-                                        <option value="gpt-4" {% if data.config.model_name == 'gpt-4' or form_data.model_name == 'gpt-4' %}selected{% endif %}>GPT-4</option>
-                                        <option value="gpt-4-turbo" {% if data.config.model_name == 'gpt-4-turbo' or form_data.model_name == 'gpt-4-turbo' %}selected{% endif %}>GPT-4 Turbo</option>
-                                        <option value="gpt-3.5-turbo" {% if data.config.model_name == 'gpt-3.5-turbo' or form_data.model_name == 'gpt-3.5-turbo' %}selected{% endif %}>GPT-3.5 Turbo</option>
-                                        <option value="gpt-4o" {% if data.config.model_name == 'gpt-4o' or form_data.model_name == 'gpt-4o' %}selected{% endif %}>GPT-4o</option>
-                                        <option value="gpt-4o-mini" {% if data.config.model_name == 'gpt-4o-mini' or form_data.model_name == 'gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini</option>
+                                        <optgroup label="🆓 Free Models">
+                                            <option value="google/gemini-2.0-flash-exp:free" {% if data.config.model_name == 'google/gemini-2.0-flash-exp:free' or form_data.model_name == 'google/gemini-2.0-flash-exp:free' %}selected{% endif %}>Gemini 2.0 Flash (Free)</option>
+                                        </optgroup>
+                                        <optgroup label="💰 Ultra Low Cost ($0.05-$0.40/1M tokens)">
+                                            <option value="openai/gpt-5-nano" {% if data.config.model_name == 'openai/gpt-5-nano' or form_data.model_name == 'openai/gpt-5-nano' %}selected{% endif %}>GPT-5 Nano ($0.05/$0.40)</option>
+                                            <option value="google/gemini-2.0-flash-lite-001" {% if data.config.model_name == 'google/gemini-2.0-flash-lite-001' or form_data.model_name == 'google/gemini-2.0-flash-lite-001' %}selected{% endif %}>Gemini 2.0 Flash Lite ($0.075/$0.30)</option>
+                                            <option value="google/gemini-2.5-flash-lite" {% if data.config.model_name == 'google/gemini-2.5-flash-lite' or form_data.model_name == 'google/gemini-2.5-flash-lite' %}selected{% endif %}>Gemini 2.5 Flash Lite ($0.10/$0.40)</option>
+                                            <option value="openai/gpt-4.1-nano" {% if data.config.model_name == 'openai/gpt-4.1-nano' or form_data.model_name == 'openai/gpt-4.1-nano' %}selected{% endif %}>GPT-4.1 Nano ($0.10/$0.40)</option>
+                                        </optgroup>
+                                        <optgroup label="🚀 Low Cost & Fast ($0.15-$2.00/1M tokens)">
+                                            <option value="openai/gpt-4o-mini" {% if data.config.model_name == 'openai/gpt-4o-mini' or form_data.model_name == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini ($0.15/$0.60) - Recommended</option>
+                                            <option value="openai/gpt-5-mini" {% if data.config.model_name == 'openai/gpt-5-mini' or form_data.model_name == 'openai/gpt-5-mini' %}selected{% endif %}>GPT-5 Mini ($0.25/$2.00)</option>
+                                            <option value="anthropic/claude-3-haiku" {% if data.config.model_name == 'anthropic/claude-3-haiku' or form_data.model_name == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku ($0.25/$1.25)</option>
+                                            <option value="openai/gpt-3.5-turbo" {% if data.config.model_name == 'openai/gpt-3.5-turbo' or form_data.model_name == 'openai/gpt-3.5-turbo' %}selected{% endif %}>GPT-3.5 Turbo ($0.50/$1.50)</option>
+                                            <option value="anthropic/claude-3.5-haiku" {% if data.config.model_name == 'anthropic/claude-3.5-haiku' or form_data.model_name == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku ($0.80/$4.00)</option>
+                                        </optgroup>
+                                        <optgroup label="🧠 Advanced Reasoning ($1.10-$4.40/1M tokens)">
+                                            <option value="openai/o3-mini-high" {% if data.config.model_name == 'openai/o3-mini-high' or form_data.model_name == 'openai/o3-mini-high' %}selected{% endif %}>O3 Mini High ($1.10/$4.40)</option>
+                                            <option value="openai/o4-mini" {% if data.config.model_name == 'openai/o4-mini' or form_data.model_name == 'openai/o4-mini' %}selected{% endif %}>O4 Mini ($1.10/$4.40)</option>
+                                            <option value="openai/gpt-4.1-mini" {% if data.config.model_name == 'openai/gpt-4.1-mini' or form_data.model_name == 'openai/gpt-4.1-mini' %}selected{% endif %}>GPT-4.1 Mini ($0.40/$1.60)</option>
+                                        </optgroup>
+                                        <optgroup label="🔥 Latest & Greatest ($0.30-$10.00/1M tokens)">
+                                            <option value="google/gemini-2.5-flash" {% if data.config.model_name == 'google/gemini-2.5-flash' or form_data.model_name == 'google/gemini-2.5-flash' %}selected{% endif %}>Gemini 2.5 Flash ($0.30/$2.50)</option>
+                                            <option value="openai/gpt-5" {% if data.config.model_name == 'openai/gpt-5' or form_data.model_name == 'openai/gpt-5' %}selected{% endif %}>GPT-5 ($1.25/$10.00)</option>
+                                            <option value="openai/gpt-5-chat" {% if data.config.model_name == 'openai/gpt-5-chat' or form_data.model_name == 'openai/gpt-5-chat' %}selected{% endif %}>GPT-5 Chat ($1.25/$10.00)</option>
+                                            <option value="openai/gpt-4o" {% if data.config.model_name == 'openai/gpt-4o' or form_data.model_name == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o ($2.50/$10.00)</option>
+                                            <option value="google/gemini-2.5-pro" {% if data.config.model_name == 'google/gemini-2.5-pro' or form_data.model_name == 'google/gemini-2.5-pro' %}selected{% endif %}>Gemini 2.5 Pro ($1.25/$10.00)</option>
+                                        </optgroup>
+                                        <optgroup label="🎯 Specialized ($1.25-$10.00/1M tokens)">
+                                            <option value="openai/gpt-5-codex" {% if data.config.model_name == 'openai/gpt-5-codex' or form_data.model_name == 'openai/gpt-5-codex' %}selected{% endif %}>GPT-5 Codex - Code ($1.25/$10.00)</option>
+                                            <option value="openai/gpt-4o-audio-preview" {% if data.config.model_name == 'openai/gpt-4o-audio-preview' or form_data.model_name == 'openai/gpt-4o-audio-preview' %}selected{% endif %}>GPT-4o Audio ($2.50/$10.00)</option>
+                                            <option value="openai/gpt-4o-mini-search-preview" {% if data.config.model_name == 'openai/gpt-4o-mini-search-preview' or form_data.model_name == 'openai/gpt-4o-mini-search-preview' %}selected{% endif %}>GPT-4o Mini Search ($0.15/$0.60)</option>
+                                        </optgroup>
+                                        <optgroup label="🏆 Premium Claude Models ($3.00-$75.00/1M tokens)">
+                                            <option value="anthropic/claude-3.7-sonnet" {% if data.config.model_name == 'anthropic/claude-3.7-sonnet' or form_data.model_name == 'anthropic/claude-3.7-sonnet' %}selected{% endif %}>Claude 3.7 Sonnet ($3.00/$15.00)</option>
+                                            <option value="anthropic/claude-sonnet-4" {% if data.config.model_name == 'anthropic/claude-sonnet-4' or form_data.model_name == 'anthropic/claude-sonnet-4' %}selected{% endif %}>Claude Sonnet 4 ($3.00/$15.00)</option>
+                                            <option value="anthropic/claude-opus-4" {% if data.config.model_name == 'anthropic/claude-opus-4' or form_data.model_name == 'anthropic/claude-opus-4' %}selected{% endif %}>Claude Opus 4 ($15.00/$75.00)</option>
+                                            <option value="anthropic/claude-opus-4.1" {% if data.config.model_name == 'anthropic/claude-opus-4.1' or form_data.model_name == 'anthropic/claude-opus-4.1' %}selected{% endif %}>Claude Opus 4.1 ($15.00/$75.00)</option>
+                                        </optgroup>
+                                        <optgroup label="🤖 Advanced Reasoning (Premium $2.00-$80.00/1M tokens)">
+                                            <option value="openai/o3" {% if data.config.model_name == 'openai/o3' or form_data.model_name == 'openai/o3' %}selected{% endif %}>O3 ($2.00/$8.00)</option>
+                                            <option value="openai/o3-pro" {% if data.config.model_name == 'openai/o3-pro' or form_data.model_name == 'openai/o3-pro' %}selected{% endif %}>O3 Pro ($20.00/$80.00)</option>
+                                            <option value="openai/o1-pro" {% if data.config.model_name == 'openai/o1-pro' or form_data.model_name == 'openai/o1-pro' %}selected{% endif %}>O1 Pro ($150.00/$600.00)</option>
+                                        </optgroup>
                                     </select>
-                                    <div class="form-text">The OpenAI model to use</div>
+                                    <div class="form-text">Choose from hundreds of models via OpenRouter - organized by cost and capability</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label for="api_key" class="form-label">API Key *</label>
+                            <label for="api_key" class="form-label">OpenRouter API Key *</label>
                             <input type="password" class="form-control" id="api_key" name="api_key" 
                                    value="{% if data.config %}{{ data.config.api_key }}{% elif form_data %}{{ form_data.api_key }}{% endif %}" 
                                    required>
-                            <div class="form-text">Your OpenAI API key (will be stored securely)</div>
+                            <div class="form-text">Your OpenRouter API key (will be stored securely)</div>
                         </div>
 
                         <div class="mb-3">
@@ -135,21 +174,29 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <h6>How to get an OpenAI API Key:</h6>
+                    <h6>How to get an OpenRouter API Key:</h6>
                     <ol>
-                        <li>Visit <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI API Keys</a></li>
-                        <li>Sign in to your OpenAI account (or create one)</li>
-                        <li>Click "Create new secret key"</li>
+                        <li>Visit <a href="https://openrouter.ai/keys" target="_blank">OpenRouter API Keys</a></li>
+                        <li>Sign in to your OpenRouter account (or create one)</li>
+                        <li>Click "Create Key" and give it a name</li>
                         <li>Copy the key and paste it in the API Key field above</li>
-                        <li>Make sure you have billing set up in your OpenAI account</li>
+                        <li>Add credits to your OpenRouter account for usage</li>
                     </ol>
                     
-                    <h6 class="mt-3">Recommended Settings:</h6>
+                    <h6 class="mt-3">💡 Cost-Effective Recommendations for Education:</h6>
                     <ul>
-                        <li><strong>GPT-4o Mini:</strong> Fast and cost-effective for most tutoring tasks</li>
-                        <li><strong>GPT-4:</strong> More capable but slower and more expensive</li>
+                        <li><strong>🆓 Free:</strong> Gemini 2.0 Flash - Perfect for testing and light usage</li>
+                        <li><strong>💰 Ultra Cheap:</strong> GPT-5 Nano ($0.05/$0.40) - Extremely cost-effective</li>
+                        <li><strong>🚀 Recommended:</strong> GPT-4o Mini ($0.15/$0.60) - Best balance of cost and quality</li>
+                        <li><strong>🧠 Advanced:</strong> Claude 3 Haiku ($0.25/$1.25) - Great for complex reasoning</li>
+                        <li><strong>🔥 Latest:</strong> GPT-5 Mini ($0.25/$2.00) - Cutting-edge performance</li>
+                    </ul>
+                    
+                    <h6 class="mt-3">⚙️ Settings Guide:</h6>
+                    <ul>
                         <li><strong>Temperature 0.7:</strong> Good balance of creativity and consistency</li>
                         <li><strong>Max Tokens 1000:</strong> Sufficient for most tutoring responses</li>
+                        <li><strong>Pricing Format:</strong> (Input cost/Output cost) per 1M tokens</li>
                     </ul>
                 </div>
             </div>

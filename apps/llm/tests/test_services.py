@@ -164,8 +164,11 @@ class TestLLMServiceResponses(LLMServiceTestCase):
         # Check result
         self.assertEqual(response, "This is a test AI response.")
 
-        # Check OpenAI client was initialized with correct API key
-        mock_openai_class.assert_called_once_with(api_key=self.llm_config.api_key)
+        # Check OpenAI client was initialized with OpenRouter endpoint and API key
+        mock_openai_class.assert_called_once_with(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self.llm_config.api_key
+        )
 
         # Check API was called
         mock_client.chat.completions.create.assert_called_once()
