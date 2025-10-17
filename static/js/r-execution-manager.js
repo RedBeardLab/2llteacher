@@ -9,49 +9,49 @@ class RExecutionManager {
         this.isInitializing = false;
         this.initializationPromise = null;
     }
-    
+
     async initialize() {
         if (this.isInitialized) {
             return this.webR;
         }
-        
+
         if (this.isInitializing) {
             return this.initializationPromise;
         }
-        
+
         this.isInitializing = true;
         console.log('Initializing WebR...');
-        
+
         this.initializationPromise = this._doInitialize();
         return this.initializationPromise;
     }
-    
+
     async _doInitialize() {
         try {
             // Show global loading indicator
             this.showGlobalLoadingState(true);
-            
+
             // Initialize WebR
             const { WebR } = await import('https://webr.r-wasm.org/latest/webr.mjs');
             this.webR = new WebR({
                 SW_URL: 'https://webr.r-wasm.org/latest/',
             });
-            
+
             await this.webR.init();
-            
+
             // Set up webr::canvas as default graphics device for proper plot capture
             await this.webR.evalRVoid('options(device=webr::canvas)');
-            
+
             // Install common packages
             await this.installCommonPackages();
-            
+
             this.isInitialized = true;
             this.isInitializing = false;
-            
+
             console.log('WebR initialized successfully');
             this.showGlobalLoadingState(false);
             this.enableAllRunButtons();
-            
+
             return this.webR;
         } catch (error) {
             console.error('Failed to initialize WebR:', error);
@@ -61,7 +61,7 @@ class RExecutionManager {
             throw error;
         }
     }
-    
+
     async installCommonPackages() {
         try {
             // Install commonly used packages
@@ -79,25 +79,25 @@ class RExecutionManager {
             // Don't throw - WebR is still usable without these packages
         }
     }
-    
+
     async executeCode(code, outputContainer) {
         if (!this.isInitialized) {
             await this.initialize();
         }
-        
+
         try {
             // Clear previous output
             outputContainer.innerHTML = '';
             this.showExecutionState(outputContainer, 'running');
-            
+
             // Use WebR's proper captureR method for output and plot capture
             const shelter = await new this.webR.Shelter();
-            const result = await shelter.captureR(code);
-            
+            const result = await shelter.captureR(code, { withAutoprint: true });
+
             // Process captured output
             let textOutput = '';
             let hasError = false;
-            
+
             // Extract text output from captured results
             if (result.output && result.output.length > 0) {
                 const outputLines = [];
@@ -117,7 +117,7 @@ class RExecutionManager {
                 }
                 textOutput = outputLines.join('\n');
             }
-            
+
             // If no output captured but we have a result, try to get the result value
             if (!textOutput.trim() && result.result && !hasError) {
                 try {
@@ -129,22 +129,22 @@ class RExecutionManager {
                     // Ignore conversion errors
                 }
             }
-            
+
             // Display results with captured plots
             this.displayResults(outputContainer, textOutput, result.images || [], hasError);
-            
+
             // Clean up shelter
             shelter.purge();
-            
+
         } catch (error) {
             console.error('R execution error:', error);
             this.showExecutionError(outputContainer, error.message || 'Failed to execute R code');
         }
     }
-    
+
     displayResults(container, output, plots, hasError) {
         container.innerHTML = '';
-        
+
         if (hasError) {
             container.innerHTML = `
                 <div class="r-execution-result error">
@@ -157,7 +157,7 @@ class RExecutionManager {
             `;
         } else {
             let resultHtml = '<div class="r-execution-result success">';
-            
+
             // Add text output if present
             if (output && output.trim()) {
                 resultHtml += `
@@ -170,7 +170,7 @@ class RExecutionManager {
                     </div>
                 `;
             }
-            
+
             // Add plots if present (ImageBitmap objects from WebR)
             if (plots && plots.length > 0) {
                 resultHtml += `
@@ -181,10 +181,10 @@ class RExecutionManager {
                         </div>
                     </div>
                 `;
-                
+
                 // We'll add the ImageBitmap plots after setting the HTML
                 container.innerHTML = resultHtml + '</div>';
-                
+
                 // Now add the ImageBitmap plots as canvas elements
                 const plotsContainer = container.querySelector('.r-plots');
                 plots.forEach((imageBitmap, index) => {
@@ -194,15 +194,15 @@ class RExecutionManager {
                     canvas.className = 'r-plot';
                     canvas.style.maxWidth = '100%';
                     canvas.style.height = 'auto';
-                    
+
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(imageBitmap, 0, 0);
-                    
+
                     plotsContainer.appendChild(canvas);
                 });
                 return; // Early return since we already set innerHTML
             }
-            
+
             // Show success message if no output
             if (!output.trim() && plots.length === 0) {
                 resultHtml += `
@@ -212,12 +212,12 @@ class RExecutionManager {
                     </div>
                 `;
             }
-            
+
             resultHtml += '</div>';
             container.innerHTML = resultHtml;
         }
     }
-    
+
     showExecutionState(container, state) {
         if (state === 'running') {
             container.innerHTML = `
@@ -228,7 +228,7 @@ class RExecutionManager {
             `;
         }
     }
-    
+
     showExecutionError(container, message) {
         container.innerHTML = `
             <div class="r-execution-result error">
@@ -240,10 +240,10 @@ class RExecutionManager {
             </div>
         `;
     }
-    
+
     showGlobalLoadingState(show) {
         let indicator = document.getElementById('webr-loading-indicator');
-        
+
         if (show && !indicator) {
             // Create a non-blocking toast notification instead of full-screen overlay
             indicator = document.createElement('div');
@@ -270,7 +270,7 @@ class RExecutionManager {
             }, 300);
         }
     }
-    
+
     showGlobalError(message) {
         const errorDiv = document.createElement('div');
         errorDiv.className = 'alert alert-danger alert-dismissible fade show webr-global-error';
@@ -279,19 +279,19 @@ class RExecutionManager {
             <strong>R Environment Error:</strong> ${this.escapeHtml(message)}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
-        
+
         const container = document.querySelector('.container');
         if (container) {
             container.insertBefore(errorDiv, container.firstChild);
         }
     }
-    
+
     enableAllRunButtons() {
         const buttons = document.querySelectorAll('.r-run-button');
         buttons.forEach(button => {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-play-fill"></i> Run Code';
-            
+
             // Ensure click handler is bound for existing buttons
             const messageId = button.getAttribute('data-message-id');
             if (messageId && !button.hasAttribute('data-handler-bound')) {
@@ -300,14 +300,14 @@ class RExecutionManager {
             }
         });
     }
-    
+
     bindButtonClickHandler(button, messageId) {
         button.addEventListener('click', async () => {
             if (!this.isInitialized) {
                 console.error('WebR not initialized yet');
                 return;
             }
-            
+
             // Get the R code from the message - try multiple selectors
             let codeElement = document.querySelector(`[data-message-id="${messageId}"] code.language-r`);
             if (!codeElement) {
@@ -318,7 +318,7 @@ class RExecutionManager {
                 // Another fallback: try any code element in the message
                 codeElement = document.querySelector(`[data-message-id="${messageId}"] pre code`);
             }
-            
+
             if (!codeElement) {
                 console.error('R code not found for message', messageId);
                 console.log('Message container:', document.querySelector(`[data-message-id="${messageId}"]`));
@@ -327,15 +327,15 @@ class RExecutionManager {
                 console.log('All r-code-containers:', document.querySelectorAll('.r-code-container'));
                 return;
             }
-            
+
             const code = codeElement.textContent;
             const outputContainer = document.getElementById(`r-output-${messageId}`);
-            
+
             if (!outputContainer) {
                 console.error('Output container not found for message', messageId);
                 return;
             }
-            
+
             // Execute the R code
             try {
                 await this.executeCode(code, outputContainer);
@@ -353,7 +353,7 @@ class RExecutionManager {
             }
         });
     }
-    
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
