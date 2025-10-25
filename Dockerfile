@@ -1,5 +1,5 @@
 # Use Python 3.12 slim image as base
-FROM python:3.12-slim as base
+FROM python:3.12-slim AS base
 
 # Declare volume for database persistence
 VOLUME ["/data"]
@@ -28,7 +28,6 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 
 # Copy workspace structure - apps and core components
-COPY apps/ ./apps/
 COPY src/ ./src/
 
 # Install dependencies using uv (workspace-aware)
