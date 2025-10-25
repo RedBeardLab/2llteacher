@@ -111,7 +111,7 @@ Safely deletes all test data before creating new data:
 src/llteacher/management/commands/
 └── populate_test_database.py     # Comprehensive database population
 
-apps/accounts/src/accounts/management/commands/
+src/accounts/management/commands/
 └── create_test_users.py          # Simple user creation (legacy)
 ```
 

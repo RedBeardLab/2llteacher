@@ -12,53 +12,10 @@ The application includes optimized test settings that provide significant perfor
 
 ## Running Tests
 
-### Option 1: Using the Convenience Script (Recommended)
-
-The easiest and fastest way to run tests:
-
+### Using UV
 ```bash
-# Run all tests with optimized settings
-python run_tests.py
-
-# Run with verbose output
-python run_tests.py --verbosity=2
-
-# Run specific app tests
-python run_tests.py apps.accounts.tests
-python run_tests.py apps.homeworks.tests
-python run_tests.py apps.conversations.tests
-python run_tests.py apps.llm.tests
-
-# Run specific test classes
-python run_tests.py apps.accounts.tests.test_models.UserModelTest
-python run_tests.py apps.homeworks.tests.test_models.HomeworkModelTest
-
-# Run specific test methods
-python run_tests.py apps.accounts.tests.test_models.UserModelTest.test_user_creation
-
-# Keep test database between runs (faster for development)
-python run_tests.py --keepdb
-
-# Run tests in parallel (if available)
-python run_tests.py --parallel
-```
-
-### Option 2: Using Django Management Commands
-
-#### Standard Django Tests (Slower)
-```bash
-python manage.py test
-```
-
-#### Optimized Tests with Custom Settings (Fastest)
-```bash
-python manage.py test --settings=src.llteacher.test_settings
-```
-
-### Option 3: Using UV (if you prefer)
-```bash
-uv run python run_tests.py
-uv run python manage.py test --settings=src.llteacher.test_settings
+uv run python run_tests.py src 
+uv run python manage.py test --settings=src.llteacher.test_settings src 
 ```
 
 ## Test Configuration
@@ -88,7 +45,7 @@ The application includes **149 comprehensive test cases** covering:
 ## Test Structure
 
 ```
-apps/
+src/
 ├── accounts/
 │   └── tests/
 │       └── test_models.py          # User, Teacher, Student tests
@@ -170,7 +127,7 @@ class ModelNameTest(TestCase):
 python run_tests.py --verbosity=3
 
 # Run a single test method
-python run_tests.py apps.accounts.tests.test_models.UserModelTest.test_user_creation
+python run_tests.py accounts.tests.test_models.UserModelTest.test_user_creation
 
 # Run with debugger
 python run_tests.py --debug-mode

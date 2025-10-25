@@ -17,15 +17,12 @@ AI-assisted educational platform for teachers and students.
 
 This project uses [uv workspaces](https://docs.astral.sh/uv/concepts/projects/workspaces/) for dependency management.
 
-### Workspace Members
+### Project Modules
 
-- **`apps/accounts`** - User management and authentication
-- **`apps/conversations`** - AI conversation handling and submissions
-- **`apps/homeworks`** - Homework and section management
-- **`apps/llm`** - LLM configuration and services
-- **`core`** - Shared utilities and base classes
-- **`permissions`** - Permission decorators and utilities
-- **`services`** - Business logic service layer
+- **`src/accounts`** - User management and authentication
+- **`src/conversations`** - AI conversation handling and submissions
+- **`src/homeworks`** - Homework and section management
+- **`src/llm`** - LLM configuration and services
 - **`src/llteacher`** - Main Django project
 
 ## Setup
@@ -103,9 +100,9 @@ If you want to set the API key during initial setup:
 
 ## Development
 
-- Each app is a separate workspace member with its own `pyproject.toml`
-- Use `uv add <package>` to add dependencies to specific workspaces
-- Use `uv sync` to install all workspace dependencies
+- All Django apps are organized under the `src/` directory
+- Use `uv sync` to install all dependencies
+- Use `python manage.py` commands to manage the Django application
 
 ## Testing
 
@@ -115,13 +112,14 @@ The project includes comprehensive testing with **149 test cases** covering all 
 
 ```bash
 # Run all tests (fastest - uses in-memory database)
-uv run python run_tests.py
+python run_tests.py accounts conversations homeworks llm
 
 # Run with verbose output
-uv run python run_tests.py --verbosity=2
+python run_tests.py accounts conversations homeworks llm --verbosity=2
 
 # Run specific app tests
-uv run python run_tests.py apps.accounts.tests
+python run_tests.py accounts
+python run_tests.py conversations
 ```
 
 ### Performance

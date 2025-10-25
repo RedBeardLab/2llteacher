@@ -15,13 +15,11 @@ This document provides comprehensive information for AI agents working on the LL
 
 The project uses [UV workspaces](https://docs.astral.sh/uv/concepts/projects/workspaces/) for modular dependency management. See [WORKSPACE_STRUCTURE.md](WORKSPACE_STRUCTURE.md) for detailed structure.
 
-**Key Workspace Members:**
-- `apps/accounts/` - User management and authentication
-- `apps/conversations/` - AI conversation handling and submissions  
-- `apps/homeworks/` - Homework and section management
-- `apps/llm/` - LLM configuration and services
-- `core/` - Shared utilities and base classes
-- `services/` - Business logic service layer
+**Key Modules:**
+- `src/accounts/` - User management and authentication
+- `src/conversations/` - AI conversation handling and submissions  
+- `src/homeworks/` - Homework and section management
+- `src/llm/` - LLM configuration and services
 - `src/llteacher/` - Main Django project
 
 ### Architecture Patterns
@@ -77,27 +75,25 @@ class MessageViewData:
 ## 🧪 Testing Strategy
 
 ### Test Organization
-- **Location**: Each app has tests in `apps/{app_name}/tests/`
+- **Location**: Each app has tests in `src/{app_name}/tests/`
 - **Naming**: `test_{component}_{functionality}.py`
 - **Structure**: One test class per component, descriptive test method names
 
 ### Running Tests
 
 ```bash
-# Run all tests (fastest - uses optimized runner with uv)
-uv run python run_tests.py
+# Run all tests (fastest - uses optimized runner)
+python run_tests.py accounts conversations homeworks llm
 
 # Run specific app tests
-uv run python run_tests.py apps.conversations
+python run_tests.py accounts
+python run_tests.py conversations
 
 # Run with verbose output
-uv run python run_tests.py --verbosity=2
+python run_tests.py accounts conversations homeworks llm --verbosity=2
 
-# Django's test runner (slower but sometimes needed)
-uv run python manage.py test apps.conversations
-
-# Alternative without uv (if uv environment is already activated)
-python run_tests.py
+# Alternative with uv
+uv run python run_tests.py accounts conversations homeworks llm
 ```
 
 ### Test Performance
@@ -261,7 +257,7 @@ class Message(models.Model):
 
 ### Template Organization
 - **Base template**: `templates/base.html`
-- **App templates**: `apps/{app_name}/templates/{app_name}/`
+- **App templates**: `src/{app_name}/templates/{app_name}/`
 - **Shared components**: Include reusable template fragments
 
 ### CSS and JavaScript
