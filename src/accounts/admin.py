@@ -37,11 +37,12 @@ class EmailVerificationAdmin(admin.ModelAdmin):
     ]
     ordering = ['-created_at']
     
+    @admin.display(description="Token")
     def token_short(self, obj):
         """Display shortened token for readability."""
         return f"{obj.token[:8]}...{obj.token[-8:]}"
-    token_short.short_description = "Token"
     
+    @admin.display(description="Status")
     def status(self, obj):
         """Display verification status with color coding."""
         if obj.is_used:
@@ -50,19 +51,16 @@ class EmailVerificationAdmin(admin.ModelAdmin):
             return format_html('<span style="color: red;">✗ Expired</span>')
         else:
             return format_html('<span style="color: orange;">⏳ Pending</span>')
-    status.short_description = "Status"
     
+    @admin.display(description="Expired", boolean=True)
     def is_expired_display(self, obj):
         """Display expiration status."""
         return obj.is_expired()
-    is_expired_display.boolean = True
-    is_expired_display.short_description = "Expired"
     
+    @admin.display(description="Valid", boolean=True)
     def is_valid_display(self, obj):
         """Display validity status."""
         return obj.is_valid()
-    is_valid_display.boolean = True
-    is_valid_display.short_description = "Valid"
     
     def get_queryset(self, request):
         """Optimize queryset with select_related."""
