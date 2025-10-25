@@ -49,25 +49,22 @@ class ConversationAdmin(admin.ModelAdmin):
         })
     )
     
+    @admin.display(description='User', ordering='user__username')
     def user_link(self, obj):
         """Create a clickable link to the user's admin page."""
         url = reverse('admin:accounts_user_change', args=[obj.user.pk])
         return format_html('<a href="{}">{}</a>', url, obj.user.username)
-    user_link.short_description = 'User'
-    user_link.admin_order_field = 'user__username'
     
+    @admin.display(description='Section', ordering='section__title')
     def section_link(self, obj):
         """Create a clickable link to the section's admin page."""
         url = reverse('admin:homeworks_section_change', args=[obj.section.pk])
         return format_html('<a href="{}">{}</a>', url, obj.section.title)
-    section_link.short_description = 'Section'
-    section_link.admin_order_field = 'section__title'
     
+    @admin.display(description='Teacher Test', boolean=True)
     def is_teacher_test(self, obj):
         """Display whether this is a teacher test conversation."""
         return obj.is_teacher_test
-    is_teacher_test.boolean = True
-    is_teacher_test.short_description = 'Teacher Test'
 
 
 @admin.register(Message)
@@ -88,12 +85,12 @@ class MessageAdmin(admin.ModelAdmin):
         })
     )
     
+    @admin.display(description='Content Preview')
     def content_preview(self, obj):
         """Show a preview of the message content."""
         if len(obj.content) > 100:
             return obj.content[:100] + '...'
         return obj.content
-    content_preview.short_description = 'Content Preview'
 
 
 @admin.register(Submission)
@@ -115,12 +112,12 @@ class SubmissionAdmin(admin.ModelAdmin):
         })
     )
     
+    @admin.display(description='Student')
     def student_username(self, obj):
         """Display the student's username."""
         return obj.conversation.user.username
-    student_username.short_description = 'Student'
     
+    @admin.display(description='Section')
     def section_title(self, obj):
         """Display the section title."""
         return obj.conversation.section.title
-    section_title.short_description = 'Section'

@@ -238,7 +238,7 @@ class HomeworkFormData:
     user_type: str
     action: str  # 'create' or 'edit'
     is_submitted: bool = False
-    errors: Dict[str, Any] = None
+    errors: Dict[str, Any] | None = None
 
 
 class HomeworkCreateView(View):
