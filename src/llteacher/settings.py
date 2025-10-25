@@ -49,10 +49,10 @@ TEMPLATES = [
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
             BASE_DIR / "templates",
-            BASE_DIR / "apps/homeworks/templates",
-            BASE_DIR / "apps/accounts/templates",
-            BASE_DIR / "apps/conversations/templates",
-            BASE_DIR / "apps/llm/templates",
+            BASE_DIR / "src/homeworks/templates",
+            BASE_DIR / "src/accounts/templates",
+            BASE_DIR / "src/conversations/templates",
+            BASE_DIR / "src/llm/templates",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
