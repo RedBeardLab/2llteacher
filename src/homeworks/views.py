@@ -6,9 +6,12 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import TYPE_CHECKING, Dict, Any
 from uuid import UUID
 from django.forms import formset_factory
+
+if TYPE_CHECKING:
+    from django.forms.utils import ErrorDict, ErrorList
 
 from django.views import View
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
@@ -345,13 +348,13 @@ class HomeworkCreateView(View):
                 messages.error(request, f"Error creating homework: {result.error}")
 
         # Form validation error or service error
-        errors = {}
+        errors: dict[str, ErrorDict | list[ErrorList]] = {}
         if form.errors:
             errors["homework"] = form.errors
         if section_formset.errors:
             errors["sections"] = section_formset.errors
         if section_formset.non_form_errors():
-            errors["formset"] = section_formset.non_form_errors()
+            errors["formset"] = [section_formset.non_form_errors()]
 
         # Return form data with errors
         return HomeworkFormData(
@@ -530,13 +533,13 @@ class HomeworkEditView(View):
                 messages.error(request, f"Error updating homework: {result.error}")
 
         # Form validation error or service error
-        errors = {}
+        errors: dict[str, ErrorDict | list[ErrorList]] = {}
         if form.errors:
             errors["homework"] = form.errors
         if section_formset.errors:
             errors["sections"] = section_formset.errors
         if section_formset.non_form_errors():
-            errors["formset"] = section_formset.non_form_errors()
+            errors["formset"] = [section_formset.non_form_errors()]
 
         # Return form data with errors
         return HomeworkFormData(
