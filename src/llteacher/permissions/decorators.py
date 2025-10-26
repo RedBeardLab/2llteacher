@@ -6,21 +6,23 @@ and object ownership, following the testable-first architecture principles.
 """
 
 from functools import wraps
-from typing import Tuple, Optional, Callable, Any, TypeVar, cast
+from typing import Callable, Any, TypeVar, cast
 from uuid import UUID
 
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
 from accounts.models import Teacher, Student
 
+# Type alias for request.user which can be either authenticated or anonymous
+RequestUser = AbstractBaseUser | AnonymousUser
+
 # Create a type variable for the view function
 ViewFunc = TypeVar("ViewFunc", bound=Callable[..., HttpResponse])
-User = get_user_model()
 
 
-def get_teacher_or_student(user: User) -> Tuple[Optional[Teacher], Optional[Student]]:
+def get_teacher_or_student(user: RequestUser) -> tuple[Teacher | None , Student | None]:
     """
     Get teacher and student profiles from a user object.
 
