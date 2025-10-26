@@ -607,7 +607,7 @@ class HomeworkService:
             submission_map = {sub.conversation.id: sub for sub in submissions}
 
             # Group conversations by student and section
-            student_section_conversations_map = {}
+            student_section_conversations_map: dict[UUID, dict[UUID, list[Conversation]]] = {}
             for conv in conversations:
                 student_id = conv.user.student_profile.id
                 section_id = conv.section.id
