@@ -161,7 +161,7 @@ class LLMService:
                 hasattr(conversation.section, "homework")
                 and conversation.section.homework.llm_config
             ):
-                llm_config = conversation.section.homework.llm_config
+                llm_config = LLMConfigData.from_model(conversation.section.homework.llm_config)
 
             # If no config on homework, get default config
             if not llm_config:
@@ -360,7 +360,7 @@ class LLMService:
                 hasattr(conversation.section, "homework")
                 and conversation.section.homework.llm_config
             ):
-                llm_config = conversation.section.homework.llm_config
+                llm_config = LLMConfigData.from_model(conversation.section.homework.llm_config)
 
             # If no config on homework, get default config
             if not llm_config:
