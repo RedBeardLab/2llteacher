@@ -6,7 +6,7 @@ and object ownership, following the testable-first architecture principles.
 """
 
 from functools import wraps
-from typing import Callable, Any, TypeVar, cast
+from typing import Callable, Any, TypeVar, cast, Protocol, ParamSpec, Concatenate
 from uuid import UUID
 
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
@@ -18,8 +18,42 @@ from accounts.models import Teacher, Student
 # Type alias for request.user which can be either authenticated or anonymous
 RequestUser = AbstractBaseUser | AnonymousUser
 
+# ParamSpec for preserving function signatures
+P = ParamSpec('P')
+R = TypeVar('R', bound=HttpResponse)
+
 # Create a type variable for the view function
 ViewFunc = TypeVar("ViewFunc", bound=Callable[..., HttpResponse])
+
+
+class UserWithTeacher(Protocol):
+    """Protocol for User with teacher_profile attribute."""
+    teacher_profile: Teacher
+
+
+class UserWithStudent(Protocol):
+    """Protocol for User with student_profile attribute."""
+    student_profile: Student
+
+
+class TeacherRequest(HttpRequest):
+    """Request type where user is guaranteed to have teacher_profile.
+    
+    Note: The user attribute override is intentional - the decorator guarantees
+    this type narrowing at runtime. The type: ignore is necessary because mypy
+    doesn't allow narrowing an attribute type in a subclass.
+    """
+    user: UserWithTeacher  # type: ignore[assignment]
+
+
+class StudentRequest(HttpRequest):
+    """Request type where user is guaranteed to have student_profile.
+    
+    Note: The user attribute override is intentional - the decorator guarantees
+    this type narrowing at runtime. The type: ignore is necessary because mypy
+    doesn't allow narrowing an attribute type in a subclass.
+    """
+    user: UserWithStudent  # type: ignore[assignment]
 
 
 def get_teacher_or_student(user: RequestUser) -> tuple[Teacher | None , Student | None]:
@@ -37,46 +71,52 @@ def get_teacher_or_student(user: RequestUser) -> tuple[Teacher | None , Student 
     return teacher, student
 
 
-def teacher_required(view_func: ViewFunc) -> ViewFunc:
+def teacher_required(view_func: Callable[Concatenate[TeacherRequest, P], R]) -> Callable[Concatenate[HttpRequest, P], R]:
     """
-    Decorator to ensure user is a teacher.
+    Decorator to ensure user is a teacher and transform request type.
+    
+    The decorated view function receives TeacherRequest with guaranteed teacher_profile access.
 
     Args:
-        view_func: View function to decorate
+        view_func: View function that expects TeacherRequest
 
     Returns:
-        Decorated function that checks if user is a teacher
+        Decorated function that accepts HttpRequest and checks teacher access
     """
 
     @wraps(view_func)
-    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+    def wrapper(request: HttpRequest, *args: P.args, **kwargs: P.kwargs) -> R:
         teacher, _ = get_teacher_or_student(request.user)
         if not teacher:
-            return HttpResponseForbidden("Teacher access required.")
-        return view_func(request, *args, **kwargs)
+            return cast(R, HttpResponseForbidden("Teacher access required."))
+        # Cast to TeacherRequest since we've verified teacher_profile exists
+        return view_func(cast(TeacherRequest, request), *args, **kwargs)
 
-    return cast(ViewFunc, wrapper)
+    return wrapper
 
 
-def student_required(view_func: ViewFunc) -> ViewFunc:
+def student_required(view_func: Callable[Concatenate[StudentRequest, P], R]) -> Callable[Concatenate[HttpRequest, P], R]:
     """
-    Decorator to ensure user is a student.
+    Decorator to ensure user is a student and transform request type.
+    
+    The decorated view function receives StudentRequest with guaranteed student_profile access.
 
     Args:
-        view_func: View function to decorate
+        view_func: View function that expects StudentRequest
 
     Returns:
-        Decorated function that checks if user is a student
+        Decorated function that accepts HttpRequest and checks student access
     """
 
     @wraps(view_func)
-    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+    def wrapper(request: HttpRequest, *args: P.args, **kwargs: P.kwargs) -> R:
         _, student = get_teacher_or_student(request.user)
         if not student:
-            return HttpResponseForbidden("Student access required.")
-        return view_func(request, *args, **kwargs)
+            return cast(R, HttpResponseForbidden("Student access required."))
+        # Cast to StudentRequest since we've verified student_profile exists
+        return view_func(cast(StudentRequest, request), *args, **kwargs)
 
-    return cast(ViewFunc, wrapper)
+    return wrapper
 
 
 def homework_owner_required(view_func: ViewFunc) -> ViewFunc:

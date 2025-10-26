@@ -18,7 +18,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.contrib import messages
 
-from llteacher.permissions.decorators import teacher_required
+from llteacher.permissions.decorators import teacher_required, TeacherRequest
 
 from .models import Homework, Section
 from .services import (
@@ -250,12 +250,12 @@ class HomeworkCreateView(View):
         """Ensure user is a logged-in teacher."""
         return super().dispatch(*args, **kwargs)
 
-    def get(self, request: HttpRequest) -> HttpResponse:
+    def get(self, request: TeacherRequest) -> HttpResponse:
         """Handle GET requests to display the create form."""
         data = self._get_view_data(request)
         return render(request, "homeworks/form.html", {"data": data})
 
-    def post(self, request: HttpRequest) -> HttpResponse:
+    def post(self, request: TeacherRequest) -> HttpResponse:
         """Handle POST requests to process the form submission."""
         data = self._process_form_submission(request)
 
@@ -265,7 +265,7 @@ class HomeworkCreateView(View):
 
         return render(request, "homeworks/form.html", {"data": data})
 
-    def _get_view_data(self, request: HttpRequest) -> HomeworkFormData:
+    def _get_view_data(self, request: TeacherRequest) -> HomeworkFormData:
         """Prepare data for the form view."""
         # Create an empty homework form
         form = HomeworkForm()
@@ -283,7 +283,7 @@ class HomeworkCreateView(View):
             is_submitted=False,
         )
 
-    def _process_form_submission(self, request: HttpRequest) -> HomeworkFormData:
+    def _process_form_submission(self, request: TeacherRequest) -> HomeworkFormData:
         """Process the form submission."""
         # Create forms from POST data
         form = HomeworkForm(request.POST)
@@ -373,7 +373,7 @@ class HomeworkEditView(View):
         """Ensure user is a logged-in teacher."""
         return super().dispatch(*args, **kwargs)
 
-    def get(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
+    def get(self, request: TeacherRequest, homework_id: UUID) -> HttpResponse:
         """Handle GET requests to display the edit form with existing data."""
         # Get the homework and check ownership
         try:
@@ -390,7 +390,7 @@ class HomeworkEditView(View):
         data = self._get_view_data(request, homework)
         return render(request, "homeworks/form.html", {"data": data})
 
-    def post(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
+    def post(self, request: TeacherRequest, homework_id: UUID) -> HttpResponse:
         """Handle POST requests to process the form submission."""
         # Get the homework and check ownership
         try:
@@ -413,7 +413,7 @@ class HomeworkEditView(View):
         return render(request, "homeworks/form.html", {"data": data})
 
     def _get_view_data(
-        self, request: HttpRequest, homework: Homework
+        self, request: TeacherRequest, homework: Homework
     ) -> HomeworkFormData:
         """Prepare data for the form view with existing homework data."""
         # Create homework form with instance
@@ -450,7 +450,7 @@ class HomeworkEditView(View):
         )
 
     def _process_form_submission(
-        self, request: HttpRequest, homework: Homework
+        self, request: TeacherRequest, homework: Homework
     ) -> HomeworkFormData:
         """Process the form submission for updating a homework."""
         # Create forms from POST data with homework instance
@@ -925,7 +925,7 @@ class HomeworkSubmissionsView(View):
         """Ensure user is a logged-in teacher."""
         return super().dispatch(*args, **kwargs)
 
-    def get(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
+    def get(self, request: TeacherRequest, homework_id: UUID) -> HttpResponse:
         """Handle GET requests to display homework submissions."""
         # Get the homework and check ownership
         try:
