@@ -668,15 +668,15 @@ class HomeworkDetailView(View):
                     student_profile, homework_obj
                 )
                 # Create a map of section_id -> progress data for easy lookup
-                for progress in progress_data.sections_progress:
-                    section_progress_map[progress.id] = progress
+                for section_progress in progress_data.sections_progress:
+                    section_progress_map[section_progress.id] = section_progress
             except Homework.DoesNotExist:
                 pass
 
         if homework_detail.sections:
             for section_data in homework_detail.sections:
                 # Get progress data for this section if available
-                progress = section_progress_map.get(section_data.id)
+                progress: SectionData | None = section_progress_map.get(section_data.id)
 
                 sections.append(
                     SectionData(

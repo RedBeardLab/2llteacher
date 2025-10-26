@@ -278,7 +278,7 @@ class LLMConfigEditView(View):
 
     def _parse_update_form_data(self, request: HttpRequest) -> dict:
         """Parse update form data. Easy to test!"""
-        data = {}
+        data: dict[str, str | float | int | bool] = {}
 
         name = request.POST.get("name")
         if name:
