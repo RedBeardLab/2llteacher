@@ -6,7 +6,7 @@ Following a testable-first approach with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any, Iterator
+from typing import List, Optional, Dict, Any, Iterator, TypedDict
 from datetime import datetime
 from uuid import UUID
 from django.db import transaction
@@ -796,8 +796,15 @@ class SubmissionService:
         from django.utils import timezone
         from homeworks.models import Section
 
+        class _ResultsDict(TypedDict):
+            total_sections: int
+            processed_sections: int
+            created_submissions: int
+            error_count: int
+            details: list[dict[str, Any]]
+
         # Initialize results dictionary
-        results = {
+        results: _ResultsDict = {
             "total_sections": 0,
             "processed_sections": 0,
             "created_submissions": 0,
