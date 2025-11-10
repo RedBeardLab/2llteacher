@@ -412,6 +412,7 @@ class ResendVerificationView(View):
     def get(self, request: HttpRequest) -> HttpResponse:
         """Handle GET request to resend verification email."""
         # Cast user to our custom User model
+        assert request.user.pk is not None, "User must be authenticated"
         user = User.objects.get(pk=request.user.pk)
 
         # Check if user is already verified
