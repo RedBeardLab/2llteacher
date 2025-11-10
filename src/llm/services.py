@@ -215,15 +215,16 @@ class LLMService:
             )
 
             # Build messages for OpenAI API with proper typing
-            messages = [{"role": "system", "content": llm_config.base_prompt}]
+            # System message includes base prompt and section context
+            system_message = LLMService._build_system_message(llm_config, context)
+            messages = [{"role": "system", "content": system_message}]
 
-            # Add conversation history
+            # Add conversation history (plain text messages)
             for msg in context.messages:
                 messages.append({"role": msg["role"], "content": msg["content"]})
 
-            # Add current message with context
-            current_prompt = LLMService._build_current_prompt(context)
-            messages.append({"role": "user", "content": current_prompt})
+            # Add current message (plain text)
+            messages.append({"role": "user", "content": context.current_message})
 
             # Record time after query preparation
             query_prepared_time = time.perf_counter()
@@ -494,15 +495,16 @@ class LLMService:
         )
 
         # Build messages for OpenAI API
-        messages = [{"role": "system", "content": llm_config.base_prompt}]
+        # System message includes base prompt and section context
+        system_message = LLMService._build_system_message(llm_config, context)
+        messages = [{"role": "system", "content": system_message}]
 
-        # Add conversation history
+        # Add conversation history (plain text messages)
         for msg in context.messages:
             messages.append({"role": msg["role"], "content": msg["content"]})
 
-        # Add current message with context
-        current_prompt = LLMService._build_current_prompt(context)
-        messages.append({"role": "user", "content": current_prompt})
+        # Add current message (plain text)
+        messages.append({"role": "user", "content": context.current_message})
 
         # Record time after query preparation
         query_prepared_time = time.perf_counter()
@@ -611,39 +613,31 @@ class LLMService:
         )
 
     @staticmethod
-    def _build_current_prompt(context: ConversationContext) -> str:
+    def _build_system_message(llm_config: LLMConfigData, context: ConversationContext) -> str:
         """
-        Build the current prompt with section context.
+        Build system message with base prompt and section context.
+        
+        Section context is included once in the system message to avoid repetition
+        in every user message, significantly reducing token usage in multi-turn conversations.
 
         Args:
+            llm_config: LLM configuration data
             context: Conversation context data
 
         Returns:
-            String containing the prompt for the language model
+            String containing the system message with base prompt and section context
         """
-        # Build context parts
-        context_parts = [
+        parts = [
+            llm_config.base_prompt,
+            "",  # Empty line for separation
             f"Homework: {context.homework_title}",
             f"Section: {context.section_title}",
             f"Section Content: {context.section_content}",
+            "",  # Empty line for separation
+            "Please respond as an AI tutor helping the student with this section. Guide them without giving away the complete answer."
         ]
-
-        # Add current message based on type
-        if context.message_type == "student":
-            context_parts.append(f"\nStudent Question: {context.current_message}")
-        elif context.message_type == "code":
-            context_parts.append(
-                f"\nStudent Code Submission:\n```\n{context.current_message}\n```"
-            )
-        else:
-            context_parts.append(f"\nStudent Message: {context.current_message}")
-
-        # Add instruction
-        context_parts.append(
-            "\nPlease respond as an AI tutor helping the student with this section. Guide them without giving away the complete answer."
-        )
-
-        return "\n\n".join(context_parts)
+        
+        return "\n".join(parts)
 
     @staticmethod
     def get_default_config() -> Optional[LLMConfigData]:
