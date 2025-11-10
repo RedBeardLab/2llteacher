@@ -35,12 +35,21 @@ class RegistrationFormData:
 
 
 @dataclass
-class RegistrationResult:
-    """Result of a registration attempt."""
+class RegistrationError:
+    """Registration failed with an error."""
 
-    success: bool
-    user_id: Optional[UUID] = None
-    error: Optional[str] = None
+    error: str
+
+
+@dataclass
+class RegistrationSuccessful:
+    """Registration succeeded."""
+
+    user_id: UUID
+
+
+# Union type - result is EITHER success OR error, never both
+RegistrationResult = RegistrationError | RegistrationSuccessful
 
 
 @dataclass
@@ -113,7 +122,7 @@ class UserRegistrationView(View):
         if form.is_valid():
             result = self._register_user(form)
 
-            if result.success:
+            if isinstance(result, RegistrationSuccessful):
                 # Get the created user
                 user = User.objects.get(id=result.user_id)
 
@@ -139,9 +148,9 @@ class UserRegistrationView(View):
                         "Registration successful, but we couldn't send the verification email. You can resend it from your profile.",
                     )
                     return redirect("/")
-            else:
+            elif isinstance(result, RegistrationError):
                 messages.error(
-                    request, result.error or "Registration failed. Please try again."
+                    request, result.error
                 )
 
         # Render the form with errors
@@ -155,7 +164,7 @@ class UserRegistrationView(View):
             form: Valid RegistrationForm instance
 
         Returns:
-            RegistrationResult with success status and user ID or error
+            RegistrationResult - either RegistrationSuccessful with user_id or RegistrationError with error message
         """
         try:
             with transaction.atomic():
@@ -169,11 +178,11 @@ class UserRegistrationView(View):
                 user.backend = "django.contrib.auth.backends.ModelBackend"
 
                 # Return success result
-                return RegistrationResult(success=True, user_id=user.id)
+                return RegistrationSuccessful(user_id=user.id)
 
         except Exception as e:
             # Handle any errors
-            return RegistrationResult(success=False, error=str(e))
+            return RegistrationError(error=str(e))
 
 
 class UserLoginView(View):
