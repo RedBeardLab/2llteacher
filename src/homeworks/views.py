@@ -950,3 +950,35 @@ class HomeworkSubmissionsView(View):
 
         # Render the template with the data
         return render(request, "homeworks/submissions.html", {"data": submissions_data})
+
+
+class HomeworkMatrixView(View):
+    """
+    View for displaying a matrix of all students and all homeworks.
+
+    Teacher-only view that shows:
+    - All students (rows)
+    - All homeworks created by the teacher (columns)
+    - Completion status for each student-homework combination
+    - Sortable and searchable
+    """
+
+    @method_decorator(login_required, name="dispatch")
+    @method_decorator(teacher_required, name="dispatch")
+    def dispatch(self, *args, **kwargs):
+        """Ensure user is a logged-in teacher."""
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request: TeacherRequest) -> HttpResponse:
+        """Handle GET requests to display the homework matrix."""
+        # Get matrix data using service
+        matrix_data = HomeworkService.get_all_homework_matrix(
+            request.user.teacher_profile.id
+        )
+
+        if matrix_data is None:
+            messages.error(request, "Unable to load matrix data.")
+            return redirect("homeworks:list")
+
+        # Render the template with the data
+        return render(request, "homeworks/matrix.html", {"data": matrix_data})

@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+
+{% block title %}Homework Matrix Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h1>Homework Matrix Dashboard</h1>
+            <p class="text-muted">Overview of all students and homework submissions</p>
+        </div>
+        <div class="text-end">
+            <a href="{% url 'homeworks:list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Homeworks
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="mb-1">{{ data.total_students }}</h5>
+                    <small class="text-muted">Total Students</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="mb-1">{{ data.total_homeworks }}</h5>
+                    <small class="text-muted">Total Homeworks</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="text-success mb-1">{{ data.total_submissions }}</h5>
+                    <small class="text-muted">Total Submissions</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="mb-1">
+                        {% if data.total_students > 0 and data.total_homeworks > 0 %}
+                            {{ data.total_submissions|floatformat:0 }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h5>
+                    <small class="text-muted">Avg Submissions/Student</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter Controls -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" id="studentSearch" class="form-control" placeholder="Search students by name or email...">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="btn-group" role="group" aria-label="Sort options">
+                        <input type="radio" class="btn-check" name="sort" id="sort-name" value="name" autocomplete="off" checked>
+                        <label class="btn btn-outline-primary" for="sort-name">Sort by Name</label>
+
+                        <input type="radio" class="btn-check" name="sort" id="sort-completion" value="completion" autocomplete="off">
+                        <label class="btn btn-outline-primary" for="sort-completion">Sort by Completion %</label>
+
+                        <input type="radio" class="btn-check" name="sort" id="sort-submissions" value="submissions" autocomplete="off">
+                        <label class="btn btn-outline-primary" for="sort-submissions">Sort by Submissions</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Matrix Table -->
+    <div class="matrix-container">
+        <table class="table table-bordered matrix-table" id="matrixTable">
+            <thead>
+                <tr>
+                    <th class="sticky-cell student-header">Student</th>
+                    {% for hw_id, hw_title, hw_due_date in data.homeworks %}
+                    <th class="homework-header" data-homework-id="{{ hw_id }}">
+                        <div class="homework-header-content">
+                            <div class="homework-title">{{ hw_title }}</div>
+                            <div class="homework-due-date">Due: {{ hw_due_date|date:"M d, Y" }}</div>
+                        </div>
+                    </th>
+                    {% empty %}
+                    <th class="text-center text-muted">No Homeworks</th>
+                    {% endfor %}
+                    <th class="summary-header">Overall</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student_row in data.student_rows %}
+                <tr class="student-row" 
+                    data-student-name="{{ student_row.student_name|lower }}"
+                    data-student-email="{{ student_row.student_email|lower }}"
+                    data-completion="{{ student_row.overall_completion_percentage }}"
+                    data-submissions="{{ student_row.total_submissions }}">
+                    <td class="sticky-cell student-cell">
+                        <div class="student-info">
+                            <div class="student-name">{{ student_row.student_name }}</div>
+                            <div class="student-email">{{ student_row.student_email }}</div>
+                        </div>
+                    </td>
+                    {% for cell in student_row.homework_cells %}
+                    <td class="matrix-cell 
+                        {% if cell.status.value == 'submitted' %}status-submitted
+                        {% elif cell.status.value == 'in_progress' %}status-in-progress
+                        {% elif cell.status.value == 'in_progress_overdue' %}status-overdue
+                        {% elif cell.status.value == 'overdue' %}status-overdue
+                        {% else %}status-not-started
+                        {% endif %}"
+                        data-homework-id="{{ cell.homework_id }}"
+                        data-student-id="{{ cell.student_id }}"
+                        title="{% if cell.last_activity %}Last activity: {{ cell.last_activity|date:'M d, Y H:i' }}{% else %}No activity{% endif %}">
+                        <div class="cell-content">
+                            <div class="completion-badge">
+                                {% if cell.completion_percentage == 100 %}
+                                    <span class="badge bg-success">✓ 100%</span>
+                                {% elif cell.completion_percentage > 0 %}
+                                    <span class="badge bg-warning text-dark">{{ cell.completion_percentage }}%</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">0%</span>
+                                {% endif %}
+                            </div>
+                            <div class="sections-count">
+                                {{ cell.submitted_sections }}/{{ cell.total_sections }}
+                            </div>
+                            {% if cell.total_conversations > 0 %}
+                            <div class="conversations-count">
+                                <small>{{ cell.total_conversations }} conv.</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    {% endfor %}
+                    <td class="summary-cell">
+                        <div class="overall-summary">
+                            <div class="overall-percentage">
+                                {% if student_row.overall_completion_percentage == 100 %}
+                                    <span class="badge bg-success">100%</span>
+                                {% elif student_row.overall_completion_percentage > 0 %}
+                                    <span class="badge bg-info">{{ student_row.overall_completion_percentage }}%</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">0%</span>
+                                {% endif %}
+                            </div>
+                            <div class="overall-count">
+                                {{ student_row.total_submissions }} submissions
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{{ data.homeworks|length|add:2 }}" class="text-center text-muted py-4">
+                        No students found in the system.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Legend -->
+    <div class="card mt-3">
+        <div class="card-body">
+            <h6 class="mb-3">Legend:</h6>
+            <div class="row">
+                <div class="col-md-3">
+                    <span class="legend-box status-submitted"></span>
+                    <span>Fully Submitted (100%)</span>
+                </div>
+                <div class="col-md-3">
+                    <span class="legend-box status-in-progress"></span>
+                    <span>In Progress (1-99%)</span>
+                </div>
+                <div class="col-md-3">
+                    <span class="legend-box status-not-started"></span>
+                    <span>Not Started (0%)</span>
+                </div>
+                <div class="col-md-3">
+                    <span class="legend-box status-overdue"></span>
+                    <span>Overdue</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Matrix Container */
+.matrix-container {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 70vh;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    position: relative;
+}
+
+/* Matrix Table */
+.matrix-table {
+    margin-bottom: 0;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.matrix-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: #f8f9fa;
+}
+
+.matrix-table thead th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+    vertical-align: middle;
+}
+
+/* Sticky First Column */
+.sticky-cell {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: #fff;
+}
+
+.matrix-table thead .sticky-cell {
+    z-index: 30;
+    background-color: #f8f9fa;
+}
+
+/* Student Header and Cell */
+.student-header {
+    min-width: 250px;
+    font-weight: 600;
+}
+
+.student-cell {
+    min-width: 250px;
+    padding: 0.75rem;
+    border-right: 2px solid #dee2e6;
+}
+
+.student-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.student-name {
+    font-weight: 500;
+    color: #212529;
+}
+
+.student-email {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* Homework Headers */
+.homework-header {
+    min-width: 150px;
+    max-width: 200px;
+    text-align: center;
+    padding: 0.5rem;
+}
+
+.homework-header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.homework-title {
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.homework-due-date {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* Summary Header and Cell */
+.summary-header {
+    min-width: 120px;
+    text-align: center;
+    font-weight: 600;
+    background-color: #e9ecef !important;
+}
+
+.summary-cell {
+    min-width: 120px;
+    text-align: center;
+    background-color: #f8f9fa;
+    border-left: 2px solid #dee2e6;
+}
+
+.overall-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.overall-count {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* Matrix Cells */
+.matrix-cell {
+    min-width: 150px;
+    max-width: 200px;
+    text-align: center;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.matrix-cell:hover {
+    box-shadow: inset 0 0 0 2px #0d6efd;
+    transform: scale(1.05);
+    z-index: 5;
+}
+
+.cell-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.completion-badge .badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.sections-count {
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.conversations-count {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+
+/* Status Colors */
+.status-submitted {
+    background-color: #d1e7dd !important;
+    border-color: #badbcc !important;
+}
+
+.status-in-progress {
+    background-color: #fff3cd !important;
+    border-color: #ffecb5 !important;
+}
+
+.status-not-started {
+    background-color: #f8f9fa !important;
+    border-color: #dee2e6 !important;
+}
+
+.status-overdue {
+    background-color: #f8d7da !important;
+    border-color: #f5c2c7 !important;
+}
+
+/* Legend */
+.legend-box {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 1px solid #dee2e6;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+
+/* Row Hover Effect */
+.student-row:hover {
+    background-color: #f8f9fa;
+}
+
+.student-row:hover .sticky-cell {
+    background-color: #e9ecef;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .matrix-container {
+        max-height: 60vh;
+    }
+    
+    .student-cell {
+        min-width: 180px;
+    }
+    
+    .homework-header {
+        min-width: 120px;
+    }
+    
+    .matrix-cell {
+        min-width: 120px;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('studentSearch');
+    const sortButtons = document.querySelectorAll('input[name="sort"]');
+    const tableBody = document.querySelector('#matrixTable tbody');
+    const studentRows = Array.from(document.querySelectorAll('.student-row'));
+
+    // Search functionality
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        
+        studentRows.forEach(row => {
+            const studentName = row.dataset.studentName;
+            const studentEmail = row.dataset.studentEmail;
+            const matches = studentName.includes(searchTerm) || studentEmail.includes(searchTerm);
+            row.style.display = matches ? '' : 'none';
+        });
+    });
+
+    // Sort functionality
+    sortButtons.forEach(button => {
+        button.addEventListener('change', function() {
+            const sortBy = this.value;
+            const sortedRows = [...studentRows];
+            
+            sortedRows.sort((a, b) => {
+                switch(sortBy) {
+                    case 'name':
+                        return a.dataset.studentName.localeCompare(b.dataset.studentName);
+                    case 'completion':
+                        return parseInt(b.dataset.completion) - parseInt(a.dataset.completion);
+                    case 'submissions':
+                        return parseInt(b.dataset.submissions) - parseInt(a.dataset.submissions);
+                    default:
+                        return 0;
+                }
+            });
+            
+            // Re-append rows in sorted order
+            sortedRows.forEach(row => tableBody.appendChild(row));
+        });
+    });
+
+    // Cell click to show details (optional - can be enhanced)
+    document.querySelectorAll('.matrix-cell').forEach(cell => {
+        cell.addEventListener('click', function() {
+            const homeworkId = this.dataset.homeworkId;
+            const studentId = this.dataset.studentId;
+            // Could navigate to detailed view or show modal
+            console.log('Clicked cell:', { homeworkId, studentId });
+        });
+    });
+});
+</script>
+{% endblock %}

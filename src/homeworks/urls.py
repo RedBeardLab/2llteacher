@@ -11,6 +11,7 @@ app_name = "homeworks"
 urlpatterns = [
     path("", views.HomeworkListView.as_view(), name="list"),
     path("create/", views.HomeworkCreateView.as_view(), name="create"),
+    path("matrix/", views.HomeworkMatrixView.as_view(), name="matrix"),
     path("<uuid:homework_id>/", views.HomeworkDetailView.as_view(), name="detail"),
     path("<uuid:homework_id>/edit/", views.HomeworkEditView.as_view(), name="edit"),
     path(
