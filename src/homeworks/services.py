@@ -220,11 +220,25 @@ class StudentMatrixRow:
 
     student_id: UUID
     student_name: str
+    student_first_name: str
+    student_last_name: str
     student_email: str
     homework_cells: list[HomeworkMatrixCell]
     total_submissions: int
     total_homeworks: int
     overall_completion_percentage: int
+
+    @property
+    def student_name_csv_format(self) -> str:
+        """Return student name in 'LastName, FirstName' format for CSV export."""
+        if self.student_last_name and self.student_first_name:
+            return f"{self.student_last_name}, {self.student_first_name}"
+        elif self.student_last_name:
+            return self.student_last_name
+        elif self.student_first_name:
+            return self.student_first_name
+        else:
+            return self.student_name  # Fallback to display name
 
 
 @dataclass
@@ -470,10 +484,10 @@ class HomeworkService:
             # Get the teacher
             teacher = Teacher.objects.get(id=teacher_id)
 
-            # Get all homeworks created by this teacher
+            # Get all homeworks created by this teacher (oldest to newest)
             homeworks = (
                 Homework.objects.filter(created_by=teacher)
-                .order_by("-created_at")
+                .order_by("created_at")
                 .prefetch_related("sections")
             )
 
@@ -614,6 +628,8 @@ class HomeworkService:
                     StudentMatrixRow(
                         student_id=student.id,
                         student_name=student_name,
+                        student_first_name=student.user.first_name,
+                        student_last_name=student.user.last_name,
                         student_email=student.user.email,
                         homework_cells=homework_cells,
                         total_submissions=student_total_submissions,

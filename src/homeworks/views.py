@@ -20,6 +20,7 @@ from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.contrib import messages
+import csv
 
 from llteacher.permissions.decorators import teacher_required, TeacherRequest
 
@@ -982,3 +983,64 @@ class HomeworkMatrixView(View):
 
         # Render the template with the data
         return render(request, "homeworks/matrix.html", {"data": matrix_data})
+
+
+class HomeworkMatrixExportView(View):
+    """
+    View for exporting the homework matrix as a CSV file.
+
+    Teacher-only view that generates a CSV with:
+    - Student names in 'LastName, FirstName' format
+    - Student ID (currently empty string)
+    - Student emails
+    - Completion data for each homework (submitted/total format only)
+    """
+
+    @method_decorator(login_required, name="dispatch")
+    @method_decorator(teacher_required, name="dispatch")
+    def dispatch(self, *args, **kwargs):
+        """Ensure user is a logged-in teacher."""
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request: TeacherRequest) -> HttpResponse:
+        """Handle GET requests to export the homework matrix as CSV."""
+        # Get matrix data using service
+        matrix_data = HomeworkService.get_all_homework_matrix(
+            request.user.teacher_profile.id
+        )
+
+        if matrix_data is None:
+            messages.error(request, "Unable to load matrix data.")
+            return redirect("homeworks:list")
+
+        # Create the HttpResponse object with CSV content type
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="homework_grades.csv"'
+
+        # Create CSV writer
+        writer = csv.writer(response)
+
+        # Write header row
+        header = ["Student Name", "Student ID", "Student Email", "Overall Completion"]
+        for hw_id, hw_title, hw_due_date in matrix_data.homeworks:
+            header.append(f"{hw_title}")
+        writer.writerow(header)
+
+        # Write student rows
+        for student_row in matrix_data.student_rows:
+            row = [
+                student_row.student_name_csv_format,  # Uses 'LastName, FirstName' format
+                "",  # Student ID - hardcoded to empty string
+                student_row.student_email,
+                str(student_row.overall_completion_percentage),  # Just the number
+            ]
+
+            # Add completion data for each homework
+            for cell in student_row.homework_cells:
+                # Format: "submitted/total" only
+                cell_value = f"{cell.submitted_sections}/{cell.total_sections}"
+                row.append(cell_value)
+
+            writer.writerow(row)
+
+        return response
