@@ -146,9 +146,8 @@ class HomeworkMatrixExportViewTest(TestCase):
         self.assertEqual(header[0], "Student Name")
         self.assertEqual(header[1], "Student ID")
         self.assertEqual(header[2], "Student Email")
-        self.assertEqual(header[3], "Overall Completion")
-        self.assertEqual(header[4], "Homework 1")
-        self.assertEqual(header[5], "Homework 2")
+        self.assertEqual(header[3], "Homework 1")
+        self.assertEqual(header[4], "Homework 2")
 
     def test_csv_student_name_format(self):
         """Test that student names are in 'LastName, FirstName' format."""
@@ -183,8 +182,8 @@ class HomeworkMatrixExportViewTest(TestCase):
         for row in csv_reader:
             self.assertEqual(row[1], "")
 
-    def test_csv_completion_format_no_percentages(self):
-        """Test that completion data has no percentage symbols."""
+    def test_csv_completion_format_no_percentage_symbols(self):
+        """Test that completion data has no percentage symbols (just numbers)."""
         # Create some submissions
         conv = Conversation.objects.create(user=self.student1_user, section=self.section1_1)
         Submission.objects.create(conversation=conv, submitted_at=timezone.now())
@@ -196,18 +195,22 @@ class HomeworkMatrixExportViewTest(TestCase):
         csv_reader = csv.reader(StringIO(content))
         next(csv_reader)  # Skip header
 
-        # Check that no percentage symbols exist in data
+        # Check that no percentage symbols or other formatting exists in data
         for row in csv_reader:
-            # Overall completion (should be just number)
-            self.assertNotIn("%", row[3])
-            # Homework completions (should be "submitted/total" format)
-            for homework_col in row[4:]:
+            # Homework completions (should be just numbers 0-100)
+            for homework_col in row[3:]:
                 self.assertNotIn("%", homework_col)
                 self.assertNotIn("(", homework_col)
                 self.assertNotIn(")", homework_col)
+                self.assertNotIn("/", homework_col)
+                # Should be a valid number
+                try:
+                    float(homework_col)
+                except ValueError:
+                    self.fail(f"Homework column '{homework_col}' is not a valid number")
 
     def test_csv_homework_completion_format(self):
-        """Test that homework completion is in 'submitted/total' format."""
+        """Test that homework completion is in percentage format (0-100)."""
         # Student 1 completes 1 of 2 sections in homework 1
         conv = Conversation.objects.create(user=self.student1_user, section=self.section1_1)
         Submission.objects.create(conversation=conv, submitted_at=timezone.now())
@@ -222,10 +225,10 @@ class HomeworkMatrixExportViewTest(TestCase):
         # Find student1's row
         for row in csv_reader:
             if "Smith, Alice" in row[0]:
-                # Check homework 1 completion (column 4)
-                self.assertEqual(row[4], "1/2")
-                # Check homework 2 completion (column 5)
-                self.assertEqual(row[5], "0/1")
+                # Check homework 1 completion (column 3) - 1/2 = 50%
+                self.assertEqual(row[3], "50")
+                # Check homework 2 completion (column 4) - 0/1 = 0%
+                self.assertEqual(row[4], "0")
                 break
 
     def test_csv_with_no_submissions(self):
@@ -237,11 +240,10 @@ class HomeworkMatrixExportViewTest(TestCase):
         csv_reader = csv.reader(StringIO(content))
         next(csv_reader)  # Skip header
 
-        # Check that all students have 0 completion
+        # Check that all students have 0% completion
         for row in csv_reader:
-            self.assertEqual(row[3], "0")  # Overall completion
-            self.assertEqual(row[4], "0/2")  # Homework 1
-            self.assertEqual(row[5], "0/1")  # Homework 2
+            self.assertEqual(row[3], "0")  # Homework 1 - 0%
+            self.assertEqual(row[4], "0")  # Homework 2 - 0%
 
     def test_csv_with_full_completion(self):
         """Test CSV export with full homework completion."""
@@ -260,10 +262,10 @@ class HomeworkMatrixExportViewTest(TestCase):
         # Find student1's row
         for row in csv_reader:
             if "Smith, Alice" in row[0]:
-                # Overall completion should be 67% (2 out of 3 total sections)
-                self.assertEqual(row[3], "67")
-                # Homework 1 should be complete
-                self.assertEqual(row[4], "2/2")
+                # Homework 1 should be complete (2/2 = 100%)
+                self.assertEqual(row[3], "100")
+                # Homework 2 should be 0%
+                self.assertEqual(row[4], "0")
                 break
 
     def test_csv_row_count(self):
@@ -299,9 +301,9 @@ class HomeworkMatrixExportViewTest(TestCase):
         csv_reader = csv.reader(StringIO(content))
         header = next(csv_reader)
 
-        # Should have 4 fixed columns + 3 homework columns
-        self.assertEqual(len(header), 7)
-        self.assertEqual(header[6], "Homework 3")
+        # Should have 3 fixed columns + 3 homework columns
+        self.assertEqual(len(header), 6)
+        self.assertEqual(header[5], "Homework 3")
 
     def test_csv_email_field(self):
         """Test that email addresses are correctly included."""

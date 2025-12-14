@@ -993,7 +993,7 @@ class HomeworkMatrixExportView(View):
     - Student names in 'LastName, FirstName' format
     - Student ID (currently empty string)
     - Student emails
-    - Completion data for each homework (submitted/total format only)
+    - Completion percentage for each homework (0-100)
     """
 
     @method_decorator(login_required, name="dispatch")
@@ -1021,7 +1021,7 @@ class HomeworkMatrixExportView(View):
         writer = csv.writer(response)
 
         # Write header row
-        header = ["Student Name", "Student ID", "Student Email", "Overall Completion"]
+        header = ["Student Name", "Student ID", "Student Email"]
         for hw_id, hw_title, hw_due_date in matrix_data.homeworks:
             header.append(f"{hw_title}")
         writer.writerow(header)
@@ -1032,14 +1032,16 @@ class HomeworkMatrixExportView(View):
                 student_row.student_name_csv_format,  # Uses 'LastName, FirstName' format
                 "",  # Student ID - hardcoded to empty string
                 student_row.student_email,
-                str(student_row.overall_completion_percentage),  # Just the number
             ]
 
-            # Add completion data for each homework
+            # Add completion data for each homework as percentage
             for cell in student_row.homework_cells:
-                # Format: "submitted/total" only
-                cell_value = f"{cell.submitted_sections}/{cell.total_sections}"
-                row.append(cell_value)
+                # Calculate percentage: (submitted/total) * 100
+                if cell.total_sections > 0:
+                    percentage = (cell.submitted_sections / cell.total_sections) * 100
+                else:
+                    percentage = 0
+                row.append(f"{percentage:.0f}")
 
             writer.writerow(row)
 
