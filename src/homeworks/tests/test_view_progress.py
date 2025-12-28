@@ -15,6 +15,7 @@ from homeworks.views import HomeworkListView
 from homeworks.services import HomeworkService, HomeworkCreateData, SectionCreateData
 from accounts.models import Teacher, Student
 from conversations.models import Conversation
+from courses.models import Course, CourseEnrollment, CourseHomework, CourseTeacher
 
 User = get_user_model()
 
@@ -56,6 +57,27 @@ class TestHomeworkListViewProgress(TestCase):
         self.sections = list(
             Section.objects.filter(homework=self.homework).order_by("order")
         )
+
+        # Create a course and enroll the student
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+            is_active=True,
+        )
+
+        # Add teacher to course
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+
+        # Enroll student in course
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student, is_active=True
+        )
+
+        # Assign homework to course
+        CourseHomework.objects.create(course=self.course, homework=self.homework)
 
     def test_progress_percentages_no_activity(self):
         """Test percentage calculations when student has no activity."""
@@ -164,6 +186,9 @@ class TestHomeworkListViewProgress(TestCase):
         sections_3 = list(
             Section.objects.filter(homework=homework_3_sections).order_by("order")
         )
+
+        # Assign this homework to the course so student can see it
+        CourseHomework.objects.create(course=self.course, homework=homework_3_sections)
 
         # Create conversation for 1 out of 3 sections (33.33% -> should round to 33%)
         Conversation.objects.create(user=self.student_user, section=sections_3[0])

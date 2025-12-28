@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
 from accounts.models import Teacher, Student
+from courses.models import CourseHomework
 
 # Type alias for request.user which can be either authenticated or anonymous
 RequestUser = AbstractBaseUser | AnonymousUser
@@ -255,5 +256,52 @@ def submission_access_required(view_func: ViewFunc) -> ViewFunc:
             return view_func(request, submission, *args, **kwargs)
 
         return HttpResponseForbidden("Access denied.")
+
+    return cast(ViewFunc, wrapper)
+
+
+def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
+    """
+    Decorator to ensure user has access to homework based on course enrollment.
+
+    Allows access if:
+    1. User is a teacher who owns the homework
+    2. User is a student enrolled in an active course that has the homework assigned
+
+    Args:
+        view_func: View function to decorate
+
+    Returns:
+        Decorated function that checks if user has homework access
+    """
+
+    @wraps(view_func)
+    def wrapper(
+        request: HttpRequest, homework_id: UUID, *args: Any, **kwargs: Any
+    ) -> HttpResponse:
+        from homeworks.models import Homework
+
+        homework = get_object_or_404(Homework, id=homework_id)
+        teacher, student = get_teacher_or_student(request.user)
+
+        # Teachers who own the homework have access
+        if teacher and homework.created_by == teacher:
+            return view_func(request, homework_id, *args, **kwargs)
+
+        # For students, check if they're enrolled in a course that has this homework
+        if student:
+            enrolled_courses = student.enrolled_courses.filter(
+                courseenrollment__is_active=True
+            )
+            has_access = CourseHomework.objects.filter(
+                homework=homework, course__in=enrolled_courses
+            ).exists()
+
+            if has_access:
+                return view_func(request, homework_id, *args, **kwargs)
+
+        return HttpResponseForbidden(
+            "Access denied. You are not enrolled in a course that has this homework assigned."
+        )
 
     return cast(ViewFunc, wrapper)

@@ -23,6 +23,7 @@ from django.contrib import messages
 import csv
 
 from llteacher.permissions.decorators import teacher_required, TeacherRequest
+from courses.models import CourseHomework
 
 from .models import Homework, Section
 from .services import (
@@ -131,9 +132,16 @@ class HomeworkListView(View):
             user_type = "student"
             has_progress_data = True
 
-            # For now, show all homeworks (in a real app, would filter by assignments)
+            # Filter homeworks by courses the student is enrolled in
+            enrolled_courses = student_profile.enrolled_courses.filter(
+                courseenrollment__is_active=True
+            )
+            homework_ids = CourseHomework.objects.filter(
+                course__in=enrolled_courses
+            ).values_list("homework_id", flat=True)
+
             homework_objects = (
-                Homework.objects.all()
+                Homework.objects.filter(id__in=homework_ids)
                 .order_by("-created_at")
                 .prefetch_related("sections")
             )
@@ -630,11 +638,23 @@ class HomeworkDetailView(View):
             homework_id: The UUID of the homework to display
 
         Returns:
-            HomeworkDetailData with homework details, or None if not found
+            HomeworkDetailData with homework details, or None if not found or access denied
         """
         # Determine user type
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
+
+        # For students, check if they're enrolled in a course that has this homework
+        if student_profile:
+            enrolled_courses = student_profile.enrolled_courses.filter(
+                courseenrollment__is_active=True
+            )
+            has_access = CourseHomework.objects.filter(
+                homework_id=homework_id, course__in=enrolled_courses
+            ).exists()
+
+            if not has_access:
+                return None
 
         # Get homework details using service
         homework_detail = HomeworkService.get_homework_with_sections(homework_id)
@@ -772,8 +792,19 @@ class SectionDetailView(View):
         if teacher_profile and homework.created_by != teacher_profile:
             return HttpResponseForbidden("Access denied.")
 
-        # For now, allow all students access to sections
-        # Additional checks can be added here if needed
+        # For students, check if they're enrolled in a course that has this homework
+        if student_profile:
+            enrolled_courses = student_profile.enrolled_courses.filter(
+                courseenrollment__is_active=True
+            )
+            has_access = CourseHomework.objects.filter(
+                homework=homework, course__in=enrolled_courses
+            ).exists()
+
+            if not has_access:
+                return HttpResponseForbidden(
+                    "Access denied. You are not enrolled in a course that has this homework assigned."
+                )
 
         # If user is neither teacher nor student, deny access
         if not teacher_profile and not student_profile:

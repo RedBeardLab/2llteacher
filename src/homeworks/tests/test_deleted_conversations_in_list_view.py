@@ -12,6 +12,7 @@ from homeworks.models import Homework, Section
 from conversations.models import Conversation, Submission
 from homeworks.views import HomeworkListView
 from homeworks.services import HomeworkService, SectionStatus
+from courses.models import Course, CourseEnrollment, CourseHomework, CourseTeacher
 
 User = get_user_model()
 
@@ -46,6 +47,27 @@ class DeletedConversationsListViewTests(TestCase):
             content="Test section content",
             order=1,
         )
+
+        # Create a course and enroll the student
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+            is_active=True,
+        )
+
+        # Add teacher to course
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher_profile, role="owner"
+        )
+
+        # Enroll student in course
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student_profile, is_active=True
+        )
+
+        # Assign homework to course
+        CourseHomework.objects.create(course=self.course, homework=self.homework)
 
     def test_deleted_conversation_not_shown_in_list_view(self):
         """
@@ -161,6 +183,9 @@ class DeletedConversationsListViewTests(TestCase):
             content="Test section content",
             order=1,
         )
+
+        # Assign this homework to the course so student can see it
+        CourseHomework.objects.create(course=self.course, homework=homework)
 
         # Step 1: Create initial conversation and submit it
         initial_conversation = Conversation.objects.create(

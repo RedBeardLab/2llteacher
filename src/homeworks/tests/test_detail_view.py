@@ -15,6 +15,7 @@ import uuid
 from homeworks.models import Homework, Section, SectionSolution
 from homeworks.views import HomeworkDetailView, HomeworkDetailData
 from accounts.models import Teacher, Student
+from courses.models import Course, CourseEnrollment, CourseHomework, CourseTeacher
 
 User = get_user_model()
 
@@ -70,6 +71,27 @@ class HomeworkDetailViewTests(TestCase):
             content="Test content for section 2",
             order=2,
         )
+
+        # Create a course and enroll the student
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+            is_active=True,
+        )
+
+        # Add teacher to course
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+
+        # Enroll student in course
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student, is_active=True
+        )
+
+        # Assign homework to course
+        CourseHomework.objects.create(course=self.course, homework=self.homework)
 
         # Create the request factory
         self.factory = RequestFactory()
