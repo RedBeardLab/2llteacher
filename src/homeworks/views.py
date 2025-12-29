@@ -102,12 +102,26 @@ class HomeworkListView(View):
         has_progress_data = False
 
         if teacher_profile:
-            # Teacher view - show homeworks created by this teacher
+            # Teacher view - show homeworks from courses this teacher teaches
             user_type = "teacher"
 
-            # Query homeworks created by this teacher
+            # Get courses where this teacher is teaching
+            teacher_courses = teacher_profile.courses.all()
+
+            # Get homeworks assigned to courses the teacher teaches
+            course_homework_ids = CourseHomework.objects.filter(
+                course__in=teacher_courses
+            ).values_list("homework_id", flat=True)
+
+            # Also include homeworks created by this teacher (even if not assigned to courses)
+            # Combine both querysets using Q objects
+            from django.db.models import Q
+
             homework_objects = (
-                Homework.objects.filter(created_by=teacher_profile)
+                Homework.objects.filter(
+                    Q(id__in=course_homework_ids) | Q(created_by=teacher_profile)
+                )
+                .distinct()
                 .order_by("-created_at")
                 .prefetch_related("sections")
             )
@@ -385,12 +399,39 @@ class HomeworkEditView(View):
         """Ensure user is a logged-in teacher."""
         return super().dispatch(*args, **kwargs)
 
+    def _can_teacher_edit_homework(self, teacher_profile, homework: Homework) -> bool:
+        """
+        Check if teacher can edit the homework.
+
+        Teacher can edit if:
+        1. They created the homework, OR
+        2. They teach a course that has this homework assigned
+
+        Args:
+            teacher_profile: Teacher object
+            homework: Homework object
+
+        Returns:
+            True if teacher can edit, False otherwise
+        """
+        # Check if teacher created it
+        if homework.created_by == teacher_profile:
+            return True
+
+        # Check if teacher teaches a course that has this homework
+        teacher_courses = teacher_profile.courses.all()
+        teaches_course_with_homework = CourseHomework.objects.filter(
+            homework=homework, course__in=teacher_courses
+        ).exists()
+
+        return teaches_course_with_homework
+
     def get(self, request: TeacherRequest, homework_id: UUID) -> HttpResponse:
         """Handle GET requests to display the edit form with existing data."""
-        # Get the homework and check ownership
+        # Get the homework and check permissions
         try:
             homework = Homework.objects.get(id=homework_id)
-            if homework.created_by != request.user.teacher_profile:
+            if not self._can_teacher_edit_homework(request.user.teacher_profile, homework):
                 return HttpResponseForbidden(
                     "You don't have permission to edit this homework."
                 )
@@ -404,10 +445,10 @@ class HomeworkEditView(View):
 
     def post(self, request: TeacherRequest, homework_id: UUID) -> HttpResponse:
         """Handle POST requests to process the form submission."""
-        # Get the homework and check ownership
+        # Get the homework and check permissions
         try:
             homework = Homework.objects.get(id=homework_id)
-            if homework.created_by != request.user.teacher_profile:
+            if not self._can_teacher_edit_homework(request.user.teacher_profile, homework):
                 return HttpResponseForbidden(
                     "You don't have permission to edit this homework."
                 )
@@ -604,14 +645,22 @@ class HomeworkDetailView(View):
         if not teacher_profile:
             return HttpResponseForbidden("Only teachers can delete homeworks.")
 
-        # Get the homework and check ownership
+        # Get the homework and check permissions
         try:
             from .models import Homework
 
             homework = Homework.objects.get(id=homework_id)
-            if homework.created_by != teacher_profile:
+
+            # Check if teacher can delete (created it OR teaches a course that has it)
+            created_by_teacher = homework.created_by == teacher_profile
+            teacher_courses = teacher_profile.courses.all()
+            teaches_course_with_homework = CourseHomework.objects.filter(
+                homework=homework, course__in=teacher_courses
+            ).exists()
+
+            if not (created_by_teacher or teaches_course_with_homework):
                 return HttpResponseForbidden(
-                    "You can only delete homeworks you created."
+                    "You can only delete homeworks from courses you teach."
                 )
         except Homework.DoesNotExist:
             messages.error(request, "Homework not found.")
@@ -668,8 +717,16 @@ class HomeworkDetailView(View):
 
         if teacher_profile:
             user_type = "teacher"
-            # Teacher can edit if they are the owner
-            can_edit = str(teacher_profile.id) == str(homework_detail.created_by)
+            # Teacher can edit if they created it OR if they teach a course that has this homework
+            created_by_teacher = str(teacher_profile.id) == str(homework_detail.created_by)
+
+            # Check if teacher teaches a course that has this homework
+            teacher_courses = teacher_profile.courses.all()
+            teaches_course_with_homework = CourseHomework.objects.filter(
+                homework_id=homework_id, course__in=teacher_courses
+            ).exists()
+
+            can_edit = created_by_teacher or teaches_course_with_homework
 
         elif student_profile:
             user_type = "student"
@@ -788,9 +845,18 @@ class SectionDetailView(View):
         teacher_profile = getattr(request.user, "teacher_profile", None)
         student_profile = getattr(request.user, "student_profile", None)
 
-        # Teacher must own the homework
-        if teacher_profile and homework.created_by != teacher_profile:
-            return HttpResponseForbidden("Access denied.")
+        # Teacher must either own the homework OR teach a course that has it
+        if teacher_profile:
+            created_by_teacher = homework.created_by == teacher_profile
+
+            # Check if teacher teaches a course that has this homework
+            teacher_courses = teacher_profile.courses.all()
+            teaches_course_with_homework = CourseHomework.objects.filter(
+                homework=homework, course__in=teacher_courses
+            ).exists()
+
+            if not (created_by_teacher or teaches_course_with_homework):
+                return HttpResponseForbidden("Access denied.")
 
         # For students, check if they're enrolled in a course that has this homework
         if student_profile:
@@ -962,12 +1028,20 @@ class HomeworkSubmissionsView(View):
 
     def get(self, request: TeacherRequest, homework_id: UUID) -> HttpResponse:
         """Handle GET requests to display homework submissions."""
-        # Get the homework and check ownership
+        # Get the homework and check permissions
         try:
             homework = Homework.objects.get(id=homework_id)
-            if homework.created_by != request.user.teacher_profile:
+
+            # Check if teacher can view submissions (created it OR teaches a course that has it)
+            created_by_teacher = homework.created_by == request.user.teacher_profile
+            teacher_courses = request.user.teacher_profile.courses.all()
+            teaches_course_with_homework = CourseHomework.objects.filter(
+                homework=homework, course__in=teacher_courses
+            ).exists()
+
+            if not (created_by_teacher or teaches_course_with_homework):
                 return HttpResponseForbidden(
-                    "You can only view submissions for homeworks you created."
+                    "You can only view submissions for homeworks from courses you teach."
                 )
         except Homework.DoesNotExist:
             messages.error(request, "Homework not found.")
