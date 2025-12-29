@@ -16,6 +16,7 @@ from accounts.models import Teacher, Student
 from homeworks.models import Homework, Section, SectionSolution
 from homeworks.services import HomeworkService, ParticipationStatus
 from conversations.models import Conversation, Message, Submission
+from courses.models import Course, CourseEnrollment, CourseHomework
 
 User = get_user_model()
 
@@ -78,6 +79,21 @@ class HomeworkSubmissionsViewTest(TestCase):
             created_by=self.teacher,
             due_date=timezone.now() + timedelta(days=7),
         )
+
+        # Create course and enroll students
+        self.course = Course.objects.create(
+            name="Test Course",
+            description="Test course description",
+            code="TEST101",
+        )
+
+        # Enroll students in the course
+        CourseEnrollment.objects.create(course=self.course, student=self.student1)
+        CourseEnrollment.objects.create(course=self.course, student=self.student2)
+        CourseEnrollment.objects.create(course=self.course, student=self.student3)
+
+        # Assign homework to course
+        CourseHomework.objects.create(course=self.course, homework=self.homework)
 
         # Create sections
         self.section1 = Section.objects.create(
@@ -294,6 +310,20 @@ class HomeworkSubmissionsServiceTest(TestCase):
             created_by=self.teacher,
             due_date=timezone.now() + timedelta(days=7),
         )
+
+        # Create course and enroll students
+        self.course = Course.objects.create(
+            name="Test Course",
+            description="Test course description",
+            code="TEST101",
+        )
+
+        # Enroll students in the course
+        CourseEnrollment.objects.create(course=self.course, student=self.student1)
+        CourseEnrollment.objects.create(course=self.course, student=self.student2)
+
+        # Assign homework to course
+        CourseHomework.objects.create(course=self.course, homework=self.homework)
 
         self.section1 = Section.objects.create(
             homework=self.homework,
@@ -533,3 +563,35 @@ class HomeworkSubmissionsServiceTest(TestCase):
             if s.participation_status == ParticipationStatus.PARTIAL
         )
         self.assertLess(no_interaction_index, partial_index)
+
+    def test_non_enrolled_students_not_shown(self):
+        """Test that students not enrolled in any course with the homework are not shown."""
+        # Create a student who is NOT enrolled in the course
+        non_enrolled_user = User.objects.create_user(
+            username="non_enrolled",
+            email="non_enrolled@example.com",
+            password="password123",
+            first_name="Non",
+            last_name="Enrolled",
+        )
+        non_enrolled_student = Student.objects.create(user=non_enrolled_user)
+
+        # Create a conversation for the non-enrolled student
+        # This should still NOT make them appear in the results
+        Conversation.objects.create(user=non_enrolled_user, section=self.section1)
+
+        # Get submissions data
+        result = HomeworkService.get_homework_submissions(self.homework.id)
+
+        self.assertIsNotNone(result)
+        # Should only show the 2 enrolled students, not the non-enrolled one
+        self.assertEqual(result.total_students, 2)
+        self.assertEqual(len(result.students), 2)
+
+        # Verify the non-enrolled student is NOT in the results
+        student_usernames = [s.student_username for s in result.students]
+        self.assertNotIn("non_enrolled", student_usernames)
+
+        # Verify only enrolled students are shown
+        self.assertIn("student1", student_usernames)
+        self.assertIn("student2", student_usernames)

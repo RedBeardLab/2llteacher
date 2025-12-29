@@ -491,9 +491,14 @@ class HomeworkService:
                 .prefetch_related("sections")
             )
 
-            # Get all students
-            all_students = Student.objects.select_related("user").order_by(
-                "user__first_name", "user__last_name", "user__username"
+            # Get students enrolled in courses that have any of the teacher's homeworks assigned
+            enrolled_students = (
+                Student.objects.filter(
+                    courseenrollment__course__coursehomework__homework__in=homeworks
+                )
+                .select_related("user")
+                .order_by("user__first_name", "user__last_name", "user__username")
+                .distinct()
             )
 
             # Prepare homework list for matrix header
@@ -537,7 +542,7 @@ class HomeworkService:
             student_rows = []
             total_submissions = 0
 
-            for student in all_students:
+            for student in enrolled_students:
                 homework_cells = []
                 student_total_submissions = 0
 
@@ -643,7 +648,7 @@ class HomeworkService:
             return HomeworkMatrixData(
                 homeworks=homework_list,
                 student_rows=student_rows,
-                total_students=len(all_students),
+                total_students=len(enrolled_students),
                 total_homeworks=len(homeworks),
                 total_submissions=total_submissions,
             )
@@ -829,8 +834,14 @@ class HomeworkService:
             # Get all sections for this homework, ordered by section order
             homework_sections = list(homework.sections.order_by("order"))
 
-            # Get all students in the system
-            all_students = Student.objects.select_related("user").all()
+            # Get students enrolled in courses that have this homework assigned
+            enrolled_students = (
+                Student.objects.filter(
+                    courseenrollment__course__coursehomework__homework=homework,
+                )
+                .select_related("user")
+                .distinct()
+            )
 
             # Get all conversations for this homework (including soft-deleted ones)
             conversations = (
@@ -865,7 +876,7 @@ class HomeworkService:
             total_submissions = 0
             active_students = 0
 
-            for student in all_students:
+            for student in enrolled_students:
                 student_conversations = student_section_conversations_map.get(
                     student.id, {}
                 )
@@ -994,7 +1005,7 @@ class HomeworkService:
             )
 
             # Calculate statistics
-            total_students = len(all_students)
+            total_students = len(enrolled_students)
             inactive_students = total_students - active_students
             total_sections = len(homework_sections)
 

@@ -20,6 +20,7 @@ from accounts.models import Teacher, Student
 from homeworks.models import Homework, Section
 from conversations.models import Conversation, Submission
 from llm.models import LLMConfig
+from courses.models import Course, CourseEnrollment, CourseHomework
 
 User = get_user_model()
 
@@ -106,6 +107,22 @@ class HomeworkMatrixExportViewTest(TestCase):
         self.section2_1 = Section.objects.create(
             homework=self.homework2, title="Section 2.1", content="Content 2.1", order=1
         )
+
+        # Create course and enroll students
+        self.course = Course.objects.create(
+            name="Test Course",
+            description="Test course description",
+            code="TEST101",
+        )
+
+        # Enroll students in the course
+        CourseEnrollment.objects.create(course=self.course, student=self.student1)
+        CourseEnrollment.objects.create(course=self.course, student=self.student2)
+        CourseEnrollment.objects.create(course=self.course, student=self.student3)
+
+        # Assign homeworks to course
+        CourseHomework.objects.create(course=self.course, homework=self.homework1)
+        CourseHomework.objects.create(course=self.course, homework=self.homework2)
 
         # Export URL
         self.export_url = reverse("homeworks:matrix_export")
@@ -322,3 +339,47 @@ class HomeworkMatrixExportViewTest(TestCase):
         self.assertIn("student1@example.com", emails)
         self.assertIn("student2@example.com", emails)
         self.assertIn("student3@example.com", emails)
+
+    def test_non_enrolled_students_not_in_csv_export(self):
+        """Test that students not enrolled in any course are not included in CSV export."""
+        # Create a student who is NOT enrolled in the course
+        non_enrolled_user = User.objects.create_user(
+            username="non_enrolled",
+            email="non_enrolled@example.com",
+            password="password123",
+            first_name="Non",
+            last_name="Enrolled",
+        )
+        non_enrolled_student = Student.objects.create(user=non_enrolled_user)
+
+        # Create conversations and submissions for the non-enrolled student
+        # This should still NOT make them appear in the CSV
+        conv1 = Conversation.objects.create(user=non_enrolled_user, section=self.section1_1)
+        conv2 = Conversation.objects.create(user=non_enrolled_user, section=self.section2_1)
+        Submission.objects.create(conversation=conv1)
+        Submission.objects.create(conversation=conv2)
+
+        # Get CSV export
+        self.client.login(username="teacher", password="password123")
+        response = self.client.get(self.export_url)
+
+        content = response.content.decode("utf-8")
+        csv_reader = csv.reader(StringIO(content))
+        rows = list(csv_reader)
+
+        # Should have header + 3 enrolled students (not the non-enrolled one)
+        self.assertEqual(len(rows), 4)
+
+        # Collect student names and emails
+        student_names = [row[0] for row in rows[1:]]  # Skip header
+        student_emails = [row[2] for row in rows[1:]]  # Skip header
+
+        # Verify the non-enrolled student is NOT in the CSV
+        self.assertNotIn("Enrolled, Non", student_names)
+        self.assertNotIn("non_enrolled@example.com", student_emails)
+
+        # Verify only enrolled students are in the CSV
+        self.assertIn("Smith, Alice", student_names)
+        self.assertIn("Jones, Bob", student_names)
+        self.assertIn("student1@example.com", student_emails)
+        self.assertIn("student2@example.com", student_emails)

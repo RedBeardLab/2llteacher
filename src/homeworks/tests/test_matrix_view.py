@@ -18,6 +18,7 @@ from homeworks.models import Homework, Section
 from homeworks.services import HomeworkService
 from conversations.models import Conversation, Submission
 from llm.models import LLMConfig
+from courses.models import Course, CourseEnrollment, CourseHomework
 
 User = get_user_model()
 
@@ -94,6 +95,21 @@ class HomeworkMatrixViewTest(TestCase):
         self.section2_1 = Section.objects.create(
             homework=self.homework2, title="Section 2.1", content="Content 2.1", order=1
         )
+
+        # Create course and enroll students
+        self.course = Course.objects.create(
+            name="Test Course",
+            description="Test course description",
+            code="TEST101",
+        )
+
+        # Enroll students in the course
+        CourseEnrollment.objects.create(course=self.course, student=self.student1)
+        CourseEnrollment.objects.create(course=self.course, student=self.student2)
+
+        # Assign homeworks to course
+        CourseHomework.objects.create(course=self.course, homework=self.homework1)
+        CourseHomework.objects.create(course=self.course, homework=self.homework2)
 
         # Matrix URL
         self.matrix_url = reverse("homeworks:matrix")
@@ -338,3 +354,38 @@ class HomeworkMatrixViewTest(TestCase):
 
         # Soft-deleted conversation should not be counted
         self.assertEqual(hw1_cell.total_conversations, 0)
+
+    def test_non_enrolled_students_not_shown_in_matrix(self):
+        """Test that students not enrolled in any course with teacher's homeworks are not shown."""
+        # Create a student who is NOT enrolled in the course
+        non_enrolled_user = User.objects.create_user(
+            username="non_enrolled",
+            email="non_enrolled@example.com",
+            password="password123",
+            first_name="Non",
+            last_name="Enrolled",
+        )
+        non_enrolled_student = Student.objects.create(user=non_enrolled_user)
+
+        # Create conversations for the non-enrolled student
+        # This should still NOT make them appear in the matrix
+        conv1 = Conversation.objects.create(user=non_enrolled_user, section=self.section1_1)
+        conv2 = Conversation.objects.create(user=non_enrolled_user, section=self.section2_1)
+        Submission.objects.create(conversation=conv1)
+        Submission.objects.create(conversation=conv2)
+
+        # Get matrix data
+        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+
+        self.assertIsNotNone(matrix_data)
+        # Should only show the 2 enrolled students, not the non-enrolled one
+        self.assertEqual(matrix_data.total_students, 2)
+        self.assertEqual(len(matrix_data.student_rows), 2)
+
+        # Verify the non-enrolled student is NOT in the results
+        student_ids = [row.student_id for row in matrix_data.student_rows]
+        self.assertNotIn(non_enrolled_student.id, student_ids)
+
+        # Verify only enrolled students are shown
+        self.assertIn(self.student1.id, student_ids)
+        self.assertIn(self.student2.id, student_ids)
