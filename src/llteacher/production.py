@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "llteacher",  # Main project app for management commands
     "accounts",
     "conversations",
+    "courses",
     "homeworks",
     "llm",
 ]
