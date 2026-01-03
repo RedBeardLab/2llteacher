@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('courses', '0005_remove_course_homeworks_delete_coursehomework'),
-        ('homeworks', '0002_homework_course'),
+        ('homeworks', '0003_assign_homeworks_to_courses'),
     ]
 
     operations = [
