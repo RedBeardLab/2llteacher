@@ -494,9 +494,11 @@ class HomeworkService:
             )
 
             # Get students enrolled in courses that have any of the teacher's homeworks assigned
+            # Homework now has a direct FK to Course
+            # Include students from inactive courses to show historical submissions
             enrolled_students = (
                 Student.objects.filter(
-                    courseenrollment__course__coursehomework__homework__in=homeworks
+                    enrolled_courses__homeworks__in=homeworks,
                 )
                 .select_related("user")
                 .order_by("user__first_name", "user__last_name", "user__username")
@@ -836,10 +838,12 @@ class HomeworkService:
             # Get all sections for this homework, ordered by section order
             homework_sections = list(homework.sections.order_by("order"))
 
-            # Get students enrolled in courses that have this homework assigned
+            # Get students enrolled in the course that has this homework assigned
+            # Homework now has a direct FK to Course
+            # Include students from inactive enrollments to show historical submissions
             enrolled_students = (
                 Student.objects.filter(
-                    courseenrollment__course__coursehomework__homework=homework,
+                    enrolled_courses=homework.course,
                 )
                 .select_related("user")
                 .distinct()

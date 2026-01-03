@@ -20,7 +20,7 @@ from accounts.models import Teacher, Student
 from homeworks.models import Homework, Section
 from conversations.models import Conversation, Submission
 from llm.models import LLMConfig
-from courses.models import Course, CourseEnrollment, CourseHomework
+from courses.models import Course, CourseEnrollment
 
 User = get_user_model()
 
@@ -79,12 +79,25 @@ class HomeworkMatrixExportViewTest(TestCase):
             base_prompt="You are a helpful AI tutor.",
         )
 
-        # Create homeworks
+        # Create course and enroll students
+        self.course = Course.objects.create(
+            name="Test Course",
+            description="Test course description",
+            code="TEST101",
+        )
+
+        # Enroll students in the course
+        CourseEnrollment.objects.create(course=self.course, student=self.student1)
+        CourseEnrollment.objects.create(course=self.course, student=self.student2)
+        CourseEnrollment.objects.create(course=self.course, student=self.student3)
+
+        # Create homeworks with course assigned
         self.homework1 = Homework.objects.create(
             title="Homework 1",
             description="First homework",
             due_date=timezone.now() + timedelta(days=7),
             created_by=self.teacher,
+            course=self.course,
             llm_config=self.llm_config,
         )
 
@@ -101,28 +114,13 @@ class HomeworkMatrixExportViewTest(TestCase):
             description="Second homework",
             due_date=timezone.now() + timedelta(days=14),
             created_by=self.teacher,
+            course=self.course,
             llm_config=self.llm_config,
         )
 
         self.section2_1 = Section.objects.create(
             homework=self.homework2, title="Section 2.1", content="Content 2.1", order=1
         )
-
-        # Create course and enroll students
-        self.course = Course.objects.create(
-            name="Test Course",
-            description="Test course description",
-            code="TEST101",
-        )
-
-        # Enroll students in the course
-        CourseEnrollment.objects.create(course=self.course, student=self.student1)
-        CourseEnrollment.objects.create(course=self.course, student=self.student2)
-        CourseEnrollment.objects.create(course=self.course, student=self.student3)
-
-        # Assign homeworks to course
-        CourseHomework.objects.create(course=self.course, homework=self.homework1)
-        CourseHomework.objects.create(course=self.course, homework=self.homework2)
 
         # Export URL
         self.export_url = reverse("homeworks:matrix_export")
@@ -305,6 +303,7 @@ class HomeworkMatrixExportViewTest(TestCase):
             description="Third homework",
             due_date=timezone.now() + timedelta(days=21),
             created_by=self.teacher,
+            course=self.course,
             llm_config=self.llm_config,
         )
         Section.objects.create(

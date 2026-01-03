@@ -16,7 +16,7 @@ from accounts.models import Teacher, Student
 from homeworks.models import Homework, Section, SectionSolution
 from homeworks.services import HomeworkService, ParticipationStatus
 from conversations.models import Conversation, Message, Submission
-from courses.models import Course, CourseEnrollment, CourseHomework
+from courses.models import Course, CourseEnrollment
 
 User = get_user_model()
 
@@ -72,14 +72,6 @@ class HomeworkSubmissionsViewTest(TestCase):
         )
         self.student3 = Student.objects.create(user=self.student3_user)
 
-        # Create homework
-        self.homework = Homework.objects.create(
-            title="Test Homework",
-            description="Test homework description",
-            created_by=self.teacher,
-            due_date=timezone.now() + timedelta(days=7),
-        )
-
         # Create course and enroll students
         self.course = Course.objects.create(
             name="Test Course",
@@ -92,8 +84,14 @@ class HomeworkSubmissionsViewTest(TestCase):
         CourseEnrollment.objects.create(course=self.course, student=self.student2)
         CourseEnrollment.objects.create(course=self.course, student=self.student3)
 
-        # Assign homework to course
-        CourseHomework.objects.create(course=self.course, homework=self.homework)
+        # Create homework with course assigned
+        self.homework = Homework.objects.create(
+            title="Test Homework",
+            description="Test homework description",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
 
         # Create sections
         self.section1 = Section.objects.create(
@@ -303,14 +301,6 @@ class HomeworkSubmissionsServiceTest(TestCase):
         )
         self.student2 = Student.objects.create(user=self.student2_user)
 
-        # Create homework with sections
-        self.homework = Homework.objects.create(
-            title="Test Homework",
-            description="Test homework description",
-            created_by=self.teacher,
-            due_date=timezone.now() + timedelta(days=7),
-        )
-
         # Create course and enroll students
         self.course = Course.objects.create(
             name="Test Course",
@@ -322,8 +312,14 @@ class HomeworkSubmissionsServiceTest(TestCase):
         CourseEnrollment.objects.create(course=self.course, student=self.student1)
         CourseEnrollment.objects.create(course=self.course, student=self.student2)
 
-        # Assign homework to course
-        CourseHomework.objects.create(course=self.course, homework=self.homework)
+        # Create homework with sections
+        self.homework = Homework.objects.create(
+            title="Test Homework",
+            description="Test homework description",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
 
         self.section1 = Section.objects.create(
             homework=self.homework,
