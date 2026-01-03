@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}{{ data.course_name }}{% endblock %}
+
+{% block extra_js %}
+<!-- md-block for markdown rendering -->
+<script type="module" src="https://md-block.verou.me/md-block.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Course Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'courses:list' %}">Courses</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ data.course_name }}</li>
+                </ol>
+            </nav>
+            <h1>{{ data.course_name }}</h1>
+            <p class="lead">
+                <code>{{ data.course_code }}</code>
+                {% if data.user_type == 'teacher' %}
+                <span class="badge bg-primary ms-2">Teaching</span>
+                {% elif data.user_type == 'student' %}
+                <span class="badge bg-success ms-2">Enrolled</span>
+                {% endif %}
+            </p>
+            {% if data.course_description %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <md-block untrusted>{{ data.course_description }}</md-block>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Homeworks Section -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="mb-0"><i class="bi bi-file-text"></i> Homeworks</h2>
+                {% if data.user_type == 'teacher' %}
+                <a href="{% url 'courses:homework-create' data.course_id %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Create Homework
+                </a>
+                {% endif %}
+            </div>
+            {% if data.homeworks|length == 0 %}
+            <div class="alert alert-info">
+                No homeworks have been assigned to this course yet.
+            </div>
+            {% else %}
+            <div class="list-group">
+                {% for homework in data.homeworks %}
+                <a href="{% url 'homeworks:detail' homework.id %}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1">{{ homework.title }}</h5>
+                        <small class="text-muted">
+                            <i class="bi bi-calendar-event"></i> Due: {{ homework.due_date }}
+                        </small>
+                    </div>
+                    <p class="mb-1 text-muted">{{ homework.description|truncatewords:20 }}</p>
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Enrolled Students Section (Teachers Only) -->
+    {% if data.user_type == 'teacher' %}
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-people"></i> Enrolled Students</h2>
+            {% if data.enrolled_students|length == 0 %}
+            <div class="alert alert-info">
+                No students are enrolled in this course yet.
+            </div>
+            {% else %}
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        <strong>{{ data.enrolled_students|length }}</strong> student{{ data.enrolled_students|length|pluralize }} enrolled
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Enrolled At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in data.enrolled_students %}
+                                <tr>
+                                    <td>{{ student.username }}</td>
+                                    <td>{{ student.email }}</td>
+                                    <td>{{ student.enrolled_at }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -13,6 +13,7 @@ urlpatterns = [
     # Add your app URLs here
     path("accounts/", include("accounts.urls")),
     path("conversations/", include("conversations.urls")),
+    path("courses/", include("courses.urls")),
     path("homeworks/", include("homeworks.urls")),
     path("llm/", include("llm.urls")),
 ]

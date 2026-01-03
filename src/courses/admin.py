@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Course, CourseTeacher, CourseEnrollment, CourseHomework
+from .models import Course, CourseTeacher, CourseEnrollment
 
 
 @admin.register(Course)
@@ -22,10 +22,3 @@ class CourseEnrollmentAdmin(admin.ModelAdmin):
     list_display = ["course", "student", "enrolled_at", "is_active"]
     list_filter = ["is_active", "enrolled_at"]
     readonly_fields = ["enrolled_at"]
-
-
-@admin.register(CourseHomework)
-class CourseHomeworkAdmin(admin.ModelAdmin):
-    list_display = ["course", "homework", "assigned_at", "due_date"]
-    list_filter = ["assigned_at"]
-    readonly_fields = ["assigned_at"]

@@ -53,6 +53,7 @@ TEMPLATES = [
             BASE_DIR / "src/homeworks/templates",
             BASE_DIR / "src/accounts/templates",
             BASE_DIR / "src/conversations/templates",
+            BASE_DIR / "src/courses/templates",
             BASE_DIR / "src/llm/templates",
         ],
         "APP_DIRS": True,

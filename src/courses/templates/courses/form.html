@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if data.action == 'create' %}Create New Course{% else %}Edit Course{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1>
+        {% if data.action == 'create' %}Create New Course{% else %}Edit Course{% endif %}
+      </h1>
+    </div>
+    <div class="col-auto">
+      <a href="{% url 'courses:list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to List
+      </a>
+    </div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="card mb-4">
+      <div class="card-header bg-light">
+        <h5 class="mb-0">Course Details</h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label for="{{ data.form.name.id_for_label }}" class="form-label">Course Name</label>
+          {{ data.form.name }}
+          {% if data.form.name.errors %}
+          <div class="invalid-feedback d-block">
+            {{ data.form.name.errors|join:", " }}
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="{{ data.form.code.id_for_label }}" class="form-label">Course Code</label>
+          {{ data.form.code }}
+          {% if data.form.code.help_text %}
+          <div class="form-text">{{ data.form.code.help_text }}</div>
+          {% endif %}
+          {% if data.form.code.errors %}
+          <div class="invalid-feedback d-block">
+            {{ data.form.code.errors|join:", " }}
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="{{ data.form.description.id_for_label }}" class="form-label">Description</label>
+          {{ data.form.description }}
+          {% if data.form.description.errors %}
+          <div class="invalid-feedback d-block">
+            {{ data.form.description.errors|join:", " }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between">
+      <a href="{% url 'courses:list' %}" class="btn btn-secondary">
+        <i class="bi bi-x-circle"></i> Cancel
+      </a>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-save"></i>
+        {% if data.action == 'create' %}Create Course{% else %}Save Changes{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

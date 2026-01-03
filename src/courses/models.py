@@ -17,9 +17,6 @@ class Course(models.Model):
     students = models.ManyToManyField(
         "accounts.Student", through="CourseEnrollment", related_name="enrolled_courses"
     )
-    homeworks = models.ManyToManyField(
-        "homeworks.Homework", through="CourseHomework", related_name="assigned_courses"
-    )
 
     # Metadata
     is_active = models.BooleanField(default=True)
@@ -98,23 +95,3 @@ class CourseEnrollment(models.Model):
         return f"{self.student.user.email} - {self.course.name} ({status})"
 
 
-class CourseHomework(models.Model):
-    """Through model for Course-Homework relationship"""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    course = models.ForeignKey("Course", on_delete=models.CASCADE)
-    homework = models.ForeignKey("homeworks.Homework", on_delete=models.CASCADE)
-    assigned_at = models.DateTimeField(auto_now_add=True)
-    due_date = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "courses_course_homework"
-        unique_together = [("course", "homework")]
-        ordering = ["-assigned_at"]
-
-    def __str__(self):
-        return f"{self.homework.title} assigned to {self.course.name}"
-
-    def get_effective_due_date(self):
-        """Returns course-specific due date or falls back to homework due date"""
-        return self.due_date if self.due_date else self.homework.due_date

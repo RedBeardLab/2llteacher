@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Courses{% endblock %}
+
+{% block extra_js %}
+<!-- md-block for markdown rendering -->
+<script type="module" src="https://md-block.verou.me/md-block.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Courses</h1>
+            {% if data.user_type == 'student' %}
+            <p class="text-muted">Browse and enroll in available courses</p>
+            {% elif data.user_type == 'teacher' %}
+            <p class="text-muted">Your teaching courses</p>
+            {% endif %}
+        </div>
+        {% if data.user_type == 'teacher' %}
+        <div class="col-auto">
+            <a href="{% url 'courses:create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Create New Course
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if data.courses|length == 0 %}
+    <div class="alert alert-info">
+        {% if data.user_type == 'student' %}
+            No courses are currently available.
+        {% elif data.user_type == 'teacher' %}
+            You are not teaching any courses yet. <a href="{% url 'courses:create' %}">Create a course</a> to get started.
+        {% else %}
+            No courses available.
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        {% for course in data.courses %}
+        <div class="col">
+            <div class="card h-100 {% if course.is_enrolled %}border-success{% endif %}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <a href="{% url 'courses:detail' course.id %}" class="text-decoration-none">
+                            {{ course.name }}
+                        </a>
+                    </h5>
+                    {% if course.is_enrolled %}
+                    <span class="badge bg-success">Enrolled</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong>Course Code:</strong> <code>{{ course.code }}</code>
+                    </div>
+                    <div class="card-text">
+                        <md-block untrusted>{{ course.description }}</md-block>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    {% if data.user_type == 'student' %}
+                        {% if course.is_enrolled %}
+                        <button class="btn btn-success" disabled>
+                            <i class="bi bi-check-circle"></i> Already Enrolled
+                        </button>
+                        {% else %}
+                        <form method="post" action="{% url 'courses:enroll' course.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Enroll Now
+                            </button>
+                        </form>
+                        {% endif %}
+                    {% elif data.user_type == 'teacher' %}
+                        <span class="text-muted">
+                            <i class="bi bi-person-badge"></i> Teaching this course
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

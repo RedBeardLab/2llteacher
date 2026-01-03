@@ -53,6 +53,7 @@ class HomeworkCreateData:
     description: str
     due_date: Any  # datetime
     sections: list[SectionCreateData]
+    course_id: UUID  # Required - every homework belongs to a course
     llm_config: UUID | None = None
 
 
@@ -293,6 +294,7 @@ class HomeworkService:
                     description=data.description,
                     due_date=data.due_date,
                     created_by=teacher,
+                    course_id=data.course_id,
                     llm_config_id=data.llm_config,
                 )
 

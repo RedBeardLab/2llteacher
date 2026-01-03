@@ -23,7 +23,6 @@ from django.contrib import messages
 import csv
 
 from llteacher.permissions.decorators import teacher_required, TeacherRequest
-from courses.models import CourseHomework
 
 from .models import Homework, Section
 from .services import (
@@ -108,18 +107,13 @@ class HomeworkListView(View):
             # Get courses where this teacher is teaching
             teacher_courses = teacher_profile.courses.all()
 
-            # Get homeworks assigned to courses the teacher teaches
-            course_homework_ids = CourseHomework.objects.filter(
-                course__in=teacher_courses
-            ).values_list("homework_id", flat=True)
-
-            # Also include homeworks created by this teacher (even if not assigned to courses)
-            # Combine both querysets using Q objects
+            # Get homeworks for courses the teacher teaches or created by this teacher
+            # Since homework now has direct course FK, this is simpler
             from django.db.models import Q
 
             homework_objects = (
                 Homework.objects.filter(
-                    Q(id__in=course_homework_ids) | Q(created_by=teacher_profile)
+                    Q(course__in=teacher_courses) | Q(created_by=teacher_profile)
                 )
                 .distinct()
                 .order_by("-created_at")
@@ -150,12 +144,10 @@ class HomeworkListView(View):
             enrolled_courses = student_profile.enrolled_courses.filter(
                 courseenrollment__is_active=True
             )
-            homework_ids = CourseHomework.objects.filter(
-                course__in=enrolled_courses
-            ).values_list("homework_id", flat=True)
 
+            # Get homeworks for courses student is enrolled in (direct FK now)
             homework_objects = (
-                Homework.objects.filter(id__in=homework_ids)
+                Homework.objects.filter(course__in=enrolled_courses)
                 .order_by("-created_at")
                 .prefetch_related("sections")
             )
@@ -418,13 +410,12 @@ class HomeworkEditView(View):
         if homework.created_by == teacher_profile:
             return True
 
-        # Check if teacher teaches a course that has this homework
-        teacher_courses = teacher_profile.courses.all()
-        teaches_course_with_homework = CourseHomework.objects.filter(
-            homework=homework, course__in=teacher_courses
-        ).exists()
+        # Check if teacher teaches the course that has this homework (direct FK now)
+        if homework.course:
+            teacher_courses = teacher_profile.courses.all()
+            return homework.course in teacher_courses
 
-        return teaches_course_with_homework
+        return False
 
     def get(self, request: TeacherRequest, homework_id: UUID) -> HttpResponse:
         """Handle GET requests to display the edit form with existing data."""
@@ -651,12 +642,12 @@ class HomeworkDetailView(View):
 
             homework = Homework.objects.get(id=homework_id)
 
-            # Check if teacher can delete (created it OR teaches a course that has it)
+            # Check if teacher can delete (created it OR teaches the course that has it)
             created_by_teacher = homework.created_by == teacher_profile
-            teacher_courses = teacher_profile.courses.all()
-            teaches_course_with_homework = CourseHomework.objects.filter(
-                homework=homework, course__in=teacher_courses
-            ).exists()
+            teaches_course_with_homework = False
+            if homework.course:
+                teacher_courses = teacher_profile.courses.all()
+                teaches_course_with_homework = homework.course in teacher_courses
 
             if not (created_by_teacher or teaches_course_with_homework):
                 return HttpResponseForbidden(
@@ -693,16 +684,18 @@ class HomeworkDetailView(View):
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
 
-        # For students, check if they're enrolled in a course that has this homework
+        # For students, check if they're enrolled in the course that has this homework
         if student_profile:
-            enrolled_courses = student_profile.enrolled_courses.filter(
-                courseenrollment__is_active=True
-            )
-            has_access = CourseHomework.objects.filter(
-                homework_id=homework_id, course__in=enrolled_courses
-            ).exists()
+            homework = Homework.objects.filter(id=homework_id).first()
+            if homework and homework.course:
+                enrolled_courses = student_profile.enrolled_courses.filter(
+                    courseenrollment__is_active=True
+                )
+                has_access = homework.course in enrolled_courses
 
-            if not has_access:
+                if not has_access:
+                    return None
+            else:
                 return None
 
         # Get homework details using service
@@ -717,14 +710,15 @@ class HomeworkDetailView(View):
 
         if teacher_profile:
             user_type = "teacher"
-            # Teacher can edit if they created it OR if they teach a course that has this homework
+            # Teacher can edit if they created it OR if they teach the course that has this homework
             created_by_teacher = str(teacher_profile.id) == str(homework_detail.created_by)
 
-            # Check if teacher teaches a course that has this homework
-            teacher_courses = teacher_profile.courses.all()
-            teaches_course_with_homework = CourseHomework.objects.filter(
-                homework_id=homework_id, course__in=teacher_courses
-            ).exists()
+            # Check if teacher teaches the course that has this homework (direct FK now)
+            teaches_course_with_homework = False
+            homework_obj = Homework.objects.filter(id=homework_id).first()
+            if homework_obj and homework_obj.course:
+                teacher_courses = teacher_profile.courses.all()
+                teaches_course_with_homework = homework_obj.course in teacher_courses
 
             can_edit = created_by_teacher or teaches_course_with_homework
 
@@ -845,32 +839,29 @@ class SectionDetailView(View):
         teacher_profile = getattr(request.user, "teacher_profile", None)
         student_profile = getattr(request.user, "student_profile", None)
 
-        # Teacher must either own the homework OR teach a course that has it
+        # Teacher must either own the homework OR teach the course that has it
         if teacher_profile:
             created_by_teacher = homework.created_by == teacher_profile
 
-            # Check if teacher teaches a course that has this homework
-            teacher_courses = teacher_profile.courses.all()
-            teaches_course_with_homework = CourseHomework.objects.filter(
-                homework=homework, course__in=teacher_courses
-            ).exists()
+            # Check if teacher teaches the course that has this homework (direct FK now)
+            teaches_course_with_homework = False
+            if homework.course:
+                teacher_courses = teacher_profile.courses.all()
+                teaches_course_with_homework = homework.course in teacher_courses
 
             if not (created_by_teacher or teaches_course_with_homework):
                 return HttpResponseForbidden("Access denied.")
 
-        # For students, check if they're enrolled in a course that has this homework
+        # For students, check if they're enrolled in the course that has this homework
         if student_profile:
-            enrolled_courses = student_profile.enrolled_courses.filter(
-                courseenrollment__is_active=True
-            )
-            has_access = CourseHomework.objects.filter(
-                homework=homework, course__in=enrolled_courses
-            ).exists()
-
-            if not has_access:
-                return HttpResponseForbidden(
-                    "Access denied. You are not enrolled in a course that has this homework assigned."
-                )
+            if homework.course:
+                is_enrolled = homework.course.is_student_enrolled(student_profile)
+                if not is_enrolled:
+                    return HttpResponseForbidden(
+                        "Access denied. You are not enrolled in the course that has this homework."
+                    )
+            else:
+                return HttpResponseForbidden("Access denied. This homework is not assigned to a course.")
 
         # If user is neither teacher nor student, deny access
         if not teacher_profile and not student_profile:
@@ -1032,12 +1023,12 @@ class HomeworkSubmissionsView(View):
         try:
             homework = Homework.objects.get(id=homework_id)
 
-            # Check if teacher can view submissions (created it OR teaches a course that has it)
+            # Check if teacher can view submissions (created it OR teaches the course that has it)
             created_by_teacher = homework.created_by == request.user.teacher_profile
-            teacher_courses = request.user.teacher_profile.courses.all()
-            teaches_course_with_homework = CourseHomework.objects.filter(
-                homework=homework, course__in=teacher_courses
-            ).exists()
+            teaches_course_with_homework = False
+            if homework.course:
+                teacher_courses = request.user.teacher_profile.courses.all()
+                teaches_course_with_homework = homework.course in teacher_courses
 
             if not (created_by_teacher or teaches_course_with_homework):
                 return HttpResponseForbidden(

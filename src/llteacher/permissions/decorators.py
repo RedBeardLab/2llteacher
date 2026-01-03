@@ -14,7 +14,6 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
 from accounts.models import Teacher, Student
-from courses.models import CourseHomework
 
 # Type alias for request.user which can be either authenticated or anonymous
 RequestUser = AbstractBaseUser | AnonymousUser
@@ -266,7 +265,7 @@ def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
 
     Allows access if:
     1. User is a teacher who owns the homework
-    2. User is a student enrolled in an active course that has the homework assigned
+    2. User is a student enrolled in the course that has the homework
 
     Args:
         view_func: View function to decorate
@@ -288,20 +287,14 @@ def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
         if teacher and homework.created_by == teacher:
             return view_func(request, homework_id, *args, **kwargs)
 
-        # For students, check if they're enrolled in a course that has this homework
+        # For students, check if they're enrolled in the course that has this homework
         if student:
-            enrolled_courses = student.enrolled_courses.filter(
-                courseenrollment__is_active=True
-            )
-            has_access = CourseHomework.objects.filter(
-                homework=homework, course__in=enrolled_courses
-            ).exists()
-
-            if has_access:
+            is_enrolled = homework.course.is_student_enrolled(student)
+            if is_enrolled:
                 return view_func(request, homework_id, *args, **kwargs)
 
         return HttpResponseForbidden(
-            "Access denied. You are not enrolled in a course that has this homework assigned."
+            "Access denied. You are not enrolled in the course that has this homework."
         )
 
     return cast(ViewFunc, wrapper)

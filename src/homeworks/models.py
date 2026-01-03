@@ -13,6 +13,9 @@ class Homework(models.Model):
     created_by = models.ForeignKey(
         "accounts.Teacher", on_delete=models.CASCADE, related_name="homeworks_created"
     )
+    course = models.ForeignKey(
+        "courses.Course", on_delete=models.CASCADE, related_name="homeworks"
+    )
     due_date = models.DateTimeField()
     llm_config = models.ForeignKey(
         "llm.LLMConfig", on_delete=models.SET_NULL, null=True, blank=True
