@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth import get_user_model
-from courses.models import Course, CourseTeacher, CourseEnrollment, CourseHomework
+from courses.models import Course, CourseTeacher, CourseEnrollment
 from accounts.models import Teacher, Student
 from homeworks.models import Homework
 import uuid
@@ -325,148 +325,6 @@ class CourseEnrollmentModelTest(TestCase):
         self.assertEqual(enrollments[1], enrollment1)
 
 
-class CourseHomeworkModelTest(TestCase):
-    """Test cases for the CourseHomework model."""
-
-    def setUp(self):
-        self.User = get_user_model()
-        self.teacher_user = self.User.objects.create_user(
-            username="testteacher", password="testpass123"
-        )
-        self.teacher = Teacher.objects.create(user=self.teacher_user)
-
-        self.course = Course.objects.create(
-            name="Test Course",
-            description="Test Description",
-            code="TEST101",
-        )
-
-        self.homework = Homework.objects.create(
-            title="Test Homework",
-            description="Test homework description",
-            created_by=self.teacher,
-            due_date=timezone.now() + timedelta(days=7),
-        )
-
-    def test_course_homework_creation(self):
-        """Test basic CourseHomework creation."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        self.assertEqual(course_homework.course, self.course)
-        self.assertEqual(course_homework.homework, self.homework)
-        self.assertIsInstance(course_homework.id, uuid.UUID)
-
-    def test_course_homework_uuid_primary_key(self):
-        """Test that CourseHomework has UUID primary key."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        self.assertIsInstance(course_homework.id, uuid.UUID)
-
-    def test_course_homework_assigned_at(self):
-        """Test CourseHomework assigned_at timestamp."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        self.assertIsNotNone(course_homework.assigned_at)
-        self.assertIsInstance(course_homework.assigned_at, timezone.datetime)
-
-    def test_course_homework_without_due_date(self):
-        """Test CourseHomework creation without due_date."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        self.assertIsNone(course_homework.due_date)
-
-    def test_course_homework_with_due_date(self):
-        """Test CourseHomework creation with due_date."""
-        custom_due_date = timezone.now() + timedelta(days=14)
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-            due_date=custom_due_date,
-        )
-        self.assertEqual(course_homework.due_date, custom_due_date)
-
-    def test_course_homework_str_representation(self):
-        """Test CourseHomework string representation."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        expected_str = f"{self.homework.title} assigned to {self.course.name}"
-        self.assertEqual(str(course_homework), expected_str)
-
-    def test_course_homework_table_name(self):
-        """Test CourseHomework table name."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        self.assertEqual(course_homework._meta.db_table, "courses_course_homework")
-
-    def test_course_homework_unique_together(self):
-        """Test CourseHomework unique_together constraint."""
-        CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-
-        with self.assertRaises(Exception):
-            CourseHomework.objects.create(
-                course=self.course,
-                homework=self.homework,
-            )
-
-    def test_course_homework_ordering(self):
-        """Test CourseHomework ordering by assigned_at descending."""
-        course_homework1 = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-
-        homework2 = Homework.objects.create(
-            title="Test Homework 2",
-            description="Second homework",
-            created_by=self.teacher,
-            due_date=timezone.now() + timedelta(days=14),
-        )
-
-        course_homework2 = CourseHomework.objects.create(
-            course=self.course,
-            homework=homework2,
-        )
-
-        course_homeworks = list(CourseHomework.objects.all())
-        self.assertEqual(course_homeworks[0], course_homework2)
-        self.assertEqual(course_homeworks[1], course_homework1)
-
-    def test_get_effective_due_date_with_course_due_date(self):
-        """Test get_effective_due_date returns course-specific due date."""
-        custom_due_date = timezone.now() + timedelta(days=14)
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-            due_date=custom_due_date,
-        )
-        self.assertEqual(course_homework.get_effective_due_date(), custom_due_date)
-
-    def test_get_effective_due_date_without_course_due_date(self):
-        """Test get_effective_due_date falls back to homework due date."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        self.assertEqual(
-            course_homework.get_effective_due_date(), self.homework.due_date
-        )
-
-
 class CourseMethodsTest(TestCase):
     """Test cases for Course model methods."""
 
@@ -607,6 +465,7 @@ class CourseRelationshipsTest(TestCase):
             title="Test Homework",
             description="Test homework description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -658,50 +517,20 @@ class CourseRelationshipsTest(TestCase):
 
     def test_course_can_have_multiple_homeworks(self):
         """Test course can have multiple homeworks."""
-        CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-
+        # Homework now has direct FK to Course
         homework2 = Homework.objects.create(
             title="Test Homework 2",
             description="Second homework",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=14),
         )
 
-        CourseHomework.objects.create(
-            course=self.course,
-            homework=homework2,
-        )
-
+        # Check that both homeworks are associated with the course
         homeworks = list(self.course.homeworks.all())
         self.assertEqual(len(homeworks), 2)
         self.assertIn(self.homework, homeworks)
         self.assertIn(homework2, homeworks)
-
-    def test_homework_can_be_assigned_to_multiple_courses(self):
-        """Test homework can be assigned to multiple courses."""
-        CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-
-        course2 = Course.objects.create(
-            name="Test Course 2",
-            description="Test Description 2",
-            code="TEST201",
-        )
-
-        CourseHomework.objects.create(
-            course=course2,
-            homework=self.homework,
-        )
-
-        courses = list(self.homework.assigned_courses.all())
-        self.assertEqual(len(courses), 2)
-        self.assertIn(self.course, courses)
-        self.assertIn(course2, courses)
 
     def test_student_can_be_in_multiple_courses(self):
         """Test student can be enrolled in multiple courses."""
@@ -776,6 +605,7 @@ class CourseCascadeDeleteTest(TestCase):
             title="Test Homework",
             description="Test homework description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -802,15 +632,13 @@ class CourseCascadeDeleteTest(TestCase):
         self.assertFalse(CourseEnrollment.objects.filter(id=enrollment_id).exists())
 
     def test_course_delete_removes_course_homework(self):
-        """Test deleting course removes CourseHomework records."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        course_homework_id = course_homework.id
+        """Test deleting course cascades to homework (via FK)."""
+        # Homework now has direct FK to Course with CASCADE
+        homework_id = self.homework.id
 
         self.course.delete()
-        self.assertFalse(CourseHomework.objects.filter(id=course_homework_id).exists())
+        # Homework should be deleted when course is deleted
+        self.assertFalse(Homework.objects.filter(id=homework_id).exists())
 
     def test_teacher_delete_removes_course_teacher(self):
         """Test deleting teacher removes CourseTeacher records."""
@@ -833,18 +661,6 @@ class CourseCascadeDeleteTest(TestCase):
 
         self.student.delete()
         self.assertFalse(CourseEnrollment.objects.filter(id=enrollment_id).exists())
-
-    def test_homework_delete_removes_course_homework(self):
-        """Test deleting homework removes CourseHomework records."""
-        course_homework = CourseHomework.objects.create(
-            course=self.course,
-            homework=self.homework,
-        )
-        course_homework_id = course_homework.id
-
-        self.homework.delete()
-        self.assertFalse(CourseHomework.objects.filter(id=course_homework_id).exists())
-
 
 class CourseEdgeCasesTest(TestCase):
     """Test cases for course model edge cases."""

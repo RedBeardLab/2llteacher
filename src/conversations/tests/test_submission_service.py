@@ -14,6 +14,7 @@ from unittest.mock import patch
 from conversations.models import Conversation, Submission
 from conversations.services import SubmissionService
 from homeworks.models import Homework, Section
+from courses.models import Course
 from accounts.models import Teacher, Student
 
 User = get_user_model()
@@ -30,6 +31,13 @@ class SubmissionServiceTestCase(TestCase):
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         # Create a student user
         self.student_user = User.objects.create_user(
             username="teststudent", email="student@example.com", password="password123"
@@ -42,6 +50,7 @@ class SubmissionServiceTestCase(TestCase):
             description="Test Description",
             due_date=timezone.now() + timedelta(days=7),
             created_by=self.teacher,
+            course=self.course,
         )
 
         self.section = Section.objects.create(

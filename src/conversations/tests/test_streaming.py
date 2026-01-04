@@ -11,6 +11,7 @@ from django.urls import reverse
 from unittest.mock import patch
 
 from homeworks.models import Homework, Section
+from courses.models import Course
 from conversations.models import Conversation, Message
 from accounts.models import Student, Teacher
 
@@ -38,6 +39,13 @@ class StreamingLLMTest(TestCase):
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         # Create homework and section
         from datetime import datetime
 
@@ -45,6 +53,7 @@ class StreamingLLMTest(TestCase):
             title="Test Homework",
             description="Test description",
             created_by=self.teacher,
+            course=self.course,
             due_date=datetime(2024, 12, 31),
         )
 

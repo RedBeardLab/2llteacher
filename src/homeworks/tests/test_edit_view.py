@@ -41,11 +41,20 @@ class HomeworkEditViewTestCase(TestCase):
         )
         self.student = Student.objects.create(user=self.student_user)
 
+        # Create course
+        from courses.models import Course
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         # Create homework
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=datetime.datetime(2030, 1, 1),
         )
 

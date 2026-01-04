@@ -36,6 +36,14 @@ class HomeworkCreateViewTests(TestCase):
             username="teststudent", email="student@example.com", password="password123"
         )
 
+        # Create a course for homework assignment
+        from courses.models import Course
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         # Create the request factory
         self.factory = RequestFactory()
 

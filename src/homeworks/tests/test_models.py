@@ -13,11 +13,18 @@ class HomeworkModelTest(TestCase):
     """Test cases for the Homework model."""
 
     def setUp(self):
+        from courses.models import Course
+
         self.User = get_user_model()
         self.user = self.User.objects.create_user(
             username="testteacher", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
         self.llm_config = LLMConfig.objects.create(
             name="Test Config",
             model_name="gpt-4",
@@ -28,6 +35,7 @@ class HomeworkModelTest(TestCase):
             "title": "Test Homework",
             "description": "This is a test homework assignment",
             "created_by": self.teacher,
+            "course": self.course,
             "due_date": timezone.now() + timedelta(days=7),
             "llm_config": self.llm_config,
         }
@@ -71,6 +79,7 @@ class HomeworkModelTest(TestCase):
             title="Test Homework 2",
             description="Second homework",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=14),
         )
 
@@ -104,6 +113,7 @@ class HomeworkModelTest(TestCase):
             title="Future Homework",
             description="Future homework",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=1),
         )
         self.assertFalse(future_homework.is_overdue)
@@ -113,6 +123,7 @@ class HomeworkModelTest(TestCase):
             title="Past Homework",
             description="Past homework",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() - timedelta(days=1),
         )
         self.assertTrue(past_homework.is_overdue)
@@ -122,15 +133,23 @@ class SectionModelTest(TestCase):
     """Test cases for the Section model."""
 
     def setUp(self):
+        from courses.models import Course
+
         self.User = get_user_model()
         self.user = self.User.objects.create_user(
             username="testteacher", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.section_data = {
@@ -205,15 +224,23 @@ class SectionValidationTest(TestCase):
     """Test cases for section validation."""
 
     def setUp(self):
+        from courses.models import Course
+
         self.User = get_user_model()
         self.user = self.User.objects.create_user(
             username="testteacher", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -277,6 +304,7 @@ class SectionValidationTest(TestCase):
             title="Test Homework 2",
             description="Test Description 2",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=14),
         )
 
@@ -356,15 +384,23 @@ class HomeworkSectionRelationshipTest(TestCase):
     """Test cases for homework-section relationships."""
 
     def setUp(self):
+        from courses.models import Course
+
         self.User = get_user_model()
         self.user = self.User.objects.create_user(
             username="testteacher", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -426,11 +462,18 @@ class ModelEdgeCasesTest(TestCase):
     """Test cases for model edge cases."""
 
     def setUp(self):
+        from courses.models import Course
+
         self.User = get_user_model()
         self.user = self.User.objects.create_user(
             username="testteacher", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
 
     def test_homework_with_very_long_title(self):
         """Test homework with very long title."""
@@ -439,6 +482,7 @@ class ModelEdgeCasesTest(TestCase):
             title=long_title,
             description="Test description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.assertEqual(homework.title, long_title)
@@ -450,6 +494,7 @@ class ModelEdgeCasesTest(TestCase):
             title="Test Homework",
             description=long_description,
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.assertEqual(homework.description, long_description)
@@ -460,6 +505,7 @@ class ModelEdgeCasesTest(TestCase):
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -475,6 +521,7 @@ class ModelEdgeCasesTest(TestCase):
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -497,6 +544,7 @@ class ModelEdgeCasesTest(TestCase):
             title=special_title,
             description="Test description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.assertEqual(homework.title, special_title)
@@ -507,6 +555,7 @@ class ModelEdgeCasesTest(TestCase):
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 

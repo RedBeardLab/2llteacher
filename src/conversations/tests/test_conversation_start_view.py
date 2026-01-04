@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from accounts.models import User, Teacher, Student
 from homeworks.models import Homework, Section
+from courses.models import Course
 
 
 class ConversationStartViewTests(TestCase):
@@ -32,6 +33,13 @@ class ConversationStartViewTests(TestCase):
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         # Create a test user with student profile
         self.student_user = User.objects.create_user(
             username="studentuser",
@@ -47,6 +55,7 @@ class ConversationStartViewTests(TestCase):
             title="Test Homework",
             description="Test description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),  # Due in 7 days
         )
 

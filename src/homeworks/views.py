@@ -311,11 +311,23 @@ class HomeworkCreateView(View):
 
         # Check form validity
         if form.is_valid() and section_formset.is_valid():
+            # Get or create a default course for standalone homework creation
+            # In production, homework should be created through CourseHomeworkCreateView
+            from courses.models import Course
+            default_course, _ = Course.objects.get_or_create(
+                code="DEFAULT",
+                defaults={
+                    "name": "Default Course",
+                    "description": "Default course for standalone homeworks",
+                },
+            )
+
             # Extract homework data from form
             homework_data = HomeworkCreateData(
                 title=form.cleaned_data["title"],
                 description=form.cleaned_data["description"],
                 due_date=form.cleaned_data["due_date"],
+                course_id=default_course.id,
                 sections=[],
                 llm_config=form.cleaned_data["llm_config"].id
                 if form.cleaned_data["llm_config"]

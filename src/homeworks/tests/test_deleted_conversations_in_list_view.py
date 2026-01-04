@@ -12,7 +12,7 @@ from homeworks.models import Homework, Section
 from conversations.models import Conversation, Submission
 from homeworks.views import HomeworkListView
 from homeworks.services import HomeworkService, SectionStatus
-from courses.models import Course, CourseEnrollment, CourseHomework, CourseTeacher
+from courses.models import Course, CourseEnrollment, CourseTeacher
 
 User = get_user_model()
 
@@ -33,21 +33,6 @@ class DeletedConversationsListViewTests(TestCase):
         )
         self.teacher_profile = Teacher.objects.create(user=self.teacher_user)
 
-        # Create test homework and section
-        self.homework = Homework.objects.create(
-            title="Test Homework",
-            description="Test Description",
-            due_date="2030-12-31",  # Future date to avoid overdue status
-            created_by=self.teacher_profile,
-        )
-
-        self.section = Section.objects.create(
-            homework=self.homework,
-            title="Test Section",
-            content="Test section content",
-            order=1,
-        )
-
         # Create a course and enroll the student
         self.course = Course.objects.create(
             name="Test Course",
@@ -66,8 +51,21 @@ class DeletedConversationsListViewTests(TestCase):
             course=self.course, student=self.student_profile, is_active=True
         )
 
-        # Assign homework to course
-        CourseHomework.objects.create(course=self.course, homework=self.homework)
+        # Create test homework with course (direct FK relationship)
+        self.homework = Homework.objects.create(
+            title="Test Homework",
+            description="Test Description",
+            due_date="2030-12-31",  # Future date to avoid overdue status
+            created_by=self.teacher_profile,
+            course=self.course,
+        )
+
+        self.section = Section.objects.create(
+            homework=self.homework,
+            title="Test Section",
+            content="Test section content",
+            order=1,
+        )
 
     def test_deleted_conversation_not_shown_in_list_view(self):
         """
@@ -169,12 +167,13 @@ class DeletedConversationsListViewTests(TestCase):
         2. Student deletes conversation and starts new one
         3. Progress should show new conversation, not submitted status
         """
-        # Create homework with LLM config and future due date
+        # Create homework with course (direct FK relationship)
         homework = Homework.objects.create(
             title="Test Homework with Submission",
             description="Test homework description",
             due_date=timezone.now() + timedelta(days=7),
             created_by=self.teacher_profile,
+            course=self.course,
         )
 
         section = Section.objects.create(
@@ -183,9 +182,6 @@ class DeletedConversationsListViewTests(TestCase):
             content="Test section content",
             order=1,
         )
-
-        # Assign this homework to the course so student can see it
-        CourseHomework.objects.create(course=self.course, homework=homework)
 
         # Step 1: Create initial conversation and submit it
         initial_conversation = Conversation.objects.create(

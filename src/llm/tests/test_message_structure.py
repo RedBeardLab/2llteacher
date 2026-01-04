@@ -51,12 +51,22 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
             is_active=True,
         )
 
-        # Create homework and section with substantial content
+        # Create course first
+        from courses.models import Course
         from datetime import datetime
+
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
+        # Create homework with course (direct FK relationship)
         self.homework = Homework.objects.create(
             title="Python Basics Homework",
             description="Learn Python fundamentals",
             created_by=self.teacher,
+            course=self.course,
             due_date=datetime(2024, 12, 31),
             llm_config=self.llm_config,
         )

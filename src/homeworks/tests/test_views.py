@@ -16,7 +16,7 @@ import uuid
 from homeworks.models import Homework, Section
 from homeworks.views import HomeworkListView, HomeworkListData
 from accounts.models import Teacher, Student
-from courses.models import Course, CourseEnrollment, CourseHomework, CourseTeacher
+from courses.models import Course, CourseEnrollment, CourseTeacher
 
 User = get_user_model()
 
@@ -37,29 +37,6 @@ class HomeworkListViewTests(TestCase):
         )
         self.student = Student.objects.create(user=self.student_user)
 
-        # Create a sample homework
-        self.homework = Homework.objects.create(
-            title="Test Homework",
-            description="Test Description",
-            created_by=self.teacher,
-            due_date=timezone.now() + timedelta(days=7),
-        )
-
-        # Create sections for the homework
-        self.section1 = Section.objects.create(
-            homework=self.homework,
-            title="Section 1",
-            content="Test content for section 1",
-            order=1,
-        )
-
-        self.section2 = Section.objects.create(
-            homework=self.homework,
-            title="Section 2",
-            content="Test content for section 2",
-            order=2,
-        )
-
         # Create a course and enroll the student
         self.course = Course.objects.create(
             name="Test Course",
@@ -78,8 +55,29 @@ class HomeworkListViewTests(TestCase):
             course=self.course, student=self.student, is_active=True
         )
 
-        # Assign homework to course
-        CourseHomework.objects.create(course=self.course, homework=self.homework)
+        # Create homework with course (direct FK relationship)
+        self.homework = Homework.objects.create(
+            title="Test Homework",
+            description="Test Description",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+
+        # Create sections for the homework
+        self.section1 = Section.objects.create(
+            homework=self.homework,
+            title="Section 1",
+            content="Test content for section 1",
+            order=1,
+        )
+
+        self.section2 = Section.objects.create(
+            homework=self.homework,
+            title="Section 2",
+            content="Test content for section 2",
+            order=2,
+        )
 
         # Create the request factory
         self.factory = RequestFactory()

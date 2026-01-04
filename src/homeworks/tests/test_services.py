@@ -24,6 +24,7 @@ from homeworks.services import (
     SectionStatus,
 )
 from accounts.models import Teacher, Student
+from courses.models import Course
 
 User = get_user_model()
 
@@ -45,6 +46,13 @@ class HomeworkServiceTestCase(TestCase):
         )
         self.student = Student.objects.create(user=self.student_user)
 
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         # Create test data for sections
         self.section1 = SectionCreateData(
             title="Section 1",
@@ -65,6 +73,7 @@ class HomeworkServiceTestCase(TestCase):
             title="Test Homework",
             description="Test Description for homework",
             due_date=timezone.now() + timedelta(days=7),
+            course_id=self.course.id,
             sections=[self.section1, self.section2],
             llm_config=None,
         )
@@ -121,6 +130,7 @@ class TestHomeworkServiceCreate(HomeworkServiceTestCase):
             title="Homework Without Solutions",
             description="Test Description",
             due_date=timezone.now() + timedelta(days=7),
+            course_id=self.course.id,
             sections=[section1, section2],
         )
 
@@ -145,6 +155,7 @@ class TestHomeworkServiceCreate(HomeworkServiceTestCase):
             title="",
             description="Test",
             due_date=timezone.now() + timedelta(days=7),
+            course_id=self.course.id,
             sections=[self.section1],
         )
 

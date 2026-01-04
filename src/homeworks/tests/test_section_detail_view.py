@@ -12,7 +12,7 @@ from django.urls import reverse
 from accounts.models import User, Teacher, Student
 from homeworks.models import Homework, Section, SectionSolution
 from conversations.models import Conversation, Submission
-from courses.models import Course, CourseEnrollment, CourseHomework, CourseTeacher
+from courses.models import Course, CourseEnrollment, CourseTeacher
 
 
 class SectionDetailViewTestCase(TestCase):
@@ -32,7 +32,25 @@ class SectionDetailViewTestCase(TestCase):
         )
         self.student = Student.objects.create(user=self.student_user)
 
-        # Create homework with timezone-naive datetime
+        # Create a course and enroll the student
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+            is_active=True,
+        )
+
+        # Add teacher to course
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+
+        # Enroll student in course
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student, is_active=True
+        )
+
+        # Create homework with timezone-naive datetime and course (direct FK relationship)
         import datetime
 
         # Use a naive datetime object for the test
@@ -40,6 +58,7 @@ class SectionDetailViewTestCase(TestCase):
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=datetime.datetime(2030, 1, 1),
         )
 
@@ -75,27 +94,6 @@ class SectionDetailViewTestCase(TestCase):
         self.teacher_conversation = Conversation.objects.create(
             user=self.teacher_user, section=self.section_with_solution
         )
-
-        # Create a course and enroll the student
-        self.course = Course.objects.create(
-            name="Test Course",
-            code="TEST101",
-            description="Test course description",
-            is_active=True,
-        )
-
-        # Add teacher to course
-        CourseTeacher.objects.create(
-            course=self.course, teacher=self.teacher, role="owner"
-        )
-
-        # Enroll student in course
-        CourseEnrollment.objects.create(
-            course=self.course, student=self.student, is_active=True
-        )
-
-        # Assign homework to course
-        CourseHomework.objects.create(course=self.course, homework=self.homework)
 
         # Set up client
         self.client = Client()

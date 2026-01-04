@@ -15,7 +15,7 @@ from homeworks.views import HomeworkListView
 from homeworks.services import HomeworkService, HomeworkCreateData, SectionCreateData
 from accounts.models import Teacher, Student
 from conversations.models import Conversation
-from courses.models import Course, CourseEnrollment, CourseHomework, CourseTeacher
+from courses.models import Course, CourseEnrollment, CourseTeacher
 
 User = get_user_model()
 
@@ -37,27 +37,6 @@ class TestHomeworkListViewProgress(TestCase):
         )
         self.student = Student.objects.create(user=self.student_user)
 
-        # Create test homework with 4 sections
-        homework_data = HomeworkCreateData(
-            title="Test Homework",
-            description="Test Description",
-            due_date=timezone.now() + timedelta(days=7),
-            sections=[
-                SectionCreateData(title="Section 1", content="Content 1", order=1),
-                SectionCreateData(title="Section 2", content="Content 2", order=2),
-                SectionCreateData(title="Section 3", content="Content 3", order=3),
-                SectionCreateData(title="Section 4", content="Content 4", order=4),
-            ],
-        )
-
-        result = HomeworkService.create_homework_with_sections(
-            homework_data, self.teacher
-        )
-        self.homework = Homework.objects.get(id=result.homework_id)
-        self.sections = list(
-            Section.objects.filter(homework=self.homework).order_by("order")
-        )
-
         # Create a course and enroll the student
         self.course = Course.objects.create(
             name="Test Course",
@@ -76,8 +55,27 @@ class TestHomeworkListViewProgress(TestCase):
             course=self.course, student=self.student, is_active=True
         )
 
-        # Assign homework to course
-        CourseHomework.objects.create(course=self.course, homework=self.homework)
+        # Create test homework with 4 sections (includes course_id)
+        homework_data = HomeworkCreateData(
+            title="Test Homework",
+            description="Test Description",
+            due_date=timezone.now() + timedelta(days=7),
+            course_id=self.course.id,
+            sections=[
+                SectionCreateData(title="Section 1", content="Content 1", order=1),
+                SectionCreateData(title="Section 2", content="Content 2", order=2),
+                SectionCreateData(title="Section 3", content="Content 3", order=3),
+                SectionCreateData(title="Section 4", content="Content 4", order=4),
+            ],
+        )
+
+        result = HomeworkService.create_homework_with_sections(
+            homework_data, self.teacher
+        )
+        self.homework = Homework.objects.get(id=result.homework_id)
+        self.sections = list(
+            Section.objects.filter(homework=self.homework).order_by("order")
+        )
 
     def test_progress_percentages_no_activity(self):
         """Test percentage calculations when student has no activity."""
@@ -167,11 +165,12 @@ class TestHomeworkListViewProgress(TestCase):
 
     def test_progress_percentages_rounding(self):
         """Test percentage calculations with rounding (3 sections for 33.33% scenarios)."""
-        # Create homework with 3 sections for testing rounding
+        # Create homework with 3 sections for testing rounding (includes course_id)
         homework_data = HomeworkCreateData(
             title="Rounding Test Homework",
             description="Test Description",
             due_date=timezone.now() + timedelta(days=7),
+            course_id=self.course.id,
             sections=[
                 SectionCreateData(title="Section A", content="Content A", order=1),
                 SectionCreateData(title="Section B", content="Content B", order=2),
@@ -186,9 +185,6 @@ class TestHomeworkListViewProgress(TestCase):
         sections_3 = list(
             Section.objects.filter(homework=homework_3_sections).order_by("order")
         )
-
-        # Assign this homework to the course so student can see it
-        CourseHomework.objects.create(course=self.course, homework=homework_3_sections)
 
         # Create conversation for 1 out of 3 sections (33.33% -> should round to 33%)
         Conversation.objects.create(user=self.student_user, section=sections_3[0])

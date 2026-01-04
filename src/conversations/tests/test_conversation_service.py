@@ -18,6 +18,7 @@ from conversations.services import (
     ConversationStartResult,
 )
 from homeworks.models import Homework, Section
+from courses.models import Course
 from accounts.models import Teacher, Student, User
 
 
@@ -32,6 +33,13 @@ class ConversationServiceTestCase(TestCase):
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         # Create a student user
         self.student_user = User.objects.create_user(
             username="teststudent", email="student@example.com", password="password123"
@@ -44,6 +52,7 @@ class ConversationServiceTestCase(TestCase):
             description="Test Description",
             due_date=timezone.now() + timedelta(days=7),
             created_by=self.teacher,
+            course=self.course,
         )
 
         self.section = Section.objects.create(

@@ -318,12 +318,21 @@ class TestLLMGenerateAPIView(LLMViewsTestCase):
         # Create necessary database objects for the test
         from homeworks.models import Homework, Section
         from conversations.models import Conversation
+        from courses.models import Course
 
-        # Create homework and section
+        # Create a course first
+        course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
+        # Create homework with course (direct FK relationship)
         homework = Homework.objects.create(
             title="Test Homework",
             description="Test homework description",
             created_by=self.teacher,
+            course=course,
             due_date="2024-12-31 23:59:59",
             llm_config=self.llm_config,
         )

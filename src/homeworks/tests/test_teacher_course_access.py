@@ -16,7 +16,7 @@ from datetime import timedelta
 from homeworks.models import Homework, Section
 from homeworks.views import HomeworkListView, HomeworkEditView
 from accounts.models import Teacher
-from courses.models import Course, CourseHomework, CourseTeacher
+from courses.models import Course, CourseTeacher
 
 User = get_user_model()
 
@@ -78,13 +78,25 @@ class TeacherCourseAccessTestCase(TestCase):
             course=self.course2, teacher=self.teacher2, role="owner"
         )
 
-        # Teacher3 is not part of any course
+        # Create a third course for teacher3's homework
+        self.course3 = Course.objects.create(
+            name="Course 3",
+            code="COURSE3",
+            description="Course 3 description",
+            is_active=True,
+        )
 
-        # Create homework1 by teacher1, assigned to course1
+        # Teacher3 is owner of course3
+        CourseTeacher.objects.create(
+            course=self.course3, teacher=self.teacher3, role="owner"
+        )
+
+        # Create homework1 by teacher1, assigned to course1 (direct FK relationship)
         self.homework1 = Homework.objects.create(
             title="Homework 1 - Variables",
             description="Learn about variables",
             created_by=self.teacher1,
+            course=self.course1,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.section1 = Section.objects.create(
@@ -93,13 +105,13 @@ class TeacherCourseAccessTestCase(TestCase):
             content="Content 1",
             order=1,
         )
-        CourseHomework.objects.create(course=self.course1, homework=self.homework1)
 
-        # Create homework2 by teacher2, assigned to course2
+        # Create homework2 by teacher2, assigned to course2 (direct FK relationship)
         self.homework2 = Homework.objects.create(
             title="Homework 2 - Decorators",
             description="Learn about decorators",
             created_by=self.teacher2,
+            course=self.course2,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.section2 = Section.objects.create(
@@ -108,13 +120,13 @@ class TeacherCourseAccessTestCase(TestCase):
             content="Content 1",
             order=1,
         )
-        CourseHomework.objects.create(course=self.course2, homework=self.homework2)
 
-        # Create homework3 by teacher3, not assigned to any course
+        # Create homework3 by teacher3, assigned to course3 (direct FK relationship)
         self.homework3 = Homework.objects.create(
             title="Homework 3 - Unassigned",
-            description="Not assigned to any course",
+            description="Not assigned to teacher1 or teacher2 courses",
             created_by=self.teacher3,
+            course=self.course3,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.section3 = Section.objects.create(
@@ -124,11 +136,12 @@ class TeacherCourseAccessTestCase(TestCase):
             order=1,
         )
 
-        # Create homework4 by teacher1, assigned to course2 (to test cross-course scenario)
+        # Create homework4 by teacher1, assigned to course2 (direct FK - cross-course scenario)
         self.homework4 = Homework.objects.create(
             title="Homework 4 - Cross-Course",
             description="Created by teacher1 but assigned to course2",
             created_by=self.teacher1,
+            course=self.course2,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.section4 = Section.objects.create(
@@ -137,7 +150,6 @@ class TeacherCourseAccessTestCase(TestCase):
             content="Content 1",
             order=1,
         )
-        CourseHomework.objects.create(course=self.course2, homework=self.homework4)
 
         self.client = Client()
 
@@ -433,6 +445,7 @@ class TestTeacherRoleInCourse(TeacherCourseAccessTestCase):
             title="Homework by Other",
             description="Created by another teacher",
             created_by=other_teacher,
+            course=self.course1,
             due_date=timezone.now() + timedelta(days=7),
         )
         Section.objects.create(
@@ -441,7 +454,6 @@ class TestTeacherRoleInCourse(TeacherCourseAccessTestCase):
             content="Content 1",
             order=1,
         )
-        CourseHomework.objects.create(course=self.course1, homework=homework_other)
 
         # Both teacher1 (owner) and teacher2 (co-teacher) should see this homework
         self.client.login(username="teacher1", password="password123")

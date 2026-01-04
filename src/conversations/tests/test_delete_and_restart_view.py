@@ -10,6 +10,7 @@ from unittest.mock import patch, MagicMock
 
 from accounts.models import Student, Teacher
 from homeworks.models import Homework, Section
+from courses.models import Course
 from conversations.models import Conversation
 from conversations.services import ConversationService
 
@@ -34,12 +35,20 @@ class ConversationDeleteAndRestartViewTests(TestCase):
         )
         self.teacher_profile = Teacher.objects.create(user=self.teacher_user)
 
+        # Create course
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         # Create test homework and section
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             due_date="2024-12-31",
             created_by=self.teacher_profile,
+            course=self.course,
         )
 
         self.section = Section.objects.create(

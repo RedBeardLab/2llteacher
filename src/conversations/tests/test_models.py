@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from conversations.models import Conversation, Message, Submission
 from accounts.models import Teacher, Student
 from homeworks.models import Homework, Section
+from courses.models import Course
 import uuid
 from datetime import timedelta
 
@@ -21,12 +22,20 @@ class ConversationModelTest(TestCase):
             username="teststudent", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
         self.student = Student.objects.create(user=self.student_user)
 
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -139,11 +148,18 @@ class MessageModelTest(TestCase):
             username="testuser", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
 
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -311,10 +327,18 @@ class SubmissionModelTest(TestCase):
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -460,11 +484,18 @@ class ConversationMessageRelationshipTest(TestCase):
             username="testuser", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
 
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -532,10 +563,18 @@ class ConversationSubmissionRelationshipTest(TestCase):
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 
@@ -578,11 +617,18 @@ class ModelEdgeCasesTest(TestCase):
             username="testuser", password="testpass123"
         )
         self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+
 
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
             created_by=self.teacher,
+            course=self.course,
             due_date=timezone.now() + timedelta(days=7),
         )
 

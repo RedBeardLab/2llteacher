@@ -13,7 +13,7 @@ from datetime import timedelta
 
 from homeworks.models import Homework, Section
 from accounts.models import Teacher, Student
-from courses.models import Course, CourseEnrollment, CourseHomework, CourseTeacher
+from courses.models import Course, CourseEnrollment, CourseTeacher
 
 User = get_user_model()
 
@@ -79,11 +79,12 @@ class CourseEnrollmentAccessTestCase(TestCase):
             course=self.course2, student=self.student2, is_active=True
         )
 
-        # Create homework for course1
+        # Create homework for course1 (direct FK relationship)
         self.homework1 = Homework.objects.create(
             title="Homework 1 - Variables",
             description="Learn about variables",
             created_by=self.teacher,
+            course=self.course1,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.section1 = Section.objects.create(
@@ -92,13 +93,13 @@ class CourseEnrollmentAccessTestCase(TestCase):
             content="Content 1",
             order=1,
         )
-        CourseHomework.objects.create(course=self.course1, homework=self.homework1)
 
-        # Create homework for course2
+        # Create homework for course2 (direct FK relationship)
         self.homework2 = Homework.objects.create(
             title="Homework 2 - Decorators",
             description="Learn about decorators",
             created_by=self.teacher,
+            course=self.course2,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.section2 = Section.objects.create(
@@ -107,13 +108,24 @@ class CourseEnrollmentAccessTestCase(TestCase):
             content="Content 1",
             order=1,
         )
-        CourseHomework.objects.create(course=self.course2, homework=self.homework2)
 
-        # Create homework not assigned to any course
+        # Create a third course for unassigned homework test
+        self.course3 = Course.objects.create(
+            name="Unassigned Course",
+            code="UNASSIGNED",
+            description="Course for unassigned homework",
+            is_active=True,
+        )
+        CourseTeacher.objects.create(
+            course=self.course3, teacher=self.teacher, role="owner"
+        )
+
+        # Create homework for course3 (not assigned to student courses)
         self.homework_unassigned = Homework.objects.create(
             title="Homework 3 - Unassigned",
-            description="Not assigned to any course",
+            description="Not assigned to any student course",
             created_by=self.teacher,
+            course=self.course3,
             due_date=timezone.now() + timedelta(days=7),
         )
         self.section_unassigned = Section.objects.create(

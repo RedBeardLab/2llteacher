@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from accounts.models import Teacher, Student
 from homeworks.models import Homework, Section
+from courses.models import Course
 from llm.models import LLMConfig
 
 User = get_user_model()
@@ -31,6 +32,13 @@ class HomeworkDeleteViewTest(TestCase):
             last_name="Teacher",
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        # Create course for homework assignment
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
 
         # Create another teacher for permission testing
         self.other_teacher_user = User.objects.create_user(
@@ -60,6 +68,7 @@ class HomeworkDeleteViewTest(TestCase):
             description="Test description",
             due_date="2024-12-31 23:59:59",
             created_by=self.teacher,
+            course=self.course,
             llm_config=self.llm_config,
         )
 
