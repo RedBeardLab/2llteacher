@@ -154,6 +154,7 @@ class HomeworkEditViewTestCase(TestCase):
         post_data = {
             "title": "Updated Homework Title",
             "description": "Updated description",
+            "course": self.course.id,
             "due_date": "2030-02-01T00:00:00",
             "llm_config": "",
             "sections-TOTAL_FORMS": "2",
@@ -203,6 +204,7 @@ class HomeworkEditViewTestCase(TestCase):
         post_data = {
             "title": "Updated Homework Title",
             "description": "Updated description",
+            "course": self.course.id,
             "due_date": "2030-02-01T00:00:00",
             "llm_config": "",
             "sections-TOTAL_FORMS": "2",
@@ -239,6 +241,7 @@ class HomeworkEditViewTestCase(TestCase):
         post_data = {
             "title": "",  # Empty title should fail validation
             "description": "Updated description",
+            "course": self.course.id,
             "due_date": "2020-01-01T00:00:00",  # Past date should fail validation
             "llm_config": "",
             "sections-TOTAL_FORMS": "2",

@@ -424,8 +424,8 @@ class CourseHomeworkCreateView(View):
         from homeworks.forms import HomeworkForm, SectionForm, SectionFormSet
         from django.forms import formset_factory
 
-        # Create an empty homework form
-        form = HomeworkForm()
+        # Create homework form with course pre-populated
+        form = HomeworkForm(initial={"course": course})
 
         # Create empty section form (we'll start with one)
         SectionFormset = formset_factory(SectionForm, extra=1, formset=SectionFormSet)
@@ -453,8 +453,12 @@ class CourseHomeworkCreateView(View):
         )
         from django.forms import formset_factory
 
+        # Create a mutable copy of POST data and inject course
+        post_data = request.POST.copy()
+        post_data["course"] = course.id
+
         # Create forms from POST data
-        form = HomeworkForm(request.POST)
+        form = HomeworkForm(post_data)
 
         SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
         section_formset = SectionFormset(request.POST, prefix="sections")

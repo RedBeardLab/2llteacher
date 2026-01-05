@@ -54,7 +54,7 @@ class HomeworkForm(forms.ModelForm):
 
     class Meta:
         model = Homework
-        fields = ["title", "description", "due_date", "llm_config"]
+        fields = ["title", "description", "course", "due_date", "llm_config"]
         widgets = {
             "title": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Homework Title"}
@@ -65,6 +65,9 @@ class HomeworkForm(forms.ModelForm):
                     "rows": 4,
                     "placeholder": "Homework description...",
                 }
+            ),
+            "course": forms.Select(
+                attrs={"class": "form-select", "placeholder": "Select Course"}
             ),
             "due_date": forms.DateTimeInput(
                 attrs={
