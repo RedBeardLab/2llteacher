@@ -166,14 +166,11 @@ class TestLLMServiceResponses(LLMServiceTestCase):
 
         # Check OpenAI client was initialized with OpenRouter endpoint and API key
         mock_openai_class.assert_called_once_with(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=self.llm_config.api_key
+            base_url="https://openrouter.ai/api/v1", api_key=self.llm_config.api_key
         )
 
         # Check API was called
         mock_client.chat.completions.create.assert_called_once()
-
-
 
     def test_is_meaningful_chunk_validation(self):
         """Test chunk validation logic."""
@@ -181,7 +178,7 @@ class TestLLMServiceResponses(LLMServiceTestCase):
         self.assertTrue(LLMService._is_meaningful_chunk("Hello"))
         self.assertTrue(LLMService._is_meaningful_chunk("a"))
         self.assertTrue(LLMService._is_meaningful_chunk("  text  "))
-        
+
         # Test non-meaningful chunks
         self.assertFalse(LLMService._is_meaningful_chunk(""))
         self.assertFalse(LLMService._is_meaningful_chunk("   "))

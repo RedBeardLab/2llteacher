@@ -166,7 +166,11 @@ class HomeworkMatrixViewTest(TestCase):
 
         # Find student1's row
         student1_row = next(
-            (row for row in matrix_data.student_rows if row.student_id == self.student1.id),
+            (
+                row
+                for row in matrix_data.student_rows
+                if row.student_id == self.student1.id
+            ),
             None,
         )
 
@@ -174,7 +178,11 @@ class HomeworkMatrixViewTest(TestCase):
 
         # Check homework 1 cell for student 1
         hw1_cell = next(
-            (cell for cell in student1_row.homework_cells if cell.homework_id == self.homework1.id),
+            (
+                cell
+                for cell in student1_row.homework_cells
+                if cell.homework_id == self.homework1.id
+            ),
             None,
         )
 
@@ -195,13 +203,21 @@ class HomeworkMatrixViewTest(TestCase):
 
         # Find student1's row
         student1_row = next(
-            (row for row in matrix_data.student_rows if row.student_id == self.student1.id),
+            (
+                row
+                for row in matrix_data.student_rows
+                if row.student_id == self.student1.id
+            ),
             None,
         )
 
         # Check homework 1 cell
         hw1_cell = next(
-            (cell for cell in student1_row.homework_cells if cell.homework_id == self.homework1.id),
+            (
+                cell
+                for cell in student1_row.homework_cells
+                if cell.homework_id == self.homework1.id
+            ),
             None,
         )
 
@@ -217,10 +233,14 @@ class HomeworkMatrixViewTest(TestCase):
             Submission.objects.create(conversation=conv, submitted_at=timezone.now())
 
         # Student 2: Partial homework 1, complete homework 2
-        conv = Conversation.objects.create(user=self.student2_user, section=self.section1_1)
+        conv = Conversation.objects.create(
+            user=self.student2_user, section=self.section1_1
+        )
         Submission.objects.create(conversation=conv, submitted_at=timezone.now())
 
-        conv2 = Conversation.objects.create(user=self.student2_user, section=self.section2_1)
+        conv2 = Conversation.objects.create(
+            user=self.student2_user, section=self.section2_1
+        )
         Submission.objects.create(conversation=conv2, submitted_at=timezone.now())
 
         matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
@@ -230,14 +250,22 @@ class HomeworkMatrixViewTest(TestCase):
 
         # Verify student 1
         student1_row = next(
-            (row for row in matrix_data.student_rows if row.student_id == self.student1.id),
+            (
+                row
+                for row in matrix_data.student_rows
+                if row.student_id == self.student1.id
+            ),
             None,
         )
         self.assertEqual(student1_row.total_submissions, 2)
 
         # Verify student 2
         student2_row = next(
-            (row for row in matrix_data.student_rows if row.student_id == self.student2.id),
+            (
+                row
+                for row in matrix_data.student_rows
+                if row.student_id == self.student2.id
+            ),
             None,
         )
         self.assertEqual(student2_row.total_submissions, 2)
@@ -245,7 +273,9 @@ class HomeworkMatrixViewTest(TestCase):
     def test_matrix_view_renders_correctly(self):
         """Test that matrix view renders with correct data."""
         # Create some submissions
-        conv = Conversation.objects.create(user=self.student1_user, section=self.section1_1)
+        conv = Conversation.objects.create(
+            user=self.student1_user, section=self.section1_1
+        )
         Submission.objects.create(conversation=conv, submitted_at=timezone.now())
 
         self.client.login(username="teacher", password="password123")
@@ -319,35 +349,53 @@ class HomeworkMatrixViewTest(TestCase):
     def test_matrix_overall_completion_percentage(self):
         """Test calculation of overall completion percentage."""
         # Student 1 completes 1 out of 3 total sections
-        conv = Conversation.objects.create(user=self.student1_user, section=self.section1_1)
+        conv = Conversation.objects.create(
+            user=self.student1_user, section=self.section1_1
+        )
         Submission.objects.create(conversation=conv, submitted_at=timezone.now())
 
         matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
 
         student1_row = next(
-            (row for row in matrix_data.student_rows if row.student_id == self.student1.id),
+            (
+                row
+                for row in matrix_data.student_rows
+                if row.student_id == self.student1.id
+            ),
             None,
         )
 
         # Should be 33% (1 out of 3 sections)
         expected_percentage = round((1 / 3) * 100)
-        self.assertEqual(student1_row.overall_completion_percentage, expected_percentage)
+        self.assertEqual(
+            student1_row.overall_completion_percentage, expected_percentage
+        )
 
     def test_matrix_with_deleted_conversations(self):
         """Test that soft-deleted conversations are not counted."""
         # Create and soft-delete a conversation
-        conv = Conversation.objects.create(user=self.student1_user, section=self.section1_1)
+        conv = Conversation.objects.create(
+            user=self.student1_user, section=self.section1_1
+        )
         conv.soft_delete()
 
         matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
 
         student1_row = next(
-            (row for row in matrix_data.student_rows if row.student_id == self.student1.id),
+            (
+                row
+                for row in matrix_data.student_rows
+                if row.student_id == self.student1.id
+            ),
             None,
         )
 
         hw1_cell = next(
-            (cell for cell in student1_row.homework_cells if cell.homework_id == self.homework1.id),
+            (
+                cell
+                for cell in student1_row.homework_cells
+                if cell.homework_id == self.homework1.id
+            ),
             None,
         )
 
@@ -368,8 +416,12 @@ class HomeworkMatrixViewTest(TestCase):
 
         # Create conversations for the non-enrolled student
         # This should still NOT make them appear in the matrix
-        conv1 = Conversation.objects.create(user=non_enrolled_user, section=self.section1_1)
-        conv2 = Conversation.objects.create(user=non_enrolled_user, section=self.section2_1)
+        conv1 = Conversation.objects.create(
+            user=non_enrolled_user, section=self.section1_1
+        )
+        conv2 = Conversation.objects.create(
+            user=non_enrolled_user, section=self.section2_1
+        )
         Submission.objects.create(conversation=conv1)
         Submission.objects.create(conversation=conv2)
 

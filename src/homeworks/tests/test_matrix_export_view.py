@@ -200,7 +200,9 @@ class HomeworkMatrixExportViewTest(TestCase):
     def test_csv_completion_format_no_percentage_symbols(self):
         """Test that completion data has no percentage symbols (just numbers)."""
         # Create some submissions
-        conv = Conversation.objects.create(user=self.student1_user, section=self.section1_1)
+        conv = Conversation.objects.create(
+            user=self.student1_user, section=self.section1_1
+        )
         Submission.objects.create(conversation=conv, submitted_at=timezone.now())
 
         self.client.login(username="teacher", password="password123")
@@ -227,7 +229,9 @@ class HomeworkMatrixExportViewTest(TestCase):
     def test_csv_homework_completion_format(self):
         """Test that homework completion is in percentage format (0-100)."""
         # Student 1 completes 1 of 2 sections in homework 1
-        conv = Conversation.objects.create(user=self.student1_user, section=self.section1_1)
+        conv = Conversation.objects.create(
+            user=self.student1_user, section=self.section1_1
+        )
         Submission.objects.create(conversation=conv, submitted_at=timezone.now())
 
         self.client.login(username="teacher", password="password123")
@@ -353,8 +357,12 @@ class HomeworkMatrixExportViewTest(TestCase):
 
         # Create conversations and submissions for the non-enrolled student
         # This should still NOT make them appear in the CSV
-        conv1 = Conversation.objects.create(user=non_enrolled_user, section=self.section1_1)
-        conv2 = Conversation.objects.create(user=non_enrolled_user, section=self.section2_1)
+        conv1 = Conversation.objects.create(
+            user=non_enrolled_user, section=self.section1_1
+        )
+        conv2 = Conversation.objects.create(
+            user=non_enrolled_user, section=self.section2_1
+        )
         Submission.objects.create(conversation=conv1)
         Submission.objects.create(conversation=conv2)
 

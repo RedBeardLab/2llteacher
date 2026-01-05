@@ -154,7 +154,6 @@ class MessageModelTest(TestCase):
             description="Test course description",
         )
 
-
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
@@ -490,7 +489,6 @@ class ConversationMessageRelationshipTest(TestCase):
             description="Test course description",
         )
 
-
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
@@ -622,7 +620,6 @@ class ModelEdgeCasesTest(TestCase):
             code="TEST101",
             description="Test course description",
         )
-
 
         self.homework = Homework.objects.create(
             title="Test Homework",

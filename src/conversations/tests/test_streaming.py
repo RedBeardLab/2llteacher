@@ -77,15 +77,21 @@ class StreamingLLMTest(TestCase):
         """Test streaming LLM response functionality."""
         # Mock the enhanced streaming response with StreamToken objects
         from llm.services import StreamToken, StreamTokenType, FinishReason
-        
-        mock_stream.return_value = iter([
-            StreamToken(type=StreamTokenType.TOKEN, content="Hello"),
-            StreamToken(type=StreamTokenType.TOKEN, content=" there"),
-            StreamToken(type=StreamTokenType.TOKEN, content="! How"),
-            StreamToken(type=StreamTokenType.TOKEN, content=" can I"),
-            StreamToken(type=StreamTokenType.TOKEN, content=" help?"),
-            StreamToken(type=StreamTokenType.COMPLETE, content="Hello there! How can I help?", finish_reason=FinishReason.STOP),
-        ])
+
+        mock_stream.return_value = iter(
+            [
+                StreamToken(type=StreamTokenType.TOKEN, content="Hello"),
+                StreamToken(type=StreamTokenType.TOKEN, content=" there"),
+                StreamToken(type=StreamTokenType.TOKEN, content="! How"),
+                StreamToken(type=StreamTokenType.TOKEN, content=" can I"),
+                StreamToken(type=StreamTokenType.TOKEN, content=" help?"),
+                StreamToken(
+                    type=StreamTokenType.COMPLETE,
+                    content="Hello there! How can I help?",
+                    finish_reason=FinishReason.STOP,
+                ),
+            ]
+        )
 
         url = reverse(
             "conversations:api_stream", kwargs={"conversation_id": self.conversation.id}

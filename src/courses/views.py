@@ -14,7 +14,12 @@ from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
-from llteacher.permissions.decorators import student_required, StudentRequest, teacher_required, TeacherRequest
+from llteacher.permissions.decorators import (
+    student_required,
+    StudentRequest,
+    teacher_required,
+    TeacherRequest,
+)
 
 from .models import Course, CourseEnrollment, CourseTeacher
 from .forms import CourseForm
@@ -150,9 +155,7 @@ class CourseEnrollView(View):
             if not enrollment.is_active:
                 enrollment.is_active = True
                 enrollment.save()
-                messages.success(
-                    request, f"Re-enrolled in {course.name} successfully!"
-                )
+                messages.success(request, f"Re-enrolled in {course.name} successfully!")
             else:
                 messages.info(request, f"You are already enrolled in {course.name}.")
         else:
@@ -419,7 +422,9 @@ class CourseHomeworkCreateView(View):
         teacher_courses = teacher_profile.courses.all()
         return course in teacher_courses
 
-    def _get_view_data(self, request: TeacherRequest, course: Course) -> HomeworkFormData:
+    def _get_view_data(
+        self, request: TeacherRequest, course: Course
+    ) -> HomeworkFormData:
         """Prepare data for the form view."""
         from homeworks.forms import HomeworkForm, SectionForm, SectionFormSet
         from django.forms import formset_factory

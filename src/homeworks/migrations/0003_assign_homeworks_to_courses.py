@@ -5,8 +5,8 @@ from django.db import migrations
 
 def assign_homeworks_to_courses(apps, schema_editor):
     """Assign all homeworks without a course to a default course."""
-    Homework = apps.get_model('homeworks', 'Homework')
-    Course = apps.get_model('courses', 'Course')
+    Homework = apps.get_model("homeworks", "Homework")
+    Course = apps.get_model("courses", "Course")
 
     # Get all homeworks without a course
     orphaned_homeworks = Homework.objects.filter(course__isnull=True)
@@ -17,7 +17,7 @@ def assign_homeworks_to_courses(apps, schema_editor):
 
     # Try to get the STAT302 course first, or any available course
     try:
-        default_course = Course.objects.get(code='STAT302-Furfaro-First')
+        default_course = Course.objects.get(code="STAT302-Furfaro-First")
     except Course.DoesNotExist:
         # If STAT302 doesn't exist, use the first available course
         default_course = Course.objects.first()
@@ -43,10 +43,9 @@ def reverse_assignment(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0005_remove_course_homeworks_delete_coursehomework'),
-        ('homeworks', '0002_homework_course'),
+        ("courses", "0005_remove_course_homeworks_delete_coursehomework"),
+        ("homeworks", "0002_homework_course"),
     ]
 
     operations = [

@@ -299,7 +299,9 @@ class HomeworkEditView(View):
         # Get the homework and check permissions
         try:
             homework = Homework.objects.get(id=homework_id)
-            if not self._can_teacher_edit_homework(request.user.teacher_profile, homework):
+            if not self._can_teacher_edit_homework(
+                request.user.teacher_profile, homework
+            ):
                 return HttpResponseForbidden(
                     "You don't have permission to edit this homework."
                 )
@@ -316,7 +318,9 @@ class HomeworkEditView(View):
         # Get the homework and check permissions
         try:
             homework = Homework.objects.get(id=homework_id)
-            if not self._can_teacher_edit_homework(request.user.teacher_profile, homework):
+            if not self._can_teacher_edit_homework(
+                request.user.teacher_profile, homework
+            ):
                 return HttpResponseForbidden(
                     "You don't have permission to edit this homework."
                 )
@@ -588,7 +592,9 @@ class HomeworkDetailView(View):
         if teacher_profile:
             user_type = "teacher"
             # Teacher can edit if they created it OR if they teach the course that has this homework
-            created_by_teacher = str(teacher_profile.id) == str(homework_detail.created_by)
+            created_by_teacher = str(teacher_profile.id) == str(
+                homework_detail.created_by
+            )
 
             # Check if teacher teaches the course that has this homework (direct FK now)
             teaches_course_with_homework = False
@@ -738,7 +744,9 @@ class SectionDetailView(View):
                         "Access denied. You are not enrolled in the course that has this homework."
                     )
             else:
-                return HttpResponseForbidden("Access denied. This homework is not assigned to a course.")
+                return HttpResponseForbidden(
+                    "Access denied. This homework is not assigned to a course."
+                )
 
         # If user is neither teacher nor student, deny access
         if not teacher_profile and not student_profile:

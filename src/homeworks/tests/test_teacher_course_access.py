@@ -398,7 +398,9 @@ class TestTeacherSubmissionsViewAccess(TeacherCourseAccessTestCase):
     def test_teacher_can_view_submissions_from_their_course(self):
         """Test that teacher1 can view submissions for homework from course1."""
         self.client.login(username="teacher1", password="password123")
-        url = reverse("homeworks:submissions", kwargs={"homework_id": self.homework1.id})
+        url = reverse(
+            "homeworks:submissions", kwargs={"homework_id": self.homework1.id}
+        )
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -406,7 +408,9 @@ class TestTeacherSubmissionsViewAccess(TeacherCourseAccessTestCase):
     def test_coteacher_can_view_submissions_from_course(self):
         """Test that teacher2 (co-teacher) can view submissions from course1."""
         self.client.login(username="teacher2", password="password123")
-        url = reverse("homeworks:submissions", kwargs={"homework_id": self.homework1.id})
+        url = reverse(
+            "homeworks:submissions", kwargs={"homework_id": self.homework1.id}
+        )
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -414,7 +418,9 @@ class TestTeacherSubmissionsViewAccess(TeacherCourseAccessTestCase):
     def test_teacher_cannot_view_submissions_from_other_course(self):
         """Test that teacher1 cannot view submissions from course2."""
         self.client.login(username="teacher1", password="password123")
-        url = reverse("homeworks:submissions", kwargs={"homework_id": self.homework2.id})
+        url = reverse(
+            "homeworks:submissions", kwargs={"homework_id": self.homework2.id}
+        )
         response = self.client.get(url)
 
         # Should be forbidden
@@ -423,7 +429,9 @@ class TestTeacherSubmissionsViewAccess(TeacherCourseAccessTestCase):
     def test_teacher_can_view_submissions_for_own_homework_in_other_course(self):
         """Test that teacher1 can view submissions for homework4 (they created it)."""
         self.client.login(username="teacher1", password="password123")
-        url = reverse("homeworks:submissions", kwargs={"homework_id": self.homework4.id})
+        url = reverse(
+            "homeworks:submissions", kwargs={"homework_id": self.homework4.id}
+        )
         response = self.client.get(url)
 
         # Can view because they created it

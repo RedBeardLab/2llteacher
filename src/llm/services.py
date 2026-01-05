@@ -23,12 +23,14 @@ from openai import OpenAI
 
 class StreamTokenType(StrEnum):
     """Types of streaming tokens."""
+
     TOKEN = "token"
     COMPLETE = "complete"
 
 
 class FinishReason(StrEnum):
     """OpenAI finish reasons."""
+
     STOP = "stop"
     LENGTH = "length"
     CONTENT_FILTER = "content_filter"
@@ -37,7 +39,9 @@ class FinishReason(StrEnum):
 
 class StreamingError(Exception):
     """Custom exception for streaming errors."""
+
     pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +119,7 @@ class LLMConfigUpdateResult:
 @dataclass
 class StreamToken:
     """Token object for streaming with completion signal."""
+
     type: StreamTokenType
     content: str
     finish_reason: FinishReason | None = None
@@ -125,7 +130,9 @@ class ConversationContext:
     section_title: str
     section_content: str
     homework_title: str
-    messages: list[dict[str, str]]  # List of {"role": "user/assistant", "content": "..."}
+    messages: list[
+        dict[str, str]
+    ]  # List of {"role": "user/assistant", "content": "..."}
     current_message: str
     message_type: str
 
@@ -137,7 +144,6 @@ class LLMService:
     This service follows a testable-first approach with clear data contracts
     and properly typed methods for easier testing and maintenance.
     """
-
 
     @staticmethod
     def get_response(
@@ -161,7 +167,9 @@ class LLMService:
                 hasattr(conversation.section, "homework")
                 and conversation.section.homework.llm_config
             ):
-                llm_config = LLMConfigData.from_model(conversation.section.homework.llm_config)
+                llm_config = LLMConfigData.from_model(
+                    conversation.section.homework.llm_config
+                )
 
             # If no config on homework, get default config
             if not llm_config:
@@ -206,12 +214,11 @@ class LLMService:
             LLMResponseResult with response or error
         """
         start_time = time.perf_counter()
-        
+
         try:
             # Initialize OpenAI client with OpenRouter endpoint
             client = OpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=llm_config.api_key
+                base_url="https://openrouter.ai/api/v1", api_key=llm_config.api_key
             )
 
             # Build messages for OpenAI API with proper typing
@@ -249,39 +256,45 @@ class LLMService:
                 tokens_used = response.usage.total_tokens if response.usage else 0
 
                 # Log response timing
-                logger.info("LLM response timing", extra={
-                    "event_type": "llm_response_timing",
-                    "model_name": llm_config.model_name,
-                    "response_mode": "non_streaming",
-                    "query_preparation_ms": query_preparation_ms,
-                    "api_response_time_ms": api_response_time_ms,
-                    "total_response_time_ms": total_response_time_ms,
-                    "token_count": tokens_used,
-                    "success": True,
-                    "section_title": context.section_title,
-                    "homework_title": context.homework_title,
-                    "message_type": context.message_type
-                })
+                logger.info(
+                    "LLM response timing",
+                    extra={
+                        "event_type": "llm_response_timing",
+                        "model_name": llm_config.model_name,
+                        "response_mode": "non_streaming",
+                        "query_preparation_ms": query_preparation_ms,
+                        "api_response_time_ms": api_response_time_ms,
+                        "total_response_time_ms": total_response_time_ms,
+                        "token_count": tokens_used,
+                        "success": True,
+                        "section_title": context.section_title,
+                        "homework_title": context.homework_title,
+                        "message_type": context.message_type,
+                    },
+                )
 
                 return LLMResponseResult(
                     response_text=response_text, tokens_used=tokens_used, success=True
                 )
             else:
                 # Log failed response timing
-                logger.info("LLM response timing", extra={
-                    "event_type": "llm_response_timing",
-                    "model_name": llm_config.model_name,
-                    "response_mode": "non_streaming",
-                    "query_preparation_ms": query_preparation_ms,
-                    "api_response_time_ms": api_response_time_ms,
-                    "total_response_time_ms": total_response_time_ms,
-                    "token_count": 0,
-                    "success": False,
-                    "error": "No response generated from OpenAI API",
-                    "section_title": context.section_title,
-                    "homework_title": context.homework_title,
-                    "message_type": context.message_type
-                })
+                logger.info(
+                    "LLM response timing",
+                    extra={
+                        "event_type": "llm_response_timing",
+                        "model_name": llm_config.model_name,
+                        "response_mode": "non_streaming",
+                        "query_preparation_ms": query_preparation_ms,
+                        "api_response_time_ms": api_response_time_ms,
+                        "total_response_time_ms": total_response_time_ms,
+                        "token_count": 0,
+                        "success": False,
+                        "error": "No response generated from OpenAI API",
+                        "section_title": context.section_title,
+                        "homework_title": context.homework_title,
+                        "message_type": context.message_type,
+                    },
+                )
 
                 return LLMResponseResult(
                     response_text="",
@@ -296,25 +309,26 @@ class LLMService:
             total_response_time_ms = int((end_time - start_time) * 1000)
 
             # Log error timing
-            logger.info("LLM response timing", extra={
-                "event_type": "llm_response_timing",
-                "model_name": llm_config.model_name,
-                "response_mode": "non_streaming",
-                "total_response_time_ms": total_response_time_ms,
-                "token_count": 0,
-                "success": False,
-                "error": str(e),
-                "section_title": context.section_title,
-                "homework_title": context.homework_title,
-                "message_type": context.message_type
-            })
+            logger.info(
+                "LLM response timing",
+                extra={
+                    "event_type": "llm_response_timing",
+                    "model_name": llm_config.model_name,
+                    "response_mode": "non_streaming",
+                    "total_response_time_ms": total_response_time_ms,
+                    "token_count": 0,
+                    "success": False,
+                    "error": str(e),
+                    "section_title": context.section_title,
+                    "homework_title": context.homework_title,
+                    "message_type": context.message_type,
+                },
+            )
 
             logger.error(f"OpenAI API error: {str(e)}")
             return LLMResponseResult(
                 response_text="", tokens_used=0, success=False, error=str(e)
             )
-
-
 
     @staticmethod
     def _is_meaningful_chunk(content: str) -> bool:
@@ -329,11 +343,10 @@ class LLMService:
         """
         if not content:
             return False
-        
+
         # Strip whitespace and check if anything meaningful remains
         stripped = content.strip()
         return len(stripped) > 0 and not stripped.isspace()
-
 
     @staticmethod
     def stream_response_with_completion(
@@ -361,7 +374,9 @@ class LLMService:
                 hasattr(conversation.section, "homework")
                 and conversation.section.homework.llm_config
             ):
-                llm_config = LLMConfigData.from_model(conversation.section.homework.llm_config)
+                llm_config = LLMConfigData.from_model(
+                    conversation.section.homework.llm_config
+                )
 
             # If no config on homework, get default config
             if not llm_config:
@@ -379,7 +394,9 @@ class LLMService:
 
         except Exception as e:
             error_id = uuid.uuid4()
-            logger.error(f"Error in stream_response_with_completion [ID: {error_id}]: {str(e)}")
+            logger.error(
+                f"Error in stream_response_with_completion [ID: {error_id}]: {str(e)}"
+            )
             raise StreamingError(f"Streaming failed: {str(e)}")
 
     @staticmethod
@@ -405,23 +422,26 @@ class LLMService:
                 accumulated_response = ""
                 chunk_count = 0
                 meaningful_chunks = 0
-                
+
                 # Stream with finish reason detection
-                for token, finish_reason in LLMService._stream_with_finish_reason_detection(
+                for (
+                    token,
+                    finish_reason,
+                ) in LLMService._stream_with_finish_reason_detection(
                     llm_config, context
                 ):
                     if token:  # Only process non-empty tokens
                         chunk_count += 1
                         accumulated_response += token
-                        
+
                         # Check if token is meaningful
                         if LLMService._is_meaningful_chunk(token):
                             meaningful_chunks += 1
                             yield StreamToken(type=StreamTokenType.TOKEN, content=token)
-                
+
                 # Validate response quality before checking finish reason
                 response_length = len(accumulated_response)
-                
+
                 # Check if we got sufficient meaningful content
                 if meaningful_chunks == 0 or response_length < 3:
                     logger.warning(
@@ -430,14 +450,14 @@ class LLMService:
                     )
                     # Treat as interrupted stream, continue to retry
                     continue
-                
+
                 # Check completion reason
                 if finish_reason == FinishReason.STOP:
                     # Success! Signal completion with full response
                     yield StreamToken(
                         type=StreamTokenType.COMPLETE,
                         content=accumulated_response,
-                        finish_reason=finish_reason
+                        finish_reason=finish_reason,
                     )
                     return
                 elif finish_reason == FinishReason.LENGTH:
@@ -454,20 +474,28 @@ class LLMService:
                     continue
                 else:
                     # Unknown finish reason - treat as error and retry
-                    logger.warning(f"Unknown finish reason: {finish_reason}, retrying...")
+                    logger.warning(
+                        f"Unknown finish reason: {finish_reason}, retrying..."
+                    )
                     continue
-                    
+
             except StreamingError:
                 # Re-raise streaming errors (don't retry)
                 raise
             except Exception as e:
-                logger.error(f"Streaming error on attempt {attempt + 1}/{max_retries}: {str(e)}")
+                logger.error(
+                    f"Streaming error on attempt {attempt + 1}/{max_retries}: {str(e)}"
+                )
                 if attempt == max_retries - 1:
                     # Final attempt failed
-                    raise StreamingError(f"Failed to generate response after {max_retries} attempts")
-        
+                    raise StreamingError(
+                        f"Failed to generate response after {max_retries} attempts"
+                    )
+
         # All retries exhausted - this should be the primary path for max retries
-        raise StreamingError(f"Failed to generate response after {max_retries} attempts")
+        raise StreamingError(
+            f"Failed to generate response after {max_retries} attempts"
+        )
 
     @staticmethod
     def _stream_with_finish_reason_detection(
@@ -487,11 +515,10 @@ class LLMService:
             Exception: Any OpenAI API or streaming errors are propagated up
         """
         start_time = time.perf_counter()
-        
+
         # Initialize OpenAI client with OpenRouter endpoint
         client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=llm_config.api_key
+            base_url="https://openrouter.ai/api/v1", api_key=llm_config.api_key
         )
 
         # Build messages for OpenAI API
@@ -523,20 +550,20 @@ class LLMService:
         finish_reason = None
         first_token_time = None
         token_count = 0
-        
+
         for chunk in stream:
             if chunk.choices and len(chunk.choices) > 0:
                 choice = chunk.choices[0]
-                
+
                 # Extract token content
                 if hasattr(choice.delta, "content") and choice.delta.content:
                     # Record time of first token
                     if first_token_time is None:
                         first_token_time = time.perf_counter()
-                    
+
                     token_count += 1
                     yield choice.delta.content, None
-                
+
                 # Capture finish reason from final chunk
                 if hasattr(choice, "finish_reason") and choice.finish_reason:
                     finish_reason_str = choice.finish_reason
@@ -545,37 +572,46 @@ class LLMService:
                         finish_reason = FinishReason(finish_reason_str)
                     except ValueError:
                         # Unknown finish reason
-                        logger.warning(f"Unknown finish reason from OpenAI: {finish_reason_str}")
+                        logger.warning(
+                            f"Unknown finish reason from OpenAI: {finish_reason_str}"
+                        )
                         finish_reason = None
-        
+
         # Calculate timing metrics
         end_time = time.perf_counter()
         total_response_time_ms = int((end_time - start_time) * 1000)
-        
+
         if first_token_time is not None:
-            time_to_first_token_ms = int((first_token_time - query_prepared_time) * 1000)
+            time_to_first_token_ms = int(
+                (first_token_time - query_prepared_time) * 1000
+            )
             total_streaming_time_ms = int((end_time - first_token_time) * 1000)
         else:
             time_to_first_token_ms = 0
             total_streaming_time_ms = 0
 
         # Log streaming timing
-        logger.info("LLM response timing", extra={
-            "event_type": "llm_response_timing",
-            "model_name": llm_config.model_name,
-            "response_mode": "streaming",
-            "query_preparation_ms": query_preparation_ms,
-            "time_to_first_token_ms": time_to_first_token_ms,
-            "total_streaming_time_ms": total_streaming_time_ms,
-            "total_response_time_ms": total_response_time_ms,
-            "token_count": token_count,
-            "success": finish_reason == FinishReason.STOP if finish_reason else False,
-            "finish_reason": finish_reason.value if finish_reason else None,
-            "section_title": context.section_title,
-            "homework_title": context.homework_title,
-            "message_type": context.message_type
-        })
-        
+        logger.info(
+            "LLM response timing",
+            extra={
+                "event_type": "llm_response_timing",
+                "model_name": llm_config.model_name,
+                "response_mode": "streaming",
+                "query_preparation_ms": query_preparation_ms,
+                "time_to_first_token_ms": time_to_first_token_ms,
+                "total_streaming_time_ms": total_streaming_time_ms,
+                "total_response_time_ms": total_response_time_ms,
+                "token_count": token_count,
+                "success": finish_reason == FinishReason.STOP
+                if finish_reason
+                else False,
+                "finish_reason": finish_reason.value if finish_reason else None,
+                "section_title": context.section_title,
+                "homework_title": context.homework_title,
+                "message_type": context.message_type,
+            },
+        )
+
         # Yield final finish reason (even if None for interrupted streams)
         yield "", finish_reason
 
@@ -613,10 +649,12 @@ class LLMService:
         )
 
     @staticmethod
-    def _build_system_message(llm_config: LLMConfigData, context: ConversationContext) -> str:
+    def _build_system_message(
+        llm_config: LLMConfigData, context: ConversationContext
+    ) -> str:
         """
         Build system message with base prompt and section context.
-        
+
         Section context is included once in the system message to avoid repetition
         in every user message, significantly reducing token usage in multi-turn conversations.
 
@@ -634,9 +672,9 @@ class LLMService:
             f"Section: {context.section_title}",
             f"Section Content: {context.section_content}",
             "",  # Empty line for separation
-            "Please respond as an AI tutor helping the student with this section. Guide them without giving away the complete answer."
+            "Please respond as an AI tutor helping the student with this section. Guide them without giving away the complete answer.",
         ]
-        
+
         return "\n".join(parts)
 
     @staticmethod

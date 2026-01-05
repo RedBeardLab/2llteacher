@@ -63,7 +63,6 @@ def reverse_teachers_and_students(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0003_alter_course_code_alter_course_name"),
         ("accounts", "0001_initial"),  # Add dependency on accounts app

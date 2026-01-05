@@ -19,8 +19,8 @@ from accounts.models import Teacher, Student
 RequestUser = AbstractBaseUser | AnonymousUser
 
 # ParamSpec for preserving function signatures
-P = ParamSpec('P')
-R = TypeVar('R', bound=HttpResponse)
+P = ParamSpec("P")
+R = TypeVar("R", bound=HttpResponse)
 
 # Create a type variable for the view function
 ViewFunc = TypeVar("ViewFunc", bound=Callable[..., HttpResponse])
@@ -28,35 +28,39 @@ ViewFunc = TypeVar("ViewFunc", bound=Callable[..., HttpResponse])
 
 class UserWithTeacher(Protocol):
     """Protocol for User with teacher_profile attribute."""
+
     teacher_profile: Teacher
 
 
 class UserWithStudent(Protocol):
     """Protocol for User with student_profile attribute."""
+
     student_profile: Student
 
 
 class TeacherRequest(HttpRequest):
     """Request type where user is guaranteed to have teacher_profile.
-    
+
     Note: The user attribute override is intentional - the decorator guarantees
     this type narrowing at runtime. The type: ignore is necessary because mypy
     doesn't allow narrowing an attribute type in a subclass.
     """
+
     user: UserWithTeacher  # type: ignore[assignment]
 
 
 class StudentRequest(HttpRequest):
     """Request type where user is guaranteed to have student_profile.
-    
+
     Note: The user attribute override is intentional - the decorator guarantees
     this type narrowing at runtime. The type: ignore is necessary because mypy
     doesn't allow narrowing an attribute type in a subclass.
     """
+
     user: UserWithStudent  # type: ignore[assignment]
 
 
-def get_teacher_or_student(user: RequestUser) -> tuple[Teacher | None , Student | None]:
+def get_teacher_or_student(user: RequestUser) -> tuple[Teacher | None, Student | None]:
     """
     Get teacher and student profiles from a user object.
 
@@ -71,10 +75,12 @@ def get_teacher_or_student(user: RequestUser) -> tuple[Teacher | None , Student 
     return teacher, student
 
 
-def teacher_required(view_func: Callable[Concatenate[TeacherRequest, P], R]) -> Callable[Concatenate[HttpRequest, P], R]:
+def teacher_required(
+    view_func: Callable[Concatenate[TeacherRequest, P], R],
+) -> Callable[Concatenate[HttpRequest, P], R]:
     """
     Decorator to ensure user is a teacher and transform request type.
-    
+
     The decorated view function receives TeacherRequest with guaranteed teacher_profile access.
 
     Args:
@@ -95,10 +101,12 @@ def teacher_required(view_func: Callable[Concatenate[TeacherRequest, P], R]) -> 
     return wrapper
 
 
-def student_required(view_func: Callable[Concatenate[StudentRequest, P], R]) -> Callable[Concatenate[HttpRequest, P], R]:
+def student_required(
+    view_func: Callable[Concatenate[StudentRequest, P], R],
+) -> Callable[Concatenate[HttpRequest, P], R]:
     """
     Decorator to ensure user is a student and transform request type.
-    
+
     The decorated view function receives StudentRequest with guaranteed student_profile access.
 
     Args:

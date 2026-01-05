@@ -662,6 +662,7 @@ class CourseCascadeDeleteTest(TestCase):
         self.student.delete()
         self.assertFalse(CourseEnrollment.objects.filter(id=enrollment_id).exists())
 
+
 class CourseEdgeCasesTest(TestCase):
     """Test cases for course model edge cases."""
 

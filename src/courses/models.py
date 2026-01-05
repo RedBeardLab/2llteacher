@@ -93,5 +93,3 @@ class CourseEnrollment(models.Model):
     def __str__(self):
         status = "Active" if self.is_active else "Inactive"
         return f"{self.student.user.email} - {self.course.name} ({status})"
-
-

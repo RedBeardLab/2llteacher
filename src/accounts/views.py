@@ -149,9 +149,7 @@ class UserRegistrationView(View):
                     )
                     return redirect("/")
             elif isinstance(result, RegistrationError):
-                messages.error(
-                    request, result.error
-                )
+                messages.error(request, result.error)
 
         # Render the form with errors
         return render(request, "accounts/register.html", {"form": form})

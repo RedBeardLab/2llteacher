@@ -13,12 +13,18 @@ from homeworks.models import Homework, Section
 from conversations.models import Conversation
 from accounts.models import Student, Teacher
 from llm.models import LLMConfig
-from llm.services import LLMService, StreamTokenType, FinishReason, StreamingError, StreamToken
+from llm.services import (
+    LLMService,
+    StreamTokenType,
+    FinishReason,
+    StreamingError,
+    StreamToken,
+)
 
 User = get_user_model()
 
 
-@patch('llm.services.OpenAI')
+@patch("llm.services.OpenAI")
 class EnhancedStreamingTest(TestCase):
     """Test the enhanced streaming functionality with intelligent retry."""
 
@@ -88,7 +94,7 @@ class EnhancedStreamingTest(TestCase):
             chunk.choices[0].delta.content = token
             chunk.choices[0].finish_reason = None
             chunks.append(chunk)
-        
+
         # Final chunk with finish reason
         final_chunk = MagicMock()
         final_chunk.choices = [MagicMock()]
@@ -96,7 +102,7 @@ class EnhancedStreamingTest(TestCase):
         final_chunk.choices[0].delta.content = None
         final_chunk.choices[0].finish_reason = finish_reason
         chunks.append(final_chunk)
-        
+
         return chunks
 
     def test_successful_streaming_with_stop_finish_reason(self, mock_openai_class):
@@ -104,22 +110,30 @@ class EnhancedStreamingTest(TestCase):
         # Setup mock
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
-        
+
         tokens = ["Hello", " there", "! How", " can I", " help?"]
         mock_chunks = self._create_mock_chunks(tokens, FinishReason.STOP)
         mock_client.chat.completions.create.return_value = iter(mock_chunks)
 
         # Test streaming
-        stream_tokens = list(LLMService.stream_response_with_completion(
-            self.conversation, "Hello, I need help", "student"
-        ))
+        stream_tokens = list(
+            LLMService.stream_response_with_completion(
+                self.conversation, "Hello, I need help", "student"
+            )
+        )
 
         # Verify tokens
-        token_contents = [token.content for token in stream_tokens if token.type == StreamTokenType.TOKEN]
+        token_contents = [
+            token.content
+            for token in stream_tokens
+            if token.type == StreamTokenType.TOKEN
+        ]
         self.assertEqual(token_contents, tokens)
 
         # Verify completion signal
-        completion_tokens = [token for token in stream_tokens if token.type == StreamTokenType.COMPLETE]
+        completion_tokens = [
+            token for token in stream_tokens if token.type == StreamTokenType.COMPLETE
+        ]
         self.assertEqual(len(completion_tokens), 1)
         self.assertEqual(completion_tokens[0].content, "Hello there! How can I help?")
         self.assertEqual(completion_tokens[0].finish_reason, FinishReason.STOP)
@@ -128,113 +142,139 @@ class EnhancedStreamingTest(TestCase):
         """Test that LENGTH and CONTENT_FILTER finish reasons raise StreamingError."""
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
-        
+
         # Test LENGTH error
         length_chunks = self._create_mock_chunks(["Long response"], FinishReason.LENGTH)
         mock_client.chat.completions.create.return_value = iter(length_chunks)
-        
+
         with self.assertRaises(StreamingError) as context:
-            list(LLMService.stream_response_with_completion(
-                self.conversation, "Tell me everything", "student"
-            ))
+            list(
+                LLMService.stream_response_with_completion(
+                    self.conversation, "Tell me everything", "student"
+                )
+            )
         self.assertIn("exceeded maximum length limit", str(context.exception))
 
         # Test CONTENT_FILTER error
-        filter_chunks = self._create_mock_chunks(["Blocked"], FinishReason.CONTENT_FILTER)
+        filter_chunks = self._create_mock_chunks(
+            ["Blocked"], FinishReason.CONTENT_FILTER
+        )
         mock_client.chat.completions.create.return_value = iter(filter_chunks)
-        
+
         with self.assertRaises(StreamingError) as context:
-            list(LLMService.stream_response_with_completion(
-                self.conversation, "Inappropriate request", "student"
-            ))
+            list(
+                LLMService.stream_response_with_completion(
+                    self.conversation, "Inappropriate request", "student"
+                )
+            )
         self.assertIn("blocked by content filter", str(context.exception))
 
     def test_streaming_retry_on_interruption(self, mock_openai_class):
         """Test retry logic when stream is interrupted."""
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
-        
+
         # First attempt - interrupted (no finish_reason)
         interrupted_chunks = self._create_mock_chunks(["Hello"], None)
-        
+
         # Second attempt - success
-        success_chunks = self._create_mock_chunks(["Hello", " there", "!"], FinishReason.STOP)
-        
+        success_chunks = self._create_mock_chunks(
+            ["Hello", " there", "!"], FinishReason.STOP
+        )
+
         mock_client.chat.completions.create.side_effect = [
             iter(interrupted_chunks),
-            iter(success_chunks)
+            iter(success_chunks),
         ]
 
         # Test streaming
-        stream_tokens = list(LLMService.stream_response_with_completion(
-            self.conversation, "Hello", "student"
-        ))
+        stream_tokens = list(
+            LLMService.stream_response_with_completion(
+                self.conversation, "Hello", "student"
+            )
+        )
 
         # Verify retry was attempted
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
-        
+
         # Verify final success (tokens from both attempts)
-        token_contents = [token.content for token in stream_tokens if token.type == StreamTokenType.TOKEN]
+        token_contents = [
+            token.content
+            for token in stream_tokens
+            if token.type == StreamTokenType.TOKEN
+        ]
         self.assertEqual(token_contents, ["Hello", "Hello", " there", "!"])
-        
-        completion_tokens = [token for token in stream_tokens if token.type == StreamTokenType.COMPLETE]
+
+        completion_tokens = [
+            token for token in stream_tokens if token.type == StreamTokenType.COMPLETE
+        ]
         self.assertEqual(completion_tokens[0].content, "Hello there!")
 
     def test_streaming_retry_on_insufficient_content(self, mock_openai_class):
         """Test retry logic when response has insufficient content."""
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
-        
+
         # First attempt - only whitespace
         insufficient_chunks = self._create_mock_chunks(["  "], FinishReason.STOP)
-        
+
         # Second attempt - success
         success_chunks = self._create_mock_chunks(["Hello", "!"], FinishReason.STOP)
-        
+
         mock_client.chat.completions.create.side_effect = [
             iter(insufficient_chunks),
-            iter(success_chunks)
+            iter(success_chunks),
         ]
 
         # Test streaming
-        stream_tokens = list(LLMService.stream_response_with_completion(
-            self.conversation, "Hello", "student"
-        ))
+        stream_tokens = list(
+            LLMService.stream_response_with_completion(
+                self.conversation, "Hello", "student"
+            )
+        )
 
         # Verify retry was attempted
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
-        
+
         # Verify we got the successful response
-        token_contents = [token.content for token in stream_tokens if token.type == StreamTokenType.TOKEN]
+        token_contents = [
+            token.content
+            for token in stream_tokens
+            if token.type == StreamTokenType.TOKEN
+        ]
         self.assertEqual(token_contents, ["Hello", "!"])
 
     def test_streaming_fails_after_max_retries(self, mock_openai_class):
         """Test that streaming fails after maximum retry attempts."""
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
-        
+
         # All attempts return interrupted streams
         interrupted_chunks = self._create_mock_chunks(["Hello"], None)
         mock_client.chat.completions.create.return_value = iter(interrupted_chunks)
 
         # Test that StreamingError is raised after max retries
         with self.assertRaises(StreamingError) as context:
-            list(LLMService.stream_response_with_completion(
-                self.conversation, "Hello", "student"
-            ))
+            list(
+                LLMService.stream_response_with_completion(
+                    self.conversation, "Hello", "student"
+                )
+            )
 
-        self.assertIn("Failed to generate response after 3 attempts", str(context.exception))
+        self.assertIn(
+            "Failed to generate response after 3 attempts", str(context.exception)
+        )
         self.assertEqual(mock_client.chat.completions.create.call_count, 3)
 
     def test_meaningful_chunk_filtering(self, mock_openai_class):
         """Test that only meaningful chunks are yielded as tokens."""
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
-        
+
         # Mix of meaningful and non-meaningful chunks
         all_chunks = []
         contents = ["Hello", "   ", " there", "", "!"]  # Include whitespace and empty
-        
+
         for content in contents:
             chunk = MagicMock()
             chunk.choices = [MagicMock()]
@@ -242,7 +282,7 @@ class EnhancedStreamingTest(TestCase):
             chunk.choices[0].delta.content = content
             chunk.choices[0].finish_reason = None
             all_chunks.append(chunk)
-        
+
         # Final chunk
         final_chunk = MagicMock()
         final_chunk.choices = [MagicMock()]
@@ -250,20 +290,28 @@ class EnhancedStreamingTest(TestCase):
         final_chunk.choices[0].delta.content = None
         final_chunk.choices[0].finish_reason = FinishReason.STOP
         all_chunks.append(final_chunk)
-        
+
         mock_client.chat.completions.create.return_value = iter(all_chunks)
 
         # Test streaming
-        stream_tokens = list(LLMService.stream_response_with_completion(
-            self.conversation, "Hello", "student"
-        ))
+        stream_tokens = list(
+            LLMService.stream_response_with_completion(
+                self.conversation, "Hello", "student"
+            )
+        )
 
         # Verify only meaningful chunks were yielded as tokens
-        token_contents = [token.content for token in stream_tokens if token.type == StreamTokenType.TOKEN]
+        token_contents = [
+            token.content
+            for token in stream_tokens
+            if token.type == StreamTokenType.TOKEN
+        ]
         self.assertEqual(token_contents, ["Hello", " there", "!"])
 
         # Verify complete response includes all content
-        completion_tokens = [token for token in stream_tokens if token.type == StreamTokenType.COMPLETE]
+        completion_tokens = [
+            token for token in stream_tokens if token.type == StreamTokenType.COMPLETE
+        ]
         self.assertEqual(completion_tokens[0].content, "Hello    there!")
 
     def test_stream_token_dataclass(self, mock_openai_class):
@@ -281,7 +329,7 @@ class EnhancedStreamingTest(TestCase):
         completion = StreamToken(
             type=StreamTokenType.COMPLETE,
             content="Hello there!",
-            finish_reason=FinishReason.STOP
+            finish_reason=FinishReason.STOP,
         )
         self.assertEqual(completion.type, StreamTokenType.COMPLETE)
         self.assertEqual(completion.content, "Hello there!")

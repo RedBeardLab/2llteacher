@@ -53,7 +53,6 @@ def reverse_assignment(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0001_initial"),
         ("homeworks", "0001_initial"),  # Add dependency on homeworks app

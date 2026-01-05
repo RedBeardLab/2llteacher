@@ -26,16 +26,12 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         """Set up test data with a multi-turn conversation."""
         # Create users and profiles
         self.student_user = User.objects.create_user(
-            username="teststudent",
-            email="student@test.com",
-            password="testpass123"
+            username="teststudent", email="student@test.com", password="testpass123"
         )
         self.student_profile = Student.objects.create(user=self.student_user)
 
         self.teacher_user = User.objects.create_user(
-            username="teacher",
-            email="teacher@test.com",
-            password="teacherpass123"
+            username="teacher", email="teacher@test.com", password="teacherpass123"
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
@@ -80,6 +76,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
 
         # Create conversation using the service (includes initial AI greeting)
         from conversations.services import ConversationService
+
         result = ConversationService.start_conversation(self.student_user, self.section)
         self.conversation = Conversation.objects.get(id=result.conversation_id)
 
@@ -87,22 +84,22 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         Message.objects.create(
             conversation=self.conversation,
             content="What is a variable in Python?",
-            message_type=Message.MESSAGE_TYPE_STUDENT
+            message_type=Message.MESSAGE_TYPE_STUDENT,
         )
         Message.objects.create(
             conversation=self.conversation,
             content="A variable is a container that stores data. What would you like to know specifically?",
-            message_type=Message.MESSAGE_TYPE_AI
+            message_type=Message.MESSAGE_TYPE_AI,
         )
         Message.objects.create(
             conversation=self.conversation,
             content="How do I create a variable?",
-            message_type=Message.MESSAGE_TYPE_STUDENT
+            message_type=Message.MESSAGE_TYPE_STUDENT,
         )
         Message.objects.create(
             conversation=self.conversation,
             content="You create a variable by using the assignment operator =. For example: x = 5",
-            message_type=Message.MESSAGE_TYPE_AI
+            message_type=Message.MESSAGE_TYPE_AI,
         )
 
     @patch("llm.services.OpenAI")
@@ -125,9 +122,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         # Make a new request (5th message in conversation)
         current_message = "Can variables change their type?"
         response = LLMService.get_response(
-            self.conversation,
-            current_message,
-            "student"
+            self.conversation, current_message, "student"
         )
 
         # Verify API was called
@@ -135,7 +130,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
 
         # Get the messages array that was sent to the API
         call_args = mock_client.chat.completions.create.call_args
-        messages_sent = call_args.kwargs['messages']
+        messages_sent = call_args.kwargs["messages"]
 
         # Expected structure:
         # 1. System message with base prompt AND section context
@@ -148,34 +143,54 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
 
         # Verify we have the right number of messages
         # System + initial AI + 4 history + 1 current = 7 messages
-        self.assertEqual(len(messages_sent), 7, 
-            f"Expected 7 messages (1 system + 1 initial AI + 4 history + 1 current), got {len(messages_sent)}")
+        self.assertEqual(
+            len(messages_sent),
+            7,
+            f"Expected 7 messages (1 system + 1 initial AI + 4 history + 1 current), got {len(messages_sent)}",
+        )
 
         # Check system message - should contain base prompt AND section context
         self.assertEqual(messages_sent[0]["role"], "system")
         system_message = messages_sent[0]["content"]
-        
+
         # System message should contain base prompt
-        self.assertIn(self.llm_config.base_prompt, system_message,
-            "System message should contain base prompt")
-        
+        self.assertIn(
+            self.llm_config.base_prompt,
+            system_message,
+            "System message should contain base prompt",
+        )
+
         # System message should contain section context
-        self.assertIn("Python Basics Homework", system_message,
-            "System message should contain homework title")
-        self.assertIn("Understanding Variables", system_message,
-            "System message should contain section title")
-        self.assertIn("Variables in Python are used to store data", system_message,
-            "System message should contain section content")
+        self.assertIn(
+            "Python Basics Homework",
+            system_message,
+            "System message should contain homework title",
+        )
+        self.assertIn(
+            "Understanding Variables",
+            system_message,
+            "System message should contain section title",
+        )
+        self.assertIn(
+            "Variables in Python are used to store data",
+            system_message,
+            "System message should contain section content",
+        )
 
         # Check initial AI greeting
         self.assertEqual(messages_sent[1]["role"], "assistant")
-        self.assertIn("Hello! I'm here to help you with Section", messages_sent[1]["content"])
+        self.assertIn(
+            "Hello! I'm here to help you with Section", messages_sent[1]["content"]
+        )
 
         # Check FIRST user message - should be PLAIN TEXT only
         self.assertEqual(messages_sent[2]["role"], "user")
         first_user_message = messages_sent[2]["content"]
-        self.assertEqual(first_user_message, "What is a variable in Python?",
-            "First user message should be just the question")
+        self.assertEqual(
+            first_user_message,
+            "What is a variable in Python?",
+            "First user message should be just the question",
+        )
 
         # Check first AI response
         self.assertEqual(messages_sent[3]["role"], "assistant")
@@ -184,8 +199,11 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         # Check SECOND user message - should be PLAIN TEXT only
         self.assertEqual(messages_sent[4]["role"], "user")
         second_user_message = messages_sent[4]["content"]
-        self.assertEqual(second_user_message, "How do I create a variable?",
-            "Second user message should be just the question")
+        self.assertEqual(
+            second_user_message,
+            "How do I create a variable?",
+            "Second user message should be just the question",
+        )
 
         # Check second AI response
         self.assertEqual(messages_sent[5]["role"], "assistant")
@@ -194,8 +212,11 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         # Check CURRENT user message - should be PLAIN TEXT only
         self.assertEqual(messages_sent[6]["role"], "user")
         current_user_message = messages_sent[6]["content"]
-        self.assertEqual(current_user_message, current_message,
-            "Current user message should be just the question")
+        self.assertEqual(
+            current_user_message,
+            current_message,
+            "Current user message should be just the question",
+        )
 
     @patch("llm.services.OpenAI")
     def test_system_message_includes_full_context(self, mock_openai_class):
@@ -205,8 +226,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         """
         # Create a fresh conversation with no messages
         new_conversation = Conversation.objects.create(
-            user=self.student_user,
-            section=self.section
+            user=self.student_user, section=self.section
         )
 
         # Setup mock
@@ -221,15 +241,11 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
 
         # Send first message
         first_message = "What is a variable?"
-        response = LLMService.get_response(
-            new_conversation,
-            first_message,
-            "student"
-        )
+        response = LLMService.get_response(new_conversation, first_message, "student")
 
         # Get the messages array
         call_args = mock_client.chat.completions.create.call_args
-        messages_sent = call_args.kwargs['messages']
+        messages_sent = call_args.kwargs["messages"]
 
         # Should have: system message + first user message
         self.assertEqual(len(messages_sent), 2)
@@ -240,7 +256,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         self.assertIn("Python Basics Homework", system_message)
         self.assertIn("Understanding Variables", system_message)
         self.assertIn("Variables in Python are used to store data", system_message)
-        
+
         # User message should be plain text
         first_user_content = messages_sent[1]["content"]
         self.assertEqual(first_user_content, first_message)
@@ -263,7 +279,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
             chunk.choices[0].delta.content = token
             chunk.choices[0].finish_reason = None
             chunks.append(chunk)
-        
+
         # Final chunk with finish reason
         final_chunk = MagicMock()
         final_chunk.choices = [MagicMock()]
@@ -271,19 +287,19 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         final_chunk.choices[0].delta.content = None
         final_chunk.choices[0].finish_reason = "stop"
         chunks.append(final_chunk)
-        
+
         mock_client.chat.completions.create.return_value = iter(chunks)
 
         # Stream a response (this is the 5th message)
-        list(LLMService.stream_response_with_completion(
-            self.conversation,
-            "Can you explain more?",
-            "student"
-        ))
+        list(
+            LLMService.stream_response_with_completion(
+                self.conversation, "Can you explain more?", "student"
+            )
+        )
 
         # Get the messages array
         call_args = mock_client.chat.completions.create.call_args
-        messages_sent = call_args.kwargs['messages']
+        messages_sent = call_args.kwargs["messages"]
 
         # Should have 7 messages (system + initial AI + 4 history + 1 current)
         self.assertEqual(len(messages_sent), 7)
@@ -291,7 +307,13 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         # Verify user messages (indices 2, 4, 6) don't repeat context
         for i in [2, 4, 6]:  # Indices of user messages 1, 2, and 3
             user_message = messages_sent[i]["content"]
-            self.assertNotIn("Python Basics Homework", user_message,
-                f"User message at index {i} should not repeat homework title")
-            self.assertNotIn("Variables in Python are used to store data", user_message,
-                f"User message at index {i} should not repeat section content")
+            self.assertNotIn(
+                "Python Basics Homework",
+                user_message,
+                f"User message at index {i} should not repeat homework title",
+            )
+            self.assertNotIn(
+                "Variables in Python are used to store data",
+                user_message,
+                f"User message at index {i} should not repeat section content",
+            )

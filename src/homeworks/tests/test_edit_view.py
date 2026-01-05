@@ -43,6 +43,7 @@ class HomeworkEditViewTestCase(TestCase):
 
         # Create course
         from courses.models import Course
+
         self.course = Course.objects.create(
             name="Test Course",
             code="TEST101",

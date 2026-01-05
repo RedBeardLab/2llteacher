@@ -595,7 +595,7 @@ class ConversationService:
                     # Save complete response to database
                     ai_message.content = stream_token.content
                     ai_message.save()
-                    
+
                     # Signal completion to frontend
                     yield StreamEvent(
                         type="ai_message_complete",
@@ -610,22 +610,20 @@ class ConversationService:
         except StreamingError as e:
             # Delete the empty AI message since we failed
             ai_message.delete()
-            
+
             # Send error to frontend
             yield StreamEvent(
-                type="error", 
-                timestamp=datetime.now(), 
-                data={"message": str(e)}
+                type="error", timestamp=datetime.now(), data={"message": str(e)}
             )
         except Exception as e:
             # Delete the empty AI message since we failed
             ai_message.delete()
-            
+
             # Send error to frontend
             yield StreamEvent(
-                type="error", 
-                timestamp=datetime.now(), 
-                data={"message": f"Unexpected error: {str(e)}"}
+                type="error",
+                timestamp=datetime.now(),
+                data={"message": f"Unexpected error: {str(e)}"},
             )
 
     @staticmethod

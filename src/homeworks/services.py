@@ -618,8 +618,7 @@ class HomeworkService:
                 total_sections_all_homeworks = sum(hw.section_count for hw in homeworks)
                 overall_completion = (
                     round(
-                        (student_total_submissions / total_sections_all_homeworks)
-                        * 100
+                        (student_total_submissions / total_sections_all_homeworks) * 100
                     )
                     if total_sections_all_homeworks > 0
                     else 0
@@ -865,7 +864,9 @@ class HomeworkService:
             submission_map = {sub.conversation.id: sub for sub in submissions}
 
             # Group conversations by student and section
-            student_section_conversations_map: dict[UUID, dict[UUID, list[Conversation]]] = {}
+            student_section_conversations_map: dict[
+                UUID, dict[UUID, list[Conversation]]
+            ] = {}
             for conv in conversations:
                 student_id = conv.user.student_profile.id
                 section_id = conv.section.id

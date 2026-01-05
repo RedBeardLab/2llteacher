@@ -6,18 +6,18 @@ from django.db import migrations
 def update_model_names_for_openrouter(apps, schema_editor):
     """
     Update existing model names to use OpenRouter format (provider/model).
-    
+
     Since all existing models are OpenAI models, this migration adds the
     'openai/' prefix to any model name that doesn't already have a provider prefix.
     """
-    LLMConfig = apps.get_model('llm', 'LLMConfig')
-    
+    LLMConfig = apps.get_model("llm", "LLMConfig")
+
     # Update existing configurations
     for config in LLMConfig.objects.all():
         old_model_name = config.model_name
-        
+
         # If model name doesn't have a provider prefix (no '/'), add 'openai/' prefix
-        if '/' not in old_model_name:
+        if "/" not in old_model_name:
             new_model_name = f"openai/{old_model_name}"
             config.model_name = new_model_name
             config.save()
@@ -30,25 +30,24 @@ def update_model_names_for_openrouter(apps, schema_editor):
 def reverse_model_names_for_openrouter(apps, schema_editor):
     """
     Reverse the model name changes (remove openai/ prefixes).
-    
+
     This is the reverse operation for rolling back the migration.
     """
-    LLMConfig = apps.get_model('llm', 'LLMConfig')
-    
+    LLMConfig = apps.get_model("llm", "LLMConfig")
+
     # Update configurations by removing OpenAI prefix
     for config in LLMConfig.objects.all():
         model_name = config.model_name
-        
+
         # Remove openai/ prefix if present
-        if model_name.startswith('openai/'):
-            new_model_name = model_name.replace('openai/', '', 1)
+        if model_name.startswith("openai/"):
+            new_model_name = model_name.replace("openai/", "", 1)
             config.model_name = new_model_name
             config.save()
             print(f"Removed OpenAI prefix: {model_name} -> {new_model_name}")
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("llm", "0002_rename_max_tokens_to_max_completion_tokens"),
     ]

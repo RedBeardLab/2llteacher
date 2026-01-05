@@ -20,6 +20,7 @@ def homepage(request):
         if student_profile:
             # Check if student is enrolled in any courses
             from courses.models import CourseEnrollment
+
             has_enrollments = CourseEnrollment.objects.filter(
                 student=student_profile, is_active=True
             ).exists()
