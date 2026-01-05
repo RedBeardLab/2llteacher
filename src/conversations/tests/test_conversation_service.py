@@ -155,9 +155,16 @@ class TestConversationServiceMessages(ConversationServiceTestCase):
             MessageProcessingRequest,
             MessageProcessingResult,
         )
+        from llm.services import LLMResponseWithTools
 
-        # Mock LLM response
-        mock_llm_response.return_value = "This is a mock AI response."
+        # Mock LLM response with tools format
+        mock_response_text = "This is a mock AI response."
+        mock_llm_response.return_value = LLMResponseWithTools(
+            response_text=mock_response_text,
+            function_calls=None,
+            tokens_used=20,
+            success=True,
+        )
 
         # Create message processing request
         message_content = "Test message from student"
@@ -183,7 +190,7 @@ class TestConversationServiceMessages(ConversationServiceTestCase):
 
         self.assertEqual(user_message.content, message_content)
         self.assertEqual(user_message.message_type, "student")
-        self.assertEqual(ai_message.content, mock_llm_response.return_value)
+        self.assertEqual(ai_message.content, mock_response_text)
         self.assertEqual(ai_message.message_type, Message.MESSAGE_TYPE_AI)
 
     def test_get_conversation_data(self):

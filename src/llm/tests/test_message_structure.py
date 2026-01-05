@@ -116,13 +116,18 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
         mock_completion.choices[0].message.content = "Great question! Let me explain..."
+        mock_completion.choices[0].message.tool_calls = None
+        mock_completion.choices[0].finish_reason = "stop"
         mock_completion.usage.total_tokens = 50
         mock_client.chat.completions.create.return_value = mock_completion
 
         # Make a new request (5th message in conversation)
         current_message = "Can variables change their type?"
         response = LLMService.get_response(
-            self.conversation, current_message, "student"
+            self.conversation,
+            current_message,
+            "student",
+            available_functions=[LLMService.get_stopping_rule_function()],
         )
 
         # Verify API was called
@@ -236,12 +241,19 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
         mock_completion.choices[0].message.content = "I'm here to help!"
+        mock_completion.choices[0].message.tool_calls = None
+        mock_completion.choices[0].finish_reason = "stop"
         mock_completion.usage.total_tokens = 30
         mock_client.chat.completions.create.return_value = mock_completion
 
         # Send first message
         first_message = "What is a variable?"
-        response = LLMService.get_response(new_conversation, first_message, "student")
+        response = LLMService.get_response(
+            new_conversation,
+            first_message,
+            "student",
+            available_functions=[LLMService.get_stopping_rule_function()],
+        )
 
         # Get the messages array
         call_args = mock_client.chat.completions.create.call_args
@@ -293,7 +305,10 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
         # Stream a response (this is the 5th message)
         list(
             LLMService.stream_response_with_completion(
-                self.conversation, "Can you explain more?", "student"
+                self.conversation,
+                "Can you explain more?",
+                "student",
+                available_functions=[LLMService.get_stopping_rule_function()],
             )
         )
 

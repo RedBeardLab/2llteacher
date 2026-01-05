@@ -17,6 +17,9 @@ from llm.services import (
     LLMConfigCreateData,
     LLMConfigCreateResult,
     LLMConfigUpdateResult,
+    LLMResponseWithTools,
+    FunctionDefinition,
+    FunctionCall,
 )
 
 User = get_user_model()
@@ -140,7 +143,7 @@ class TestLLMServiceResponses(LLMServiceTestCase):
 
     @patch("llm.services.OpenAI")
     def test_get_response(self, mock_openai_class):
-        """Test generating an AI response."""
+        """Test generating an AI response with tools."""
 
         # Mock OpenAI client and response
         mock_client = MagicMock()
@@ -150,27 +153,85 @@ class TestLLMServiceResponses(LLMServiceTestCase):
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
         mock_completion.choices[0].message.content = "This is a test AI response."
+        mock_completion.choices[0].message.tool_calls = None
+        mock_completion.choices[0].finish_reason = "stop"
         mock_completion.usage.total_tokens = 20
 
         mock_client.chat.completions.create.return_value = mock_completion
+
+        # Get stopping rule function
+        stopping_rule = LLMService.get_stopping_rule_function()
 
         # Get response
         response = LLMService.get_response(
             self.conversation,
             "I'm struggling with the concept of inheritance.",
             "student",
+            available_functions=[stopping_rule],
         )
 
         # Check result
-        self.assertEqual(response, "This is a test AI response.")
+        self.assertIsInstance(response, LLMResponseWithTools)
+        self.assertTrue(response.success)
+        self.assertEqual(response.response_text, "This is a test AI response.")
+        self.assertFalse(response.has_function_calls)
 
         # Check OpenAI client was initialized with OpenRouter endpoint and API key
         mock_openai_class.assert_called_once_with(
             base_url="https://openrouter.ai/api/v1", api_key=self.llm_config.api_key
         )
 
-        # Check API was called
+        # Check API was called with tools parameter
         mock_client.chat.completions.create.assert_called_once()
+        call_args = mock_client.chat.completions.create.call_args
+        self.assertIn("tools", call_args[1])
+
+    @patch("llm.services.OpenAI")
+    def test_get_response_with_function_call(self, mock_openai_class):
+        """Test generating an AI response that includes a function call."""
+
+        # Mock OpenAI client and response
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+
+        # Mock a tool call
+        mock_tool_call = MagicMock()
+        mock_tool_call.id = "call_123"
+        mock_tool_call.function.name = "student_answered_correctly"
+        mock_tool_call.function.arguments = "{}"
+
+        # Mock the completion response with tool call
+        mock_completion = MagicMock()
+        mock_completion.choices = [MagicMock()]
+        mock_completion.choices[0].message.content = "Great job! You've understood the concept."
+        mock_completion.choices[0].message.tool_calls = [mock_tool_call]
+        mock_completion.choices[0].finish_reason = "tool_calls"
+        mock_completion.usage.total_tokens = 25
+
+        mock_client.chat.completions.create.return_value = mock_completion
+
+        # Get stopping rule function
+        stopping_rule = LLMService.get_stopping_rule_function()
+
+        # Get response
+        response = LLMService.get_response(
+            self.conversation,
+            "So inheritance means a class can use methods from its parent class?",
+            "student",
+            available_functions=[stopping_rule],
+        )
+
+        # Check result
+        self.assertIsInstance(response, LLMResponseWithTools)
+        self.assertTrue(response.success)
+        self.assertEqual(
+            response.response_text, "Great job! You've understood the concept."
+        )
+        self.assertTrue(response.has_function_calls)
+        self.assertEqual(len(response.function_calls), 1)
+        self.assertEqual(response.function_calls[0].name, "student_answered_correctly")
+        self.assertEqual(response.function_calls[0].id, "call_123")
+        self.assertEqual(response.function_calls[0].arguments, {})
 
     def test_is_meaningful_chunk_validation(self):
         """Test chunk validation logic."""

@@ -12,7 +12,7 @@ from unittest.mock import patch
 import json
 
 from llm.models import LLMConfig
-from llm.services import LLMResponseResult
+from llm.services import LLMResponseWithTools
 from accounts.models import Teacher, Student
 
 User = get_user_model()
@@ -259,7 +259,7 @@ class TestLLMConfigTestView(LLMViewsTestCase):
     def test_teacher_can_test_config(self, mock_test_config):
         """Test that teachers can test configs."""
         # Mock successful test response
-        mock_test_config.return_value = LLMResponseResult(
+        mock_test_config.return_value = LLMResponseWithTools(
             response_text="Test response from AI", tokens_used=15, success=True
         )
 
@@ -283,7 +283,7 @@ class TestLLMConfigTestView(LLMViewsTestCase):
     def test_config_test_failure(self, mock_test_config):
         """Test handling of config test failures."""
         # Mock failed test response
-        mock_test_config.return_value = LLMResponseResult(
+        mock_test_config.return_value = LLMResponseWithTools(
             response_text="", tokens_used=0, success=False, error="Invalid API key"
         )
 
@@ -312,8 +312,15 @@ class TestLLMGenerateAPIView(LLMViewsTestCase):
         # Login as student for API access
         self.client.login(username="student", password="testpass123")
 
-        # Mock successful response
-        mock_get_response.return_value = "This is an AI response."
+        # Mock successful response with tools format
+        from llm.services import LLMResponseWithTools
+
+        mock_get_response.return_value = LLMResponseWithTools(
+            response_text="This is an AI response.",
+            function_calls=None,
+            tokens_used=20,
+            success=True,
+        )
 
         # Create necessary database objects for the test
         from homeworks.models import Homework, Section

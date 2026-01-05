@@ -15,6 +15,7 @@ from accounts.models import User
 from homeworks.models import Section
 
 from .models import Conversation
+from llm.services import LLMService, FunctionCall
 
 # Import for type hints
 from typing import TYPE_CHECKING
@@ -51,6 +52,7 @@ class MessageProcessingResult:
     ai_message_id: UUID
     success: bool = True
     error: Optional[str] = None
+    function_calls: List[FunctionCall] | None = None
 
 
 @dataclass
@@ -442,15 +444,29 @@ class ConversationService:
                     conversation, user_message, request.content, request.message_type
                 )
             else:
-                # Get complete AI response
-                ai_response = LLMService.get_response(
-                    conversation, request.content, request.message_type
+                # Get stopping rule function
+                stopping_rule = LLMService.get_stopping_rule_function()
+
+                # Get complete AI response with tools
+                response = LLMService.get_response(
+                    conversation,
+                    request.content,
+                    request.message_type,
+                    available_functions=[stopping_rule],
                 )
 
-                # Create AI message
+                # Determine message content
+                response_content = response.response_text
+                if response.has_function_calls and (
+                    not response_content or not response_content.strip()
+                ):
+                    # Use default completion message if function called but no text provided
+                    response_content = ConversationService._get_default_completion_message()
+
+                # Create AI message with response text
                 ai_message = Message.objects.create(
                     conversation=conversation,
-                    content=ai_response,
+                    content=response_content or "",
                     message_type=Message.MESSAGE_TYPE_AI,
                 )
 
@@ -458,6 +474,7 @@ class ConversationService:
                     user_message_id=user_message.id,
                     ai_message_id=ai_message.id,
                     success=True,
+                    function_calls=response.function_calls,
                 )
 
         except Conversation.DoesNotExist:
@@ -577,9 +594,12 @@ class ConversationService:
                 data={"message_id": str(ai_message.id)},
             )
 
-            # Use enhanced streaming with intelligent retry
+            # Get stopping rule function
+            stopping_rule = LLMService.get_stopping_rule_function()
+
+            # Use enhanced streaming with intelligent retry and function calling
             for stream_token in LLMService.stream_response_with_completion(
-                conversation, content, message_type
+                conversation, content, message_type, available_functions=[stopping_rule]
             ):
                 if stream_token.type == "token":
                     # Stream token to frontend
@@ -592,18 +612,40 @@ class ConversationService:
                         },
                     )
                 elif stream_token.type == "complete":
+                    # Determine final content
+                    final_content = stream_token.content
+                    if stream_token.has_function_calls and (
+                        not final_content or not final_content.strip()
+                    ):
+                        # Use default completion message if function called but no text provided
+                        final_content = ConversationService._get_default_completion_message()
+
                     # Save complete response to database
-                    ai_message.content = stream_token.content
+                    ai_message.content = final_content
                     ai_message.save()
+
+                    # Prepare completion data
+                    completion_data = {
+                        "message_id": str(ai_message.id),
+                        "final_content": final_content,
+                    }
+
+                    # Include function calls if present
+                    if stream_token.has_function_calls:
+                        completion_data["function_calls"] = [
+                            {
+                                "id": call.id,
+                                "name": call.name,
+                                "arguments": call.arguments,
+                            }
+                            for call in stream_token.function_calls
+                        ]
 
                     # Signal completion to frontend
                     yield StreamEvent(
                         type="ai_message_complete",
                         timestamp=datetime.now(),
-                        data={
-                            "message_id": str(ai_message.id),
-                            "final_content": stream_token.content,
-                        },
+                        data=completion_data,
                     )
                     return
 
@@ -653,6 +695,20 @@ class ConversationService:
             String containing the initial message with the section question
         """
         return f"Hello! I'm here to help you with Section {section.order}: {section.title}.\n\n{section.content}\n\nHow can I assist you with this question?"
+
+    @staticmethod
+    def _get_default_completion_message() -> str:
+        """
+        Get default message when section is marked complete but no response text provided.
+
+        Returns:
+            String containing congratulations and next steps
+        """
+        return (
+            "Great work! You've successfully completed this section. "
+            "You can either continue asking questions to solidify your understanding, "
+            "or move on to the next section when you're ready."
+        )
 
 
 class SubmissionService:

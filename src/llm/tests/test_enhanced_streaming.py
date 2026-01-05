@@ -19,6 +19,7 @@ from llm.services import (
     FinishReason,
     StreamingError,
     StreamToken,
+    FunctionDefinition,
 )
 
 User = get_user_model()
@@ -118,7 +119,10 @@ class EnhancedStreamingTest(TestCase):
         # Test streaming
         stream_tokens = list(
             LLMService.stream_response_with_completion(
-                self.conversation, "Hello, I need help", "student"
+                self.conversation,
+                "Hello, I need help",
+                "student",
+                available_functions=[LLMService.get_stopping_rule_function()],
             )
         )
 
@@ -150,7 +154,10 @@ class EnhancedStreamingTest(TestCase):
         with self.assertRaises(StreamingError) as context:
             list(
                 LLMService.stream_response_with_completion(
-                    self.conversation, "Tell me everything", "student"
+                    self.conversation,
+                    "Tell me everything",
+                    "student",
+                    available_functions=[LLMService.get_stopping_rule_function()],
                 )
             )
         self.assertIn("exceeded maximum length limit", str(context.exception))
@@ -164,7 +171,10 @@ class EnhancedStreamingTest(TestCase):
         with self.assertRaises(StreamingError) as context:
             list(
                 LLMService.stream_response_with_completion(
-                    self.conversation, "Inappropriate request", "student"
+                    self.conversation,
+                    "Inappropriate request",
+                    "student",
+                    available_functions=[LLMService.get_stopping_rule_function()],
                 )
             )
         self.assertIn("blocked by content filter", str(context.exception))
@@ -190,7 +200,10 @@ class EnhancedStreamingTest(TestCase):
         # Test streaming
         stream_tokens = list(
             LLMService.stream_response_with_completion(
-                self.conversation, "Hello", "student"
+                self.conversation,
+                "Hello",
+                "student",
+                available_functions=[LLMService.get_stopping_rule_function()],
             )
         )
 
@@ -229,7 +242,10 @@ class EnhancedStreamingTest(TestCase):
         # Test streaming
         stream_tokens = list(
             LLMService.stream_response_with_completion(
-                self.conversation, "Hello", "student"
+                self.conversation,
+                "Hello",
+                "student",
+                available_functions=[LLMService.get_stopping_rule_function()],
             )
         )
 
@@ -257,7 +273,10 @@ class EnhancedStreamingTest(TestCase):
         with self.assertRaises(StreamingError) as context:
             list(
                 LLMService.stream_response_with_completion(
-                    self.conversation, "Hello", "student"
+                    self.conversation,
+                    "Hello",
+                    "student",
+                    available_functions=[LLMService.get_stopping_rule_function()],
                 )
             )
 
@@ -296,7 +315,10 @@ class EnhancedStreamingTest(TestCase):
         # Test streaming
         stream_tokens = list(
             LLMService.stream_response_with_completion(
-                self.conversation, "Hello", "student"
+                self.conversation,
+                "Hello",
+                "student",
+                available_functions=[LLMService.get_stopping_rule_function()],
             )
         )
 

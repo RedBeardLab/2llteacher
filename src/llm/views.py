@@ -439,16 +439,33 @@ class LLMGenerateAPIView(View):
             ):
                 return {"success": False, "error": "Access denied"}
 
-            # Generate response
-            response_text = LLMService.get_response(
-                conversation, data["content"], data["message_type"]
+            # Generate response with function calling
+            stopping_rule = LLMService.get_stopping_rule_function()
+            response = LLMService.get_response(
+                conversation,
+                data["content"],
+                data["message_type"],
+                available_functions=[stopping_rule],
             )
 
-            return {
+            result = {
                 "success": True,
-                "response_text": response_text,
+                "response_text": response.response_text,
                 "conversation_id": str(conversation.id),
             }
+
+            # Include function calls if present
+            if response.has_function_calls:
+                result["function_calls"] = [
+                    {
+                        "id": call.id,
+                        "name": call.name,
+                        "arguments": call.arguments,
+                    }
+                    for call in response.function_calls
+                ]
+
+            return result
 
         except Exception as e:
             return {"success": False, "error": str(e)}
