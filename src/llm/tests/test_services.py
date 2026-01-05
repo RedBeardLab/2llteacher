@@ -203,7 +203,9 @@ class TestLLMServiceResponses(LLMServiceTestCase):
         # Mock the completion response with tool call
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
-        mock_completion.choices[0].message.content = "Great job! You've understood the concept."
+        mock_completion.choices[
+            0
+        ].message.content = "Great job! You've understood the concept."
         mock_completion.choices[0].message.tool_calls = [mock_tool_call]
         mock_completion.choices[0].finish_reason = "tool_calls"
         mock_completion.usage.total_tokens = 25

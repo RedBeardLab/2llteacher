@@ -461,7 +461,9 @@ class ConversationService:
                     not response_content or not response_content.strip()
                 ):
                     # Use default completion message if function called but no text provided
-                    response_content = ConversationService._get_default_completion_message()
+                    response_content = (
+                        ConversationService._get_default_completion_message()
+                    )
 
                 # Create AI message with response text
                 ai_message = Message.objects.create(
@@ -618,7 +620,9 @@ class ConversationService:
                         not final_content or not final_content.strip()
                     ):
                         # Use default completion message if function called but no text provided
-                        final_content = ConversationService._get_default_completion_message()
+                        final_content = (
+                            ConversationService._get_default_completion_message()
+                        )
 
                     # Save complete response to database
                     ai_message.content = final_content

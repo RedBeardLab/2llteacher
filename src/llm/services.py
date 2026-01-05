@@ -274,9 +274,7 @@ class LLMService:
 
         except Exception as e:
             error_id = uuid.uuid4()
-            logger.error(
-                f"Error generating AI response [ID: {error_id}]: {str(e)}"
-            )
+            logger.error(f"Error generating AI response [ID: {error_id}]: {str(e)}")
             return LLMResponseWithTools(
                 success=False,
                 error=f"Technical issue [ID: {error_id}]: {str(e)}",
@@ -468,9 +466,7 @@ class LLMService:
             )
 
             logger.error(f"OpenAI API error: {str(e)}")
-            return LLMResponseWithTools(
-                tokens_used=0, success=False, error=str(e)
-            )
+            return LLMResponseWithTools(tokens_used=0, success=False, error=str(e))
 
     @staticmethod
     def _is_meaningful_chunk(content: str) -> bool:
@@ -606,7 +602,9 @@ class LLMService:
                 has_tool_calls = len(accumulated_function_calls) > 0
 
                 # Check if we got sufficient meaningful content OR tool calls
-                if not has_tool_calls and (meaningful_chunks == 0 or response_length < 3):
+                if not has_tool_calls and (
+                    meaningful_chunks == 0 or response_length < 3
+                ):
                     logger.warning(
                         f"Insufficient content on attempt {attempt + 1}/{max_retries} "
                         f"(chunks: {chunk_count}, meaningful: {meaningful_chunks}, length: {response_length})"
@@ -621,7 +619,9 @@ class LLMService:
                         type=StreamTokenType.COMPLETE,
                         content=accumulated_response,
                         finish_reason=finish_reason,
-                        function_calls=accumulated_function_calls if accumulated_function_calls else None,
+                        function_calls=accumulated_function_calls
+                        if accumulated_function_calls
+                        else None,
                     )
                     return
                 elif finish_reason == FinishReason.TOOL_CALLS:
@@ -630,7 +630,9 @@ class LLMService:
                         type=StreamTokenType.COMPLETE,
                         content=accumulated_response if accumulated_response else "",
                         finish_reason=finish_reason,
-                        function_calls=accumulated_function_calls if accumulated_function_calls else None,
+                        function_calls=accumulated_function_calls
+                        if accumulated_function_calls
+                        else None,
                     )
                     return
                 elif finish_reason == FinishReason.LENGTH:
@@ -781,11 +783,21 @@ class LLMService:
                             hasattr(tool_call_delta, "function")
                             and tool_call_delta.function
                         ):
-                            if hasattr(tool_call_delta.function, "name") and tool_call_delta.function.name:
-                                tool_calls_accumulator[index]["name"] = tool_call_delta.function.name
+                            if (
+                                hasattr(tool_call_delta.function, "name")
+                                and tool_call_delta.function.name
+                            ):
+                                tool_calls_accumulator[index]["name"] = (
+                                    tool_call_delta.function.name
+                                )
 
-                            if hasattr(tool_call_delta.function, "arguments") and tool_call_delta.function.arguments:
-                                tool_calls_accumulator[index]["arguments"] += tool_call_delta.function.arguments
+                            if (
+                                hasattr(tool_call_delta.function, "arguments")
+                                and tool_call_delta.function.arguments
+                            ):
+                                tool_calls_accumulator[index]["arguments"] += (
+                                    tool_call_delta.function.arguments
+                                )
 
                 # Capture finish reason from final chunk
                 if hasattr(choice, "finish_reason") and choice.finish_reason:
