@@ -8,7 +8,6 @@ the behavior of the course list view and course enrollment.
 from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from django.http import HttpResponseForbidden
 
 from courses.models import Course, CourseEnrollment, CourseTeacher
 from courses.views import CourseListView, CourseListData

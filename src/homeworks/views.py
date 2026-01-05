@@ -27,7 +27,6 @@ from llteacher.permissions.decorators import teacher_required, TeacherRequest
 from .models import Homework, Section
 from .services import (
     HomeworkService,
-    HomeworkCreateData,
     HomeworkUpdateData,
     SectionCreateData,
     SectionStatus,

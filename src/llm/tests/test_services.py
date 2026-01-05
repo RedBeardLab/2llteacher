@@ -18,8 +18,6 @@ from llm.services import (
     LLMConfigCreateResult,
     LLMConfigUpdateResult,
     LLMResponseWithTools,
-    FunctionDefinition,
-    FunctionCall,
 )
 
 User = get_user_model()

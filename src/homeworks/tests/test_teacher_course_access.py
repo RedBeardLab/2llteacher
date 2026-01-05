@@ -14,7 +14,7 @@ from django.urls import reverse
 from datetime import timedelta
 
 from homeworks.models import Homework, Section
-from homeworks.views import HomeworkListView, HomeworkEditView
+from homeworks.views import HomeworkEditView
 from accounts.models import Teacher
 from courses.models import Course, CourseTeacher
 

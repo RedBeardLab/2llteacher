@@ -16,7 +16,7 @@ from enum import StrEnum
 
 # Handle imports for type checking
 if TYPE_CHECKING:
-    from conversations.models import Conversation, Message
+    from conversations.models import Conversation
     from .models import LLMConfig
 
 from openai import OpenAI

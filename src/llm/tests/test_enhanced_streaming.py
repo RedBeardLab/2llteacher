@@ -4,7 +4,6 @@ Tests for enhanced streaming with intelligent retry logic.
 Simplified version focusing on core functionality with minimal mocking.
 """
 
-import uuid
 from unittest.mock import patch, MagicMock
 from django.test import TestCase
 from django.contrib.auth import get_user_model
@@ -19,7 +18,6 @@ from llm.services import (
     FinishReason,
     StreamingError,
     StreamToken,
-    FunctionDefinition,
 )
 
 User = get_user_model()

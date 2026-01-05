@@ -397,7 +397,6 @@ class ConversationService:
             MessageProcessingResult for non-streaming, Iterator[StreamEvent] for streaming
         """
         from .models import Conversation, Message
-        from llm.services import LLMService
 
         try:
             # Get conversation
@@ -568,7 +567,7 @@ class ConversationService:
             StreamEvent objects for the streaming response
         """
         from .models import Message
-        from llm.services import LLMService, StreamingError
+        from llm.services import StreamingError
 
         try:
             # Send user message confirmation

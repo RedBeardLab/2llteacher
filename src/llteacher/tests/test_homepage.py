@@ -6,7 +6,6 @@ based on their course enrollment status.
 """
 
 from django.test import TestCase, Client
-from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from accounts.models import Teacher, Student

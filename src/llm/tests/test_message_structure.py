@@ -7,8 +7,7 @@ is not redundantly repeated in every message to the LLM.
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from unittest.mock import patch, MagicMock, call
-import uuid
+from unittest.mock import patch, MagicMock
 
 from llm.models import LLMConfig
 from llm.services import LLMService
