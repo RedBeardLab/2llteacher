@@ -136,3 +136,35 @@ class Submission(models.Model):
 
         if existing_submission.exists():
             raise ValidationError("Student already has a submission for this section.")
+
+
+class PasteEvent(models.Model):
+    """Record of paste detection events for review."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    last_message_before_paste = models.ForeignKey(
+        Message,
+        on_delete=models.SET_NULL,
+        related_name="paste_events_after",
+        null=True,
+        blank=True,
+        help_text="Last message sent before this paste event occurred",
+    )
+    pasted_content = models.TextField(help_text="Full content that was pasted")
+    word_count = models.IntegerField(help_text="Number of words in pasted content")
+    content_length = models.IntegerField(help_text="Character length of pasted content")
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "conversations_paste_event"
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"Paste event - {self.word_count} words at {self.timestamp}"
+
+    @property
+    def conversation(self):
+        """Get the conversation through the last message."""
+        if self.last_message_before_paste:
+            return self.last_message_before_paste.conversation
+        return None

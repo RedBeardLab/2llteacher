@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
-from .models import Conversation, Message, Submission
+from .models import Conversation, Message, Submission, PasteEvent
 
 
 class MessageInline(admin.StackedInline):
@@ -125,3 +125,98 @@ class SubmissionAdmin(admin.ModelAdmin):
     def section_title(self, obj):
         """Display the section title."""
         return obj.conversation.section.title
+
+
+@admin.register(PasteEvent)
+class PasteEventAdmin(admin.ModelAdmin):
+    """Admin interface for PasteEvent model."""
+
+    list_display = (
+        "id",
+        "conversation_link",
+        "user_link",
+        "word_count",
+        "content_length",
+        "content_preview",
+        "timestamp",
+    )
+    list_filter = ("timestamp", "word_count")
+    search_fields = (
+        "pasted_content",
+        "last_message_before_paste__conversation__user__username",
+    )
+    readonly_fields = (
+        "id",
+        "last_message_before_paste",
+        "pasted_content",
+        "word_count",
+        "content_length",
+        "timestamp",
+        "conversation_info",
+    )
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {
+                "fields": (
+                    "id",
+                    "timestamp",
+                    "word_count",
+                    "content_length",
+                )
+            },
+        ),
+        (
+            "Context",
+            {
+                "fields": (
+                    "conversation_info",
+                    "last_message_before_paste",
+                )
+            },
+        ),
+        ("Pasted Content", {"fields": ("pasted_content",)}),
+    )
+
+    @admin.display(description="Conversation")
+    def conversation_link(self, obj):
+        """Create a clickable link to the conversation's admin page."""
+        if obj.conversation:
+            url = reverse("admin:conversations_conversation_change", args=[obj.conversation.pk])
+            return format_html('<a href="{}">{}</a>', url, str(obj.conversation.id)[:8])
+        return "N/A"
+
+    @admin.display(description="User")
+    def user_link(self, obj):
+        """Create a clickable link to the user's admin page."""
+        if obj.conversation:
+            url = reverse("admin:accounts_user_change", args=[obj.conversation.user.pk])
+            return format_html('<a href="{}">{}</a>', url, obj.conversation.user.username)
+        return "N/A"
+
+    @admin.display(description="Content Preview")
+    def content_preview(self, obj):
+        """Show a preview of the pasted content."""
+        if len(obj.pasted_content) > 50:
+            return obj.pasted_content[:50] + "..."
+        return obj.pasted_content
+
+    @admin.display(description="Conversation Info")
+    def conversation_info(self, obj):
+        """Display additional conversation information."""
+        if obj.conversation:
+            return format_html(
+                "<strong>User:</strong> {}<br><strong>Section:</strong> {}",
+                obj.conversation.user.username,
+                obj.conversation.section.title,
+            )
+        return "N/A"
+
+    def has_add_permission(self, request):
+        """Prevent manual addition of paste events through admin."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Allow deletion of paste events for cleanup."""
+        return True

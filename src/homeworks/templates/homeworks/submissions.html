@@ -184,11 +184,16 @@
                                             {% endif %}
                                         </div>
                                         <div class="small text-muted">
-                                            Created: {{ conversation.created_at|date:"M d, Y H:i" }} | 
-                                            Updated: {{ conversation.updated_at|date:"M d, Y H:i" }} | 
+                                            Created: {{ conversation.created_at|date:"M d, Y H:i" }} |
+                                            Updated: {{ conversation.updated_at|date:"M d, Y H:i" }} |
                                             {{ conversation.message_count }} messages
                                             {% if conversation.submission_date %}
                                                 | Submitted: {{ conversation.submission_date|date:"M d, Y H:i" }}
+                                            {% endif %}
+                                            {% if conversation.paste_event_count > 0 %}
+                                                | <span class="badge bg-danger">
+                                                    <i class="bi bi-exclamation-triangle-fill"></i> {{ conversation.paste_event_count }} Paste{{ conversation.paste_event_count|pluralize }} Detected
+                                                </span>
                                             {% endif %}
                                         </div>
                                     </div>

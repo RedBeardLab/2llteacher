@@ -147,6 +147,7 @@ class StudentConversationData:
     is_submitted: bool
     is_deleted: bool
     submission_date: datetime | None
+    paste_event_count: int = 0
 
 
 @dataclass
@@ -824,7 +825,7 @@ class HomeworkService:
         """
         from .models import Homework
         from accounts.models import Student
-        from conversations.models import Conversation, Submission
+        from conversations.models import Conversation, Submission, PasteEvent
 
         try:
             # Get the homework with sections ordered by section order
@@ -862,6 +863,19 @@ class HomeworkService:
 
             # Create a map of conversation_id -> submission for quick lookup
             submission_map = {sub.conversation.id: sub for sub in submissions}
+
+            # Get all paste events for conversations in this homework
+            paste_events = PasteEvent.objects.filter(
+                last_message_before_paste__conversation__section__homework=homework
+            ).select_related("last_message_before_paste__conversation")
+
+            # Create a map of conversation_id -> paste event count for quick lookup
+            from collections import defaultdict
+            paste_event_count_map = defaultdict(int)
+            for paste_event in paste_events:
+                if paste_event.last_message_before_paste:
+                    conv_id = paste_event.last_message_before_paste.conversation.id
+                    paste_event_count_map[conv_id] += 1
 
             # Group conversations by student and section
             student_section_conversations_map: dict[
@@ -945,6 +959,7 @@ class HomeworkService:
                                 submission_date=submission.submitted_at
                                 if submission
                                 else None,
+                                paste_event_count=paste_event_count_map.get(conv.id, 0),
                             )
                         )
 

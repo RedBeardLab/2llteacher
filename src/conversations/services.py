@@ -67,6 +67,17 @@ class MessageData:
 
 
 @dataclass
+class PasteEventData:
+    """Data structure for paste event display."""
+
+    id: UUID
+    pasted_content: str
+    word_count: int
+    content_length: int
+    timestamp: datetime
+
+
+@dataclass
 class ConversationData:
     id: UUID
     user_id: UUID
@@ -80,6 +91,7 @@ class ConversationData:
     is_student_conversation: bool
     can_submit: bool
     messages: Optional[List[MessageData]] = None
+    paste_events: Optional[List[PasteEventData]] = None
 
 
 @dataclass
@@ -175,7 +187,7 @@ class ConversationService:
         Returns:
             ConversationData if found, None otherwise
         """
-        from .models import Conversation
+        from .models import Conversation, PasteEvent
 
         try:
             # Get conversation with optimized query including homework
@@ -200,6 +212,23 @@ class ConversationService:
                 )
                 message_data_list.append(message_data)
 
+            # Get paste events for this conversation (for teacher view)
+            paste_events = PasteEvent.objects.filter(
+                last_message_before_paste__conversation=conversation
+            ).order_by("timestamp")
+
+            # Create PasteEventData objects
+            paste_event_data_list: List[PasteEventData] = []
+            for paste_event in paste_events:
+                paste_event_data = PasteEventData(
+                    id=paste_event.id,
+                    pasted_content=paste_event.pasted_content,
+                    word_count=paste_event.word_count,
+                    content_length=paste_event.content_length,
+                    timestamp=paste_event.timestamp,
+                )
+                paste_event_data_list.append(paste_event_data)
+
             # Determine if user can submit this conversation
             can_submit = (
                 hasattr(user, "student_profile")
@@ -222,6 +251,7 @@ class ConversationService:
                 is_student_conversation=conversation.is_student_conversation,
                 can_submit=can_submit,
                 messages=message_data_list,
+                paste_events=paste_event_data_list,
             )
         except Conversation.DoesNotExist:
             return None

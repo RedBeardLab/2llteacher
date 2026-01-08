@@ -3,13 +3,17 @@
  * Handles streaming chat functionality with AI tutors
  */
 class RealTimeChatClient {
+    // Constants
+    static PASTE_WARNING_MESSAGE = "Pasting is against the spirit of this exercise. Please be aware that it was detected and will be reviewed.";
+    static PASTE_WORD_THRESHOLD = 10;
+
     constructor(conversationId, csrfToken) {
         this.conversationId = conversationId;
         this.csrfToken = csrfToken;
         this.eventSource = null;
         this.isStreaming = false;
         this.currentStreamingMessage = null;
-        
+
         this.initializeElements();
         this.bindEvents();
     }
@@ -54,14 +58,20 @@ class RealTimeChatClient {
             this.textarea.style.height = 'auto';
             this.textarea.style.height = this.textarea.scrollHeight + 'px';
         });
-        
+
         // Handle message type changes for R Code styling
         this.messageTypeRadios.forEach(radio => {
             radio.addEventListener('change', () => {
                 this.updateTextareaMode();
             });
         });
-        
+
+        // Handle paste detection for copy warning
+        this.textarea.addEventListener('paste', (e) => {
+            console.log("detect paste");
+            this.handlePaste(e);
+        });
+
         // Initialize textarea mode
         this.updateTextareaMode();
     }
@@ -380,7 +390,96 @@ class RealTimeChatClient {
         div.textContent = text;
         return div.innerHTML;
     }
-    
+
+    /**
+     * Handle paste event to detect and warn about pasting long content
+     */
+    handlePaste(event) {
+        // Get the pasted content
+        const pastedText = (event.clipboardData || window.clipboardData).getData('text');
+
+        // Count words in pasted text
+        const wordCount = this.countWords(pastedText);
+
+        // If more than threshold words, show warning and log to backend
+        if (wordCount > RealTimeChatClient.PASTE_WORD_THRESHOLD) {
+            // Show warning to user
+            this.showPasteWarning(wordCount);
+
+            // Log paste event to backend
+            this.logPasteEvent(pastedText, wordCount);
+        }
+    }
+
+    /**
+     * Count words in a text string
+     */
+    countWords(text) {
+        // Trim whitespace and split by whitespace
+        const words = text.trim().split(/\s+/);
+        // Filter out empty strings
+        return words.filter(word => word.length > 0).length;
+    }
+
+    /**
+     * Show warning message about paste detection
+     */
+    showPasteWarning(wordCount) {
+        const warningHtml = `
+            <div class="alert alert-danger alert-dismissible fade show paste-warning" role="alert">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <strong>Paste Detected:</strong>
+                ${RealTimeChatClient.PASTE_WARNING_MESSAGE}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+
+        // Remove any existing paste warning first
+        const existingWarning = document.querySelector('.paste-warning');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+
+        // Insert warning before the form
+        this.form.insertAdjacentHTML('beforebegin', warningHtml);
+
+        // Auto-dismiss after 10 seconds
+        setTimeout(() => {
+            const alert = document.querySelector('.paste-warning');
+            if (alert) {
+                alert.remove();
+            }
+        }, 10000);
+    }
+
+    /**
+     * Log paste event to backend for review
+     */
+    async logPasteEvent(pastedText, wordCount) {
+        try {
+            const response = await fetch(`/conversations/api/${this.conversationId}/log-paste/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.csrfToken
+                },
+                body: JSON.stringify({
+                    pasted_content: pastedText,
+                    word_count: wordCount,
+                    content_length: pastedText.length,
+                    timestamp: new Date().toISOString()
+                })
+            });
+
+            if (!response.ok) {
+                console.error('Failed to log paste event:', response.status);
+            }
+        } catch (error) {
+            console.error('Error logging paste event:', error);
+            // Fail silently - don't disrupt user experience
+        }
+    }
+
 }
 
 // Export for use in other modules

@@ -53,48 +53,81 @@
                         <i class="fas fa-info-circle"></i> You're viewing this conversation as a teacher.
                     </div>
                     {% endif %}
+
+                    <!-- Paste Events Summary (Teacher View Only) -->
+                    {% if conversation_data.paste_events and user.id != conversation_data.user_id %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <strong>{{ conversation_data.paste_events|length }} paste event{{ conversation_data.paste_events|length|pluralize }} detected</strong> in this conversation (shown inline below).
+                    </div>
+                    {% endif %}
                     
                     <!-- Messages container -->
                     <div class="conversation-container">
-                        {% if conversation_data.messages %}
-                            {% for message in conversation_data.messages %}
-                            <div class="message-container {{ message.css_class }} mb-3" data-message-id="{{ message.id }}">
-                                <div class="message-header">
-                                    {% if message.is_from_student %}
-                                    <span class="badge bg-primary">Student</span>
-                                    {% elif message.is_from_ai %}
-                                    <span class="badge bg-success">AI Tutor</span>
-                                    {% elif message.is_system_message %}
-                                    <span class="badge bg-secondary">System</span>
-                                    {% else %}
-                                    <span class="badge bg-info">Other</span>
-                                    {% endif %}
-                                    <small class="text-muted">{{ message.timestamp|date:"M d, Y H:i" }}</small>
-                                </div>
-                                <div class="message-content p-3 rounded">
-                                    {% if message.message_type == 'code' %}
-                                    <div class="r-code-container">
-                                        <div class="r-code-header">
-                                            <span class="r-code-label">
-                                                <i class="bi bi-code-slash"></i>
-                                                R Code
-                                            </span>
-                                            <button class="btn btn-sm btn-outline-primary r-run-button" 
-                                                    data-message-id="{{ message.id }}" 
-                                                    disabled>
-                                                <i class="bi bi-hourglass-split"></i> Initializing...
-                                            </button>
+                        {% if timeline %}
+                            {% for item in timeline %}
+                                {% if item.type == 'message' %}
+                                    {% with message=item.data %}
+                                    <div class="message-container {{ message.css_class }} mb-3" data-message-id="{{ message.id }}">
+                                        <div class="message-header">
+                                            {% if message.is_from_student %}
+                                            <span class="badge bg-primary">Student</span>
+                                            {% elif message.is_from_ai %}
+                                            <span class="badge bg-success">AI Tutor</span>
+                                            {% elif message.is_system_message %}
+                                            <span class="badge bg-secondary">System</span>
+                                            {% else %}
+                                            <span class="badge bg-info">Other</span>
+                                            {% endif %}
+                                            <small class="text-muted">{{ message.timestamp|date:"M d, Y H:i" }}</small>
                                         </div>
-                                        <pre><code class="language-r">{{ message.content }}</code></pre>
-                                        <div class="r-execution-output" id="r-output-{{ message.id }}"></div>
+                                        <div class="message-content p-3 rounded">
+                                            {% if message.message_type == 'code' %}
+                                            <div class="r-code-container">
+                                                <div class="r-code-header">
+                                                    <span class="r-code-label">
+                                                        <i class="bi bi-code-slash"></i>
+                                                        R Code
+                                                    </span>
+                                                    <button class="btn btn-sm btn-outline-primary r-run-button"
+                                                            data-message-id="{{ message.id }}"
+                                                            disabled>
+                                                        <i class="bi bi-hourglass-split"></i> Initializing...
+                                                    </button>
+                                                </div>
+                                                <pre><code class="language-r">{{ message.content }}</code></pre>
+                                                <div class="r-execution-output" id="r-output-{{ message.id }}"></div>
+                                            </div>
+                                            {% elif message.message_type == 'code_execution' %}
+                                            <pre><code class="output">{{ message.content }}</code></pre>
+                                            {% else %}
+                                            <md-block untrusted>{{ message.content }}</md-block>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                    {% elif message.message_type == 'code_execution' %}
-                                    <pre><code class="output">{{ message.content }}</code></pre>
-                                    {% else %}
-                                    <md-block untrusted>{{ message.content }}</md-block>
-                                    {% endif %}
-                                </div>
-                            </div>
+                                    {% endwith %}
+                                {% elif item.type == 'paste_event' %}
+                                    {% with paste_event=item.data %}
+                                    <div class="paste-event-container mb-3 border border-danger rounded">
+                                        <div class="paste-event-header bg-danger text-white p-2">
+                                            <i class="bi bi-exclamation-triangle-fill"></i>
+                                            <strong>PASTE DETECTED</strong>
+                                            <span class="float-end">
+                                                {{ paste_event.timestamp|date:"M d, Y H:i" }} |
+                                                {{ paste_event.word_count }} words ({{ paste_event.content_length }} chars)
+                                            </span>
+                                        </div>
+                                        <div class="paste-event-content p-3 bg-light">
+                                            <details>
+                                                <summary class="text-danger fw-bold" style="cursor: pointer;">
+                                                    <i class="bi bi-eye"></i> Click to view pasted content
+                                                </summary>
+                                                <pre class="mt-2 p-2 bg-white border rounded" style="white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto;">{{ paste_event.pasted_content }}</pre>
+                                            </details>
+                                        </div>
+                                    </div>
+                                    {% endwith %}
+                                {% endif %}
                             {% endfor %}
                         {% else %}
                             <div class="alert alert-warning">

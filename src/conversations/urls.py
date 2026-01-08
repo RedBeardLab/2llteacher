@@ -38,4 +38,9 @@ urlpatterns = [
         views.ConversationStreamView.as_view(),
         name="api_stream",
     ),
+    path(
+        "api/<uuid:conversation_id>/log-paste/",
+        views.PasteLogView.as_view(),
+        name="api_log_paste",
+    ),
 ]

@@ -17,6 +17,7 @@ from django.http import (
     HttpResponseForbidden,
     Http404,
     StreamingHttpResponse,
+    JsonResponse,
 )
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -26,7 +27,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 
 from homeworks.models import Section
-from .models import Conversation
+from .models import Conversation, PasteEvent
 from .services import (
     ConversationService,
     SubmissionService,
@@ -69,6 +70,17 @@ class MessageViewData:
 
 
 @dataclass
+class PasteEventViewData:
+    """Data structure for paste event display."""
+
+    id: UUID
+    pasted_content: str
+    word_count: int
+    content_length: int
+    timestamp: datetime
+
+
+@dataclass
 class ConversationDetailData:
     """Data structure for the conversation detail view."""
 
@@ -80,6 +92,8 @@ class ConversationDetailData:
     messages: List[MessageViewData]
     can_submit: bool
     is_teacher_test: bool
+    paste_events: List[PasteEventViewData] = None
+    user_id: UUID = None
 
 
 @dataclass
@@ -265,11 +279,22 @@ class ConversationDetailView(View):
         # Process message styling for display
         conversation_data = self._process_message_styling(conversation_data)
 
+        # Create combined timeline for teacher view
+        is_teacher_viewing = (
+            hasattr(request.user, "teacher_profile")
+            and request.user.id != conversation_data.user_id
+        )
+        timeline = self._create_timeline(conversation_data, is_teacher_viewing)
+
         # Render the conversation detail template
         return render(
             request,
             "conversations/detail.html",
-            {"conversation_data": conversation_data},
+            {
+                "conversation_data": conversation_data,
+                "timeline": timeline,
+                "is_teacher_viewing": is_teacher_viewing,
+            },
         )
 
     def _check_conversation_access(self, user, conversation_data):
@@ -317,6 +342,42 @@ class ConversationDetailView(View):
                     message.css_class = "message-default"
 
         return conversation_data
+
+    def _create_timeline(self, conversation_data, is_teacher_viewing):
+        """
+        Create a combined timeline of messages and paste events.
+
+        Args:
+            conversation_data: ConversationData object
+            is_teacher_viewing: Boolean indicating if teacher is viewing
+
+        Returns:
+            List of timeline items (messages and paste events) sorted by timestamp
+        """
+        timeline = []
+
+        # Add all messages with type marker
+        if conversation_data.messages:
+            for message in conversation_data.messages:
+                timeline.append({
+                    'type': 'message',
+                    'data': message,
+                    'timestamp': message.timestamp
+                })
+
+        # Add paste events if teacher is viewing
+        if is_teacher_viewing and conversation_data.paste_events:
+            for paste_event in conversation_data.paste_events:
+                timeline.append({
+                    'type': 'paste_event',
+                    'data': paste_event,
+                    'timestamp': paste_event.timestamp
+                })
+
+        # Sort by timestamp
+        timeline.sort(key=lambda x: x['timestamp'])
+
+        return timeline
 
 
 class MessageSendView(MessageProcessingMixin, View):
@@ -540,3 +601,63 @@ class ConversationDeleteAndRestartView(View):
         else:
             messages.error(request, f"Error starting new conversation: {result.error}")
             return redirect("homeworks:detail", homework_id=section.homework.id)
+
+
+class PasteLogView(View):
+    """API view for logging paste detection events."""
+
+    @method_decorator(login_required)
+    @method_decorator(csrf_exempt)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request: HttpRequest, conversation_id: UUID) -> JsonResponse:
+        """Handle POST requests to log paste events."""
+        try:
+            # Parse the JSON request first
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"error": "Invalid JSON data."}, status=400
+            )
+
+        # Get the conversation and check permissions
+        # get_object_or_404 will raise Http404 which Django handles automatically
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+
+        # Check if user owns this conversation
+        if conversation.user != request.user:
+            return JsonResponse(
+                {"error": "You can only log paste events in your own conversations."},
+                status=403,
+            )
+
+        try:
+            pasted_content = data.get("pasted_content", "")
+            word_count = data.get("word_count", 0)
+            content_length = data.get("content_length", 0)
+
+            # Get the last message in the conversation
+            last_message = conversation.messages.order_by("-timestamp").first()
+
+            # Create the paste event
+            paste_event = PasteEvent.objects.create(
+                last_message_before_paste=last_message,
+                pasted_content=pasted_content,
+                word_count=word_count,
+                content_length=content_length,
+            )
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "paste_event_id": str(paste_event.id),
+                    "message": "Paste event logged successfully.",
+                },
+                status=201,
+            )
+
+        except Exception as e:
+            return JsonResponse(
+                {"error": f"Failed to log paste event: {str(e)}"}, status=500
+            )
