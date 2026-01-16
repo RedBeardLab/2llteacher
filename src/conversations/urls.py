@@ -43,4 +43,9 @@ urlpatterns = [
         views.PasteLogView.as_view(),
         name="api_log_paste",
     ),
+    path(
+        "api/<uuid:conversation_id>/events/",
+        views.RapidTextGrowthLogView.as_view(),
+        name="api_log_events",
+    ),
 ]

@@ -78,6 +78,15 @@ class PasteEventData:
 
 
 @dataclass
+class RapidTextGrowthEventData:
+    """Data structure for rapid text growth event display."""
+
+    id: UUID
+    added_text: str
+    timestamp: datetime
+
+
+@dataclass
 class ConversationData:
     id: UUID
     user_id: UUID
@@ -92,6 +101,7 @@ class ConversationData:
     can_submit: bool
     messages: Optional[List[MessageData]] = None
     paste_events: Optional[List[PasteEventData]] = None
+    rapid_text_growth_events: Optional[List[RapidTextGrowthEventData]] = None
 
 
 @dataclass
@@ -187,7 +197,7 @@ class ConversationService:
         Returns:
             ConversationData if found, None otherwise
         """
-        from .models import Conversation, PasteEvent
+        from .models import Conversation, PasteEvent, RapidTextGrowthEvent
 
         try:
             # Get conversation with optimized query including homework
@@ -229,6 +239,21 @@ class ConversationService:
                 )
                 paste_event_data_list.append(paste_event_data)
 
+            # Get rapid text growth events for this conversation (for teacher view)
+            rapid_text_growth_events = RapidTextGrowthEvent.objects.filter(
+                last_message_before_event__conversation=conversation
+            ).order_by("timestamp")
+
+            # Create RapidTextGrowthEventData objects
+            rapid_text_growth_event_data_list: List[RapidTextGrowthEventData] = []
+            for rapid_text_growth_event in rapid_text_growth_events:
+                rapid_text_growth_event_data = RapidTextGrowthEventData(
+                    id=rapid_text_growth_event.id,
+                    added_text=rapid_text_growth_event.added_text,
+                    timestamp=rapid_text_growth_event.timestamp,
+                )
+                rapid_text_growth_event_data_list.append(rapid_text_growth_event_data)
+
             # Determine if user can submit this conversation
             can_submit = (
                 hasattr(user, "student_profile")
@@ -252,6 +277,7 @@ class ConversationService:
                 can_submit=can_submit,
                 messages=message_data_list,
                 paste_events=paste_event_data_list,
+                rapid_text_growth_events=rapid_text_growth_event_data_list,
             )
         except Conversation.DoesNotExist:
             return None

@@ -27,7 +27,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 
 from homeworks.models import Section
-from .models import Conversation, PasteEvent
+from .models import Conversation, PasteEvent, RapidTextGrowthEvent
 from .services import (
     ConversationService,
     SubmissionService,
@@ -81,6 +81,15 @@ class PasteEventViewData:
 
 
 @dataclass
+class RapidTextGrowthEventViewData:
+    """Data structure for rapid text growth event display."""
+
+    id: UUID
+    added_text: str
+    timestamp: datetime
+
+
+@dataclass
 class ConversationDetailData:
     """Data structure for the conversation detail view."""
 
@@ -93,6 +102,7 @@ class ConversationDetailData:
     can_submit: bool
     is_teacher_test: bool
     paste_events: List[PasteEventViewData] = None
+    rapid_text_growth_events: List[RapidTextGrowthEventViewData] = None
     user_id: UUID = None
 
 
@@ -345,14 +355,14 @@ class ConversationDetailView(View):
 
     def _create_timeline(self, conversation_data, is_teacher_viewing):
         """
-        Create a combined timeline of messages and paste events.
+        Create a combined timeline of messages, paste events, and rapid text growth events.
 
         Args:
             conversation_data: ConversationData object
             is_teacher_viewing: Boolean indicating if teacher is viewing
 
         Returns:
-            List of timeline items (messages and paste events) sorted by timestamp
+            List of timeline items (messages, paste events, and rapid text growth events) sorted by timestamp
         """
         timeline = []
 
@@ -372,6 +382,15 @@ class ConversationDetailView(View):
                     'type': 'paste_event',
                     'data': paste_event,
                     'timestamp': paste_event.timestamp
+                })
+
+        # Add rapid text growth events if teacher is viewing
+        if is_teacher_viewing and conversation_data.rapid_text_growth_events:
+            for rapid_text_growth_event in conversation_data.rapid_text_growth_events:
+                timeline.append({
+                    'type': 'rapid_text_growth_event',
+                    'data': rapid_text_growth_event,
+                    'timestamp': rapid_text_growth_event.timestamp
                 })
 
         # Sort by timestamp
@@ -660,4 +679,52 @@ class PasteLogView(View):
         except Exception as e:
             return JsonResponse(
                 {"error": f"Failed to log paste event: {str(e)}"}, status=500
+            )
+
+
+class RapidTextGrowthLogView(View):
+    """API view for logging rapid text growth detection events."""
+
+    @method_decorator(login_required)
+    @method_decorator(csrf_exempt)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request: HttpRequest, conversation_id: UUID) -> JsonResponse:
+        """Handle POST requests to log rapid text growth events."""
+        try:
+            # Parse the JSON request first
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"error": "Invalid JSON data."}, status=400
+            )
+
+        # Get the conversation and check permissions
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+
+        # Check if user owns this conversation
+        if conversation.user != request.user:
+            return JsonResponse(
+                {"error": "You can only log rapid text growth events in your own conversations."},
+                status=403,
+            )
+
+        try:
+            added_text = data.get("added_text", "")
+
+            # Get the last message in the conversation
+            last_message = conversation.messages.order_by("-timestamp").first()
+
+            # Create the rapid text growth event
+            RapidTextGrowthEvent.objects.create(
+                last_message_before_event=last_message,
+                added_text=added_text,
+            )
+
+            return JsonResponse({}, status=201)
+
+        except Exception as e:
+            return JsonResponse(
+                {"error": f"Failed to log rapid text growth event: {str(e)}"}, status=500
             )

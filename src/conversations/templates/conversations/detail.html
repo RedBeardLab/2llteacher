@@ -127,6 +127,27 @@
                                         </div>
                                     </div>
                                     {% endwith %}
+                                {% elif item.type == 'rapid_text_growth_event' %}
+                                    {% with rapid_text_growth_event=item.data %}
+                                    <div class="rapid-text-growth-event-container mb-3 border border-warning rounded">
+                                        <div class="rapid-text-growth-event-header bg-warning text-dark p-2">
+                                            <i class="bi bi-lightning-fill"></i>
+                                            <strong>RAPID TEXT GROWTH DETECTED</strong>
+                                            <span class="float-end">
+                                                {{ rapid_text_growth_event.timestamp|date:"M d, Y H:i" }} |
+                                                {{ rapid_text_growth_event.added_text|length }} chars
+                                            </span>
+                                        </div>
+                                        <div class="rapid-text-growth-event-content p-3 bg-light">
+                                            <details>
+                                                <summary class="text-warning fw-bold" style="cursor: pointer;">
+                                                    <i class="bi bi-eye"></i> Click to view added text
+                                                </summary>
+                                                <pre class="mt-2 p-2 bg-white border rounded" style="white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto;">{{ rapid_text_growth_event.added_text }}</pre>
+                                            </details>
+                                        </div>
+                                    </div>
+                                    {% endwith %}
                                 {% endif %}
                             {% endfor %}
                         {% else %}

@@ -168,3 +168,33 @@ class PasteEvent(models.Model):
         if self.last_message_before_paste:
             return self.last_message_before_paste.conversation
         return None
+
+
+class RapidTextGrowthEvent(models.Model):
+    """Record of rapid text growth detection events for review."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    last_message_before_event = models.ForeignKey(
+        Message,
+        on_delete=models.SET_NULL,
+        related_name="rapid_text_growth_events_after",
+        null=True,
+        blank=True,
+        help_text="Last message sent before this rapid text growth event occurred",
+    )
+    added_text = models.TextField(help_text="Text that was added during the 100ms window")
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "conversations_rapid_text_growth_event"
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"Rapid text growth - {len(self.added_text)} chars at {self.timestamp}"
+
+    @property
+    def conversation(self):
+        """Get the conversation through the last message."""
+        if self.last_message_before_event:
+            return self.last_message_before_event.conversation
+        return None

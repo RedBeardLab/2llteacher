@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
-from .models import Conversation, Message, Submission, PasteEvent
+from .models import Conversation, Message, Submission, PasteEvent, RapidTextGrowthEvent
 
 
 class MessageInline(admin.StackedInline):
@@ -219,4 +219,99 @@ class PasteEventAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         """Allow deletion of paste events for cleanup."""
+        return True
+
+
+@admin.register(RapidTextGrowthEvent)
+class RapidTextGrowthEventAdmin(admin.ModelAdmin):
+    """Admin interface for RapidTextGrowthEvent model."""
+
+    list_display = (
+        "id",
+        "conversation_link",
+        "user_link",
+        "character_count",
+        "content_preview",
+        "timestamp",
+    )
+    list_filter = ("timestamp",)
+    search_fields = (
+        "added_text",
+        "last_message_before_event__conversation__user__username",
+    )
+    readonly_fields = (
+        "id",
+        "last_message_before_event",
+        "added_text",
+        "timestamp",
+        "conversation_info",
+    )
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {
+                "fields": (
+                    "id",
+                    "timestamp",
+                )
+            },
+        ),
+        (
+            "Context",
+            {
+                "fields": (
+                    "conversation_info",
+                    "last_message_before_event",
+                )
+            },
+        ),
+        ("Added Text", {"fields": ("added_text",)}),
+    )
+
+    @admin.display(description="Conversation")
+    def conversation_link(self, obj):
+        """Create a clickable link to the conversation's admin page."""
+        if obj.conversation:
+            url = reverse("admin:conversations_conversation_change", args=[obj.conversation.pk])
+            return format_html('<a href="{}">{}</a>', url, str(obj.conversation.id)[:8])
+        return "N/A"
+
+    @admin.display(description="User")
+    def user_link(self, obj):
+        """Create a clickable link to the user's admin page."""
+        if obj.conversation:
+            url = reverse("admin:accounts_user_change", args=[obj.conversation.user.pk])
+            return format_html('<a href="{}">{}</a>', url, obj.conversation.user.username)
+        return "N/A"
+
+    @admin.display(description="Characters")
+    def character_count(self, obj):
+        """Display the number of characters in the added text."""
+        return len(obj.added_text)
+
+    @admin.display(description="Content Preview")
+    def content_preview(self, obj):
+        """Show a preview of the added text."""
+        if len(obj.added_text) > 50:
+            return obj.added_text[:50] + "..."
+        return obj.added_text
+
+    @admin.display(description="Conversation Info")
+    def conversation_info(self, obj):
+        """Display additional conversation information."""
+        if obj.conversation:
+            return format_html(
+                "<strong>User:</strong> {}<br><strong>Section:</strong> {}",
+                obj.conversation.user.username,
+                obj.conversation.section.title,
+            )
+        return "N/A"
+
+    def has_add_permission(self, request):
+        """Prevent manual addition of rapid text growth events through admin."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Allow deletion of rapid text growth events for cleanup."""
         return True

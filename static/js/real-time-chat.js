@@ -6,6 +6,8 @@ class RealTimeChatClient {
     // Constants
     static PASTE_WARNING_MESSAGE = "Pasting is against the spirit of this exercise. Please be aware that it was detected and will be reviewed.";
     static PASTE_WORD_THRESHOLD = 10;
+    static TEXT_GROWTH_THRESHOLD = 50; // Characters per 100ms
+    static TEXT_GROWTH_CHECK_INTERVAL = 100; // milliseconds
 
     constructor(conversationId, csrfToken) {
         this.conversationId = conversationId;
@@ -14,8 +16,13 @@ class RealTimeChatClient {
         this.isStreaming = false;
         this.currentStreamingMessage = null;
 
+        // Text growth monitoring
+        this.previousTextLength = 0;
+        this.textGrowthInterval = null;
+
         this.initializeElements();
         this.bindEvents();
+        this.startTextGrowthMonitoring();
     }
     
     initializeElements() {
@@ -476,6 +483,59 @@ class RealTimeChatClient {
             }
         } catch (error) {
             console.error('Error logging paste event:', error);
+            // Fail silently - don't disrupt user experience
+        }
+    }
+
+    /**
+     * Start monitoring text growth in the textarea
+     */
+    startTextGrowthMonitoring() {
+        this.previousTextLength = this.textarea.value.length;
+
+        this.textGrowthInterval = setInterval(() => {
+            this.checkTextGrowth();
+        }, RealTimeChatClient.TEXT_GROWTH_CHECK_INTERVAL);
+    }
+
+    /**
+     * Check if text is growing too fast (potential paste)
+     */
+    checkTextGrowth() {
+        const currentTextLength = this.textarea.value.length;
+        const growth = currentTextLength - this.previousTextLength;
+
+        // If text grew significantly in 100ms
+        if (growth > RealTimeChatClient.TEXT_GROWTH_THRESHOLD) {
+            const addedText = this.textarea.value.substring(this.previousTextLength);
+            this.logRapidTextGrowthEvent(addedText);
+        }
+
+        this.previousTextLength = currentTextLength;
+    }
+
+    /**
+     * Log rapid text growth event to backend for review
+     */
+    async logRapidTextGrowthEvent(addedText) {
+        try {
+            const response = await fetch(`/conversations/api/${this.conversationId}/events/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.csrfToken
+                },
+                body: JSON.stringify({
+                    added_text: addedText,
+                    timestamp: new Date().toISOString()
+                })
+            });
+
+            if (!response.ok) {
+                console.error('Failed to log rapid text growth event:', response.status);
+            }
+        } catch (error) {
+            console.error('Error logging rapid text growth event:', error);
             // Fail silently - don't disrupt user experience
         }
     }
