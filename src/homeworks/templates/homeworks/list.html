@@ -49,8 +49,7 @@
                 </div>
                 <div class="card-body">
                     <div class="card-text">
-                        <zero-md>
-                        <script type="text/markdown">{{ homework.description }}</script>
+                        <zero-md src="data:text/markdown;charset=utf-8,{{ homework.description|urlencode }}">
                         <template data-append>
                             <style>.markdown-body { background-color: transparent !important; }</style>
                         </template>

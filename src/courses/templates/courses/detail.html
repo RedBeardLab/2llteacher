@@ -30,8 +30,7 @@
             {% if data.course_description %}
             <div class="card mb-4">
                 <div class="card-body">
-                    <zero-md>
-                        <script type="text/markdown">{{ data.course_description }}</script>
+                    <zero-md src="data:text/markdown;charset=utf-8,{{ data.course_description|urlencode }}">
                         <template data-append>
                             <style>.markdown-body { background-color: transparent !important; }</style>
                         </template>

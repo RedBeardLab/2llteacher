@@ -218,8 +218,9 @@ class RealTimeChatClient {
                 </div>
             `;
         } else {
-            // Regular message
-            messageContentHtml = `<zero-md><script type="text/markdown">${this.escapeHtml(content)}</script><template data-append><style>.markdown-body { background-color: transparent !important; }</style></template></zero-md>`;
+            // Regular message - use data URL to avoid escaping issues with LaTeX
+            const dataUrl = `data:text/markdown;charset=utf-8,${encodeURIComponent(content)}`;
+            messageContentHtml = `<zero-md src="${dataUrl}"><template data-append><style>.markdown-body { background-color: transparent !important; }</style></template></zero-md>`;
         }
         
         const messageHtml = `
@@ -282,8 +283,9 @@ class RealTimeChatClient {
             this.currentStreamingMessage.classList.remove('ai-message-streaming');
             const messageContent = this.currentStreamingMessage.querySelector('.message-content');
             
-            // Replace the streaming content with zero-md
-            messageContent.innerHTML = `<zero-md><script type="text/markdown">${this.escapeHtml(finalContent)}</script><template data-append><style>.markdown-body { background-color: transparent !important; }</style></template></zero-md>`;
+            // Replace the streaming content with zero-md using data URL
+            const dataUrl = `data:text/markdown;charset=utf-8,${encodeURIComponent(finalContent)}`;
+            messageContent.innerHTML = `<zero-md src="${dataUrl}"><template data-append><style>.markdown-body { background-color: transparent !important; }</style></template></zero-md>`;
             
             this.currentStreamingMessage = null;
         }

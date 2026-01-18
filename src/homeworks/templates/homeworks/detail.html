@@ -41,12 +41,11 @@
         </div>
         <div class="card-body">
             <div class="card-text">
-                <zero-md>
-                        <script type="text/markdown">{{ data.description }}</script>
-                        <template data-append>
-                            <style>.markdown-body { background-color: transparent !important; }</style>
-                        </template>
-                    </zero-md>
+                <zero-md src="data:text/markdown;charset=utf-8,{{ data.description|urlencode }}">
+                    <template data-append>
+                        <style>.markdown-body { background-color: transparent !important; }</style>
+                    </template>
+                </zero-md>
             </div>
         </div>
     </div>
@@ -68,8 +67,7 @@
                  aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#sectionAccordion">
                 <div class="accordion-body">
                     <div class="mb-3">
-                        <zero-md>
-                        <script type="text/markdown">{{ section.content }}</script>
+                        <zero-md src="data:text/markdown;charset=utf-8,{{ section.content|urlencode }}">
                         <template data-append>
                             <style>.markdown-body { background-color: transparent !important; }</style>
                         </template>
@@ -121,8 +119,7 @@
                     {% if section.has_solution and data.user_type == 'teacher' %}
                     <div class="alert alert-info mt-3">
                         <h6><i class="bi bi-lightbulb"></i> Solution</h6>
-                        <div><zero-md>
-                        <script type="text/markdown">{{ section.solution_content }}</script>
+                        <div><zero-md src="data:text/markdown;charset=utf-8,{{ section.solution_content|urlencode }}">
                         <template data-append>
                             <style>.markdown-body { background-color: transparent !important; }</style>
                         </template>

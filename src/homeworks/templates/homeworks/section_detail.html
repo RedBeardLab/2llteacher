@@ -25,20 +25,18 @@
         </div>
         <div class="card-body">
             <div class="content-area mb-4">
-                <zero-md>
-                        <script type="text/markdown">{{ data.section_content }}</script>
-                        <template data-append>
-                            <style>.markdown-body { background-color: transparent !important; }</style>
-                        </template>
-                    </zero-md>
+                <zero-md src="data:text/markdown;charset=utf-8,{{ data.section_content|urlencode }}">
+                    <template data-append>
+                        <style>.markdown-body { background-color: transparent !important; }</style>
+                    </template>
+                </zero-md>
             </div>
 
             {% if data.is_teacher and data.has_solution %}
             <div class="alert alert-info">
                 <h5><i class="bi bi-lightbulb"></i> Solution</h5>
                 <div class="solution-content">
-                    <zero-md>
-                        <script type="text/markdown">{{ data.solution_content }}</script>
+                    <zero-md src="data:text/markdown;charset=utf-8,{{ data.solution_content|urlencode }}">
                         <template data-append>
                             <style>.markdown-body { background-color: transparent !important; }</style>
                         </template>

@@ -101,8 +101,7 @@
                                             {% elif message.message_type == 'code_execution' %}
                                             <pre><code class="output">{{ message.content }}</code></pre>
                                             {% else %}
-                                            <zero-md>
-                                                <script type="text/markdown">{{ message.content }}</script>
+                                            <zero-md src="data:text/markdown;charset=utf-8,{{ message.content|urlencode }}">
                                                 <template data-append>
                                                     <style>
                                                         .markdown-body {
