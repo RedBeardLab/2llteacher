@@ -36,14 +36,16 @@
     <div class="row row-cols-1 row-cols-md-2 g-4">
         {% for homework in data.homeworks %}
         <div class="col">
-            <div class="card h-100 {% if homework.is_overdue %}border-danger{% endif %}">
+            <div class="card h-100 {% if homework.is_submitted %}border-success{% elif homework.is_overdue %}border-danger{% else %}border-primary{% endif %}">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">
                         <a href="{% url 'homeworks:detail' homework.id %}" class="text-decoration-none">
                             {{ homework.title }}
                         </a>
                     </h5>
-                    {% if homework.is_overdue %}
+                    {% if homework.is_submitted %}
+                    <span class="badge bg-success">Submitted</span>
+                    {% elif homework.is_overdue %}
                     <span class="badge bg-danger">Overdue</span>
                     {% endif %}
                 </div>

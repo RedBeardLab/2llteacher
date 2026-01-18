@@ -210,3 +210,126 @@ class HomeworkListViewTests(TestCase):
         # Check that user is redirected to login page
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.url.startswith("/accounts/login/"))
+
+    @patch("homeworks.services.HomeworkService.get_student_homework_progress")
+    def test_is_submitted_true_when_all_sections_submitted(self, mock_get_progress):
+        """Test that is_submitted is True when all sections are submitted."""
+        from homeworks.services import SectionStatus
+
+        # Mock progress data with all sections submitted
+        mock_progress_data = MagicMock()
+        mock_progress_data.sections_progress = [
+            MagicMock(
+                id=self.section1.id,
+                title=self.section1.title,
+                content=self.section1.content,
+                order=self.section1.order,
+                solution_content=None,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                status=SectionStatus.SUBMITTED,
+                conversation_id=uuid.uuid4(),
+            ),
+            MagicMock(
+                id=self.section2.id,
+                title=self.section2.title,
+                content=self.section2.content,
+                order=self.section2.order,
+                solution_content=None,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                status=SectionStatus.SUBMITTED,
+                conversation_id=uuid.uuid4(),
+            ),
+        ]
+        mock_get_progress.return_value = mock_progress_data
+
+        view = HomeworkListView()
+        data = view._get_view_data(self.student_user)
+
+        # Check that is_submitted is True
+        self.assertEqual(len(data.homeworks), 1)
+        self.assertTrue(data.homeworks[0].is_submitted)
+        self.assertEqual(data.homeworks[0].completed_percentage, 100)
+
+    @patch("homeworks.services.HomeworkService.get_student_homework_progress")
+    def test_is_submitted_false_when_some_sections_not_submitted(self, mock_get_progress):
+        """Test that is_submitted is False when some sections are not submitted."""
+        from homeworks.services import SectionStatus
+
+        # Mock progress data with one section submitted and one not started
+        mock_progress_data = MagicMock()
+        mock_progress_data.sections_progress = [
+            MagicMock(
+                id=self.section1.id,
+                title=self.section1.title,
+                content=self.section1.content,
+                order=self.section1.order,
+                solution_content=None,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                status=SectionStatus.SUBMITTED,
+                conversation_id=uuid.uuid4(),
+            ),
+            MagicMock(
+                id=self.section2.id,
+                title=self.section2.title,
+                content=self.section2.content,
+                order=self.section2.order,
+                solution_content=None,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                status=SectionStatus.IN_PROGRESS,
+                conversation_id=uuid.uuid4(),
+            ),
+        ]
+        mock_get_progress.return_value = mock_progress_data
+
+        view = HomeworkListView()
+        data = view._get_view_data(self.student_user)
+
+        # Check that is_submitted is False
+        self.assertEqual(len(data.homeworks), 1)
+        self.assertFalse(data.homeworks[0].is_submitted)
+        self.assertEqual(data.homeworks[0].completed_percentage, 50)
+
+    @patch("homeworks.services.HomeworkService.get_student_homework_progress")
+    def test_is_submitted_false_when_no_sections_submitted(self, mock_get_progress):
+        """Test that is_submitted is False when no sections are submitted."""
+        from homeworks.services import SectionStatus
+
+        # Mock progress data with no sections submitted
+        mock_progress_data = MagicMock()
+        mock_progress_data.sections_progress = [
+            MagicMock(
+                id=self.section1.id,
+                title=self.section1.title,
+                content=self.section1.content,
+                order=self.section1.order,
+                solution_content=None,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                status=SectionStatus.NOT_STARTED,
+                conversation_id=None,
+            ),
+            MagicMock(
+                id=self.section2.id,
+                title=self.section2.title,
+                content=self.section2.content,
+                order=self.section2.order,
+                solution_content=None,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                status=SectionStatus.NOT_STARTED,
+                conversation_id=None,
+            ),
+        ]
+        mock_get_progress.return_value = mock_progress_data
+
+        view = HomeworkListView()
+        data = view._get_view_data(self.student_user)
+
+        # Check that is_submitted is False
+        self.assertEqual(len(data.homeworks), 1)
+        self.assertFalse(data.homeworks[0].is_submitted)
+        self.assertEqual(data.homeworks[0].completed_percentage, 0)

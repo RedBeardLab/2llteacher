@@ -49,6 +49,7 @@ class HomeworkListItem:
     sections: list[SectionData] | None = None
     completed_percentage: int = 0
     in_progress_percentage: int = 0
+    is_submitted: bool = False
 
 
 @dataclass
@@ -200,6 +201,12 @@ class HomeworkListView(View):
                     else 0
                 )
 
+                # Check if all sections are submitted (based on Submission records)
+                is_submitted = (
+                    total_sections > 0
+                    and completed_sections == total_sections
+                )
+
                 homeworks.append(
                     HomeworkListItem(
                         id=homework.id,
@@ -212,6 +219,7 @@ class HomeworkListView(View):
                         sections=sections,
                         completed_percentage=completed_percentage,
                         in_progress_percentage=in_progress_percentage,
+                        is_submitted=is_submitted,
                     )
                 )
 
