@@ -219,7 +219,7 @@ class RealTimeChatClient {
             `;
         } else {
             // Regular message
-            messageContentHtml = `<md-block untrusted>${this.escapeHtml(content)}</md-block>`;
+            messageContentHtml = `<zero-md><script type="text/markdown">${this.escapeHtml(content)}</script><template data-append><style>.markdown-body { background-color: transparent !important; }</style></template></zero-md>`;
         }
         
         const messageHtml = `
@@ -282,8 +282,8 @@ class RealTimeChatClient {
             this.currentStreamingMessage.classList.remove('ai-message-streaming');
             const messageContent = this.currentStreamingMessage.querySelector('.message-content');
             
-            // Replace the streaming content with md-block
-            messageContent.innerHTML = `<md-block untrusted>${this.escapeHtml(finalContent)}</md-block>`;
+            // Replace the streaming content with zero-md
+            messageContent.innerHTML = `<zero-md><script type="text/markdown">${this.escapeHtml(finalContent)}</script><template data-append><style>.markdown-body { background-color: transparent !important; }</style></template></zero-md>`;
             
             this.currentStreamingMessage = null;
         }

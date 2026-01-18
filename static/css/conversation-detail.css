@@ -24,49 +24,49 @@
 }
 
 /* Markdown styling within message content */
-.message-content md-block {
+.message-content zero-md {
     font-family: inherit;
     line-height: 1.6;
 }
 
-.message-content md-block h1,
-.message-content md-block h2,
-.message-content md-block h3,
-.message-content md-block h4,
-.message-content md-block h5,
-.message-content md-block h6 {
+.message-content zero-md h1,
+.message-content zero-md h2,
+.message-content zero-md h3,
+.message-content zero-md h4,
+.message-content zero-md h5,
+.message-content zero-md h6 {
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     font-weight: 600;
     color: inherit;
 }
 
-.message-content md-block h1 { font-size: 1.5rem; }
-.message-content md-block h2 { font-size: 1.4rem; }
-.message-content md-block h3 { font-size: 1.3rem; }
-.message-content md-block h4 { font-size: 1.2rem; }
-.message-content md-block h5 { font-size: 1.1rem; }
-.message-content md-block h6 { font-size: 1rem; }
+.message-content zero-md h1 { font-size: 1.5rem; }
+.message-content zero-md h2 { font-size: 1.4rem; }
+.message-content zero-md h3 { font-size: 1.3rem; }
+.message-content zero-md h4 { font-size: 1.2rem; }
+.message-content zero-md h5 { font-size: 1.1rem; }
+.message-content zero-md h6 { font-size: 1rem; }
 
-.message-content md-block p {
+.message-content zero-md p {
     margin-bottom: 0.75rem;
 }
 
-.message-content md-block p:last-child {
+.message-content zero-md p:last-child {
     margin-bottom: 0;
 }
 
-.message-content md-block ul,
-.message-content md-block ol {
+.message-content zero-md ul,
+.message-content zero-md ol {
     margin-bottom: 0.75rem;
     padding-left: 1.5rem;
 }
 
-.message-content md-block li {
+.message-content zero-md li {
     margin-bottom: 0.25rem;
 }
 
-.message-content md-block blockquote {
+.message-content zero-md blockquote {
     margin: 0.75rem 0;
     padding: 0.5rem 1rem;
     border-left: 4px solid #dee2e6;
@@ -74,7 +74,7 @@
     font-style: italic;
 }
 
-.message-content md-block code {
+.message-content zero-md code {
     background-color: rgba(0, 0, 0, 0.1);
     padding: 0.125rem 0.25rem;
     border-radius: 0.25rem;
@@ -82,7 +82,7 @@
     font-family: 'Courier New', Courier, monospace;
 }
 
-.message-content md-block pre {
+.message-content zero-md pre {
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
     border-radius: 0.375rem;
@@ -92,51 +92,51 @@
     font-size: 0.875rem;
 }
 
-.message-content md-block pre code {
+.message-content zero-md pre code {
     background-color: transparent;
     padding: 0;
     border-radius: 0;
     font-size: inherit;
 }
 
-.message-content md-block a {
+.message-content zero-md a {
     color: #007bff;
     text-decoration: underline;
 }
 
-.message-content md-block a:hover {
+.message-content zero-md a:hover {
     color: #0056b3;
     text-decoration: none;
 }
 
-.message-content md-block strong {
+.message-content zero-md strong {
     font-weight: 600;
 }
 
-.message-content md-block em {
+.message-content zero-md em {
     font-style: italic;
 }
 
-.message-content md-block hr {
+.message-content zero-md hr {
     margin: 1rem 0;
     border: none;
     border-top: 1px solid #dee2e6;
 }
 
-.message-content md-block table {
+.message-content zero-md table {
     width: 100%;
     margin-bottom: 0.75rem;
     border-collapse: collapse;
 }
 
-.message-content md-block th,
-.message-content md-block td {
+.message-content zero-md th,
+.message-content zero-md td {
     padding: 0.5rem;
     border: 1px solid #dee2e6;
     text-align: left;
 }
 
-.message-content md-block th {
+.message-content zero-md th {
     background-color: rgba(0, 0, 0, 0.05);
     font-weight: 600;
 }

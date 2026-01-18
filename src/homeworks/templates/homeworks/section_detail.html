@@ -3,8 +3,8 @@
 {% block title %}Section {{ data.section_order }}: {{ data.section_title }}{% endblock %}
 
 {% block extra_js %}
-<!-- md-block for markdown rendering -->
-<script type="module" src="https://md-block.verou.me/md-block.js"></script>
+<!-- zero-md for markdown rendering with LaTeX support -->
+<script type="module" src="https://cdn.jsdelivr.net/npm/zero-md@3?register"></script>
 {% endblock %}
 
 {% block content %}
@@ -25,14 +25,24 @@
         </div>
         <div class="card-body">
             <div class="content-area mb-4">
-                <md-block untrusted>{{ data.section_content }}</md-block>
+                <zero-md>
+                        <script type="text/markdown">{{ data.section_content }}</script>
+                        <template data-append>
+                            <style>.markdown-body { background-color: transparent !important; }</style>
+                        </template>
+                    </zero-md>
             </div>
 
             {% if data.is_teacher and data.has_solution %}
             <div class="alert alert-info">
                 <h5><i class="bi bi-lightbulb"></i> Solution</h5>
                 <div class="solution-content">
-                    <md-block untrusted>{{ data.solution_content }}</md-block>
+                    <zero-md>
+                        <script type="text/markdown">{{ data.solution_content }}</script>
+                        <template data-append>
+                            <style>.markdown-body { background-color: transparent !important; }</style>
+                        </template>
+                    </zero-md>
                 </div>
             </div>
             {% endif %}

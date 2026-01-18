@@ -3,8 +3,8 @@
 {% block title %}Homeworks{% endblock %}
 
 {% block extra_js %}
-<!-- md-block for markdown rendering -->
-<script type="module" src="https://md-block.verou.me/md-block.js"></script>
+<!-- zero-md for markdown rendering with LaTeX support -->
+<script type="module" src="https://cdn.jsdelivr.net/npm/zero-md@3?register"></script>
 {% endblock %}
 
 {% block content %}
@@ -49,7 +49,12 @@
                 </div>
                 <div class="card-body">
                     <div class="card-text">
-                        <md-block untrusted>{{ homework.description }}</md-block>
+                        <zero-md>
+                        <script type="text/markdown">{{ homework.description }}</script>
+                        <template data-append>
+                            <style>.markdown-body { background-color: transparent !important; }</style>
+                        </template>
+                    </zero-md>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
                         <small class="text-muted">{{ homework.section_count }} Sections</small>
