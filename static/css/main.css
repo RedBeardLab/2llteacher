@@ -1,5 +1,10 @@
 /* Custom styles for LLTeacher */
 
+/* Force light mode - disable dark mode */
+:root {
+    color-scheme: light only;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
