@@ -180,17 +180,102 @@
         align-items: flex-start;
         gap: 0.5rem;
     }
-    
+
     .r-run-button {
         align-self: flex-end;
     }
-    
-    
+
+
     .webr-global-error {
         left: 1rem;
         right: 1rem;
         transform: none;
         min-width: auto;
         max-width: none;
+    }
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+    .r-code-container {
+        background-color: #1a1a1a;
+        border-color: #404040;
+    }
+
+    .r-code-header {
+        background-color: #2d2d2d;
+        border-bottom-color: #404040;
+    }
+
+    .r-code-label {
+        color: #e0e0e0;
+    }
+
+    .r-code-label i {
+        color: #66b3ff;
+    }
+
+    .r-execution-output {
+        background-color: #1a1a1a;
+        border-top-color: #404040;
+    }
+
+    .r-execution-result.success {
+        background-color: #1a1a1a;
+    }
+
+    .r-execution-result.error {
+        background-color: #2d1a1a;
+        border-left-color: #dc3545;
+    }
+
+    .r-execution-state {
+        color: #a0a0a0;
+    }
+
+    .r-execution-state.running {
+        background-color: #3a3020;
+        border-left-color: #ffc107;
+    }
+
+    .r-output-header {
+        color: #e0e0e0;
+    }
+
+    .r-output-header i {
+        color: #4caf50;
+    }
+
+    .r-output pre {
+        background-color: #1a1a1a;
+        border-color: #404040;
+        color: #e0e0e0;
+    }
+
+    .r-error {
+        color: #ff9999;
+    }
+
+    .r-error i {
+        color: #ff5555;
+    }
+
+    .r-error pre {
+        background-color: #2d1a1a;
+        border-color: #5a2d2d;
+        color: #ff9999;
+    }
+
+    .r-success {
+        color: #99ff99;
+    }
+
+    .r-success i {
+        color: #4caf50;
+    }
+
+    .r-plot {
+        background-color: #1a1a1a;
+        border-color: #404040;
     }
 }

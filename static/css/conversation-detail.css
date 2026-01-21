@@ -323,3 +323,131 @@ code.output {
     color: #6c757d;
     font-style: italic;
 }
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+    /* Conversation container */
+    .conversation-container {
+        background-color: #1a1a1a;
+    }
+
+    /* Message backgrounds */
+    .message-chat .message-content {
+        background-color: #1a3a52;
+        border-left-color: #0d6efd;
+    }
+
+    .message-ai .message-content {
+        background-color: #1a3a1a;
+        border-left-color: #28a745;
+    }
+
+    .message-system .message-content {
+        background-color: #2d2d2d;
+        border-left-color: #6c757d;
+    }
+
+    /* Message content styling */
+    .message-content zero-md blockquote {
+        border-left-color: #505050;
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .message-content zero-md code {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .message-content zero-md pre {
+        background-color: #1a1a1a;
+        border-color: #404040;
+    }
+
+    .message-content zero-md th,
+    .message-content zero-md td {
+        border-color: #404040;
+    }
+
+    .message-content zero-md th {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .message-content zero-md hr {
+        border-top-color: #404040;
+    }
+
+    /* Code styling */
+    code.language-r {
+        background-color: #1a1a1a;
+        color: #e0e0e0;
+    }
+
+    code.output {
+        background-color: #1a1a1a;
+        border-color: #404040;
+        color: #e0e0e0;
+    }
+
+    /* R Code execution styling */
+    .r-code-container {
+        background-color: #1a1a1a;
+        border-color: #404040;
+    }
+
+    .r-code-header {
+        background-color: #2d2d2d;
+        border-bottom-color: #404040;
+    }
+
+    /* Message type selector */
+    .message-type-selector .form-label {
+        color: #e0e0e0;
+    }
+
+    .message-type-selector .btn {
+        border-color: #404040;
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+    }
+
+    .message-type-selector .btn:hover {
+        background-color: #404040;
+    }
+
+    /* R Code mode styling for dark theme */
+    #content.r-code-mode {
+        background-color: #1a1a1a;
+        color: #e0e0e0;
+        border-color: #28a745;
+    }
+
+    #content.r-code-mode::placeholder {
+        color: #808080;
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+        color: #a0a0a0;
+    }
+
+    /* Paste event container */
+    .paste-event-content {
+        background-color: #2d2d2d !important;
+    }
+
+    .paste-event-content pre {
+        background-color: #1a1a1a !important;
+        border-color: #404040 !important;
+        color: #e0e0e0;
+    }
+
+    /* Rapid text growth event container */
+    .rapid-text-growth-event-content {
+        background-color: #2d2d2d !important;
+    }
+
+    .rapid-text-growth-event-content pre {
+        background-color: #1a1a1a !important;
+        border-color: #404040 !important;
+        color: #e0e0e0;
+    }
+}
