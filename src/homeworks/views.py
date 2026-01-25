@@ -32,7 +32,7 @@ from .services import (
     SectionStatus,
     SectionData,
 )
-from .forms import HomeworkForm, SectionForm, SectionFormSet
+from .forms import HomeworkCreateForm, HomeworkEditForm, SectionForm, SectionFormSet
 
 
 @dataclass
@@ -258,8 +258,8 @@ class HomeworkDetailData:
 class HomeworkFormData:
     """Data structure for the homework form view."""
 
-    form: Any  # HomeworkForm
-    section_forms: Any  # FormSet
+    form: "HomeworkEditForm"
+    section_forms: "SectionFormSet"
     user_type: str
     action: str  # 'create' or 'edit'
     is_submitted: bool = False
@@ -349,7 +349,7 @@ class HomeworkEditView(View):
     ) -> HomeworkFormData:
         """Prepare data for the form view with existing homework data."""
         # Create homework form with instance
-        form = HomeworkForm(instance=homework)
+        form = HomeworkEditForm(instance=homework)
 
         # Get existing sections for this homework
         sections = homework.sections.all().order_by("order")
@@ -386,7 +386,7 @@ class HomeworkEditView(View):
     ) -> HomeworkFormData:
         """Process the form submission for updating a homework."""
         # Create forms from POST data with homework instance
-        form = HomeworkForm(request.POST, instance=homework)
+        form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
         SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)

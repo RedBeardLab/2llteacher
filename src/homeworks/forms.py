@@ -49,8 +49,8 @@ class SectionForm(forms.Form):
     )
 
 
-class HomeworkForm(forms.ModelForm):
-    """Form for creating or editing a homework assignment."""
+class HomeworkCreateForm(forms.ModelForm):
+    """Form for creating a new homework assignment."""
 
     class Meta:
         model = Homework
@@ -68,6 +68,53 @@ class HomeworkForm(forms.ModelForm):
             ),
             "course": forms.Select(
                 attrs={"class": "form-select", "placeholder": "Select Course"}
+            ),
+            "due_date": forms.DateTimeInput(
+                attrs={
+                    "class": "form-control",
+                    "type": "datetime-local",
+                    "placeholder": "Due Date",
+                }
+            ),
+            "llm_config": forms.Select(
+                attrs={"class": "form-select", "placeholder": "LLM Configuration"}
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["llm_config"].required = False
+
+        # Convert datetime to format expected by datetime-local input
+        if self.instance and self.instance.due_date:
+            self.initial["due_date"] = self.instance.due_date.strftime("%Y-%m-%dT%H:%M")
+
+    def clean_due_date(self):
+        """Validate due date is in the future."""
+        due_date = self.cleaned_data.get("due_date")
+
+        if due_date and due_date <= timezone.now():
+            raise forms.ValidationError("Due date must be in the future.")
+
+        return due_date
+
+
+class HomeworkEditForm(forms.ModelForm):
+    """Form for editing an existing homework assignment."""
+
+    class Meta:
+        model = Homework
+        fields = ["title", "description", "due_date", "llm_config"]  # Note: course is excluded
+        widgets = {
+            "title": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Homework Title"}
+            ),
+            "description": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "placeholder": "Homework description...",
+                }
             ),
             "due_date": forms.DateTimeInput(
                 attrs={

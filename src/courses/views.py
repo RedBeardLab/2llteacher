@@ -6,6 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from uuid import UUID
 from django.views import View
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
@@ -13,6 +14,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+
+if TYPE_CHECKING:
+    from homeworks.forms import HomeworkCreateForm, SectionFormSet
 
 from llteacher.permissions.decorators import (
     student_required,
@@ -363,8 +367,8 @@ class CourseDetailView(View):
 class HomeworkFormData:
     """Data structure for homework form view."""
 
-    form: "HomeworkForm"  # type: ignore
-    section_forms: "SectionFormSet"  # type: ignore
+    form: "HomeworkCreateForm"
+    section_forms: "SectionFormSet"
     course_name: str
     course_id: UUID
     action: str  # 'create'
@@ -426,11 +430,11 @@ class CourseHomeworkCreateView(View):
         self, request: TeacherRequest, course: Course
     ) -> HomeworkFormData:
         """Prepare data for the form view."""
-        from homeworks.forms import HomeworkForm, SectionForm, SectionFormSet
+        from homeworks.forms import HomeworkCreateForm, SectionForm, SectionFormSet
         from django.forms import formset_factory
 
         # Create homework form with course pre-populated
-        form = HomeworkForm(initial={"course": course})
+        form = HomeworkCreateForm(initial={"course": course})
 
         # Create empty section form (we'll start with one)
         SectionFormset = formset_factory(SectionForm, extra=1, formset=SectionFormSet)
@@ -450,7 +454,7 @@ class CourseHomeworkCreateView(View):
         self, request: TeacherRequest, course: Course
     ) -> HomeworkFormData:
         """Process the form submission."""
-        from homeworks.forms import HomeworkForm, SectionForm, SectionFormSet
+        from homeworks.forms import HomeworkCreateForm, SectionForm, SectionFormSet
         from homeworks.services import (
             HomeworkService,
             HomeworkCreateData,
@@ -463,7 +467,7 @@ class CourseHomeworkCreateView(View):
         post_data["course"] = course.id
 
         # Create forms from POST data
-        form = HomeworkForm(post_data)
+        form = HomeworkCreateForm(post_data)
 
         SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
         section_formset = SectionFormset(request.POST, prefix="sections")

@@ -41,13 +41,34 @@ class HomeworkEditViewTestCase(TestCase):
         )
         self.student = Student.objects.create(user=self.student_user)
 
-        # Create course
-        from courses.models import Course
+        # Create courses
+        from courses.models import Course, CourseTeacher
 
         self.course = Course.objects.create(
             name="Test Course",
             code="TEST101",
             description="Test course description",
+        )
+
+        # Assign first teacher to the course
+        CourseTeacher.objects.create(
+            course=self.course,
+            teacher=self.teacher,
+            role="owner",
+        )
+
+        # Create a second course for the other teacher
+        self.other_course = Course.objects.create(
+            name="Other Course",
+            code="OTHER101",
+            description="Another course",
+        )
+
+        # Assign other teacher to the other course
+        CourseTeacher.objects.create(
+            course=self.other_course,
+            teacher=self.other_teacher,
+            role="owner",
         )
 
         # Create homework
@@ -123,6 +144,62 @@ class HomeworkEditViewTestCase(TestCase):
         # Check access is denied
         self.assertEqual(response.status_code, 403)
 
+    def test_edit_view_post_teacher_different_course_no_access(self):
+        """Test teacher from a different course cannot update the homework."""
+        # Login as other teacher (teaches different course)
+        self.client.login(username="other_teacher", password="password")
+
+        # Prepare post data
+        post_data = {
+            "title": "Trying to Update",
+            "description": "Should not work",
+            "due_date": "2030-02-01T00:00:00",
+            "llm_config": "",
+            "sections-TOTAL_FORMS": "1",
+            "sections-INITIAL_FORMS": "1",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-id": self.section_without_solution.id,
+            "sections-0-title": "Updated Section Title",
+            "sections-0-content": "Updated content",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+        }
+
+        # Try to submit the form
+        url = reverse("homeworks:edit", kwargs={"homework_id": self.homework.id})
+        response = self.client.post(url, post_data)
+
+        # Check access is denied
+        self.assertEqual(response.status_code, 403)
+
+        # Verify homework was NOT updated
+        self.homework.refresh_from_db()
+        self.assertEqual(self.homework.title, "Test Homework")
+        self.assertNotEqual(self.homework.title, "Trying to Update")
+
+    def test_edit_view_teacher_teaches_course_can_edit(self):
+        """Test teacher who teaches the course can edit homework even if they didn't create it."""
+        from courses.models import CourseTeacher
+
+        # Add other_teacher to teach the same course
+        CourseTeacher.objects.create(
+            course=self.course,
+            teacher=self.other_teacher,
+            role="instructor",
+        )
+
+        # Login as other teacher
+        self.client.login(username="other_teacher", password="password")
+
+        # Access edit view (GET)
+        url = reverse("homeworks:edit", kwargs={"homework_id": self.homework.id})
+        response = self.client.get(url)
+
+        # Check access is allowed
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "homeworks/form.html")
+
     def test_edit_view_invalid_homework(self):
         """Test accessing non-existent homework redirects to list."""
         # Login as teacher
@@ -151,11 +228,10 @@ class HomeworkEditViewTestCase(TestCase):
         # Login as teacher
         self.client.login(username="teacher", password="password")
 
-        # Prepare post data
+        # Prepare post data (note: course is NOT included, as it's not in the edit form)
         post_data = {
             "title": "Updated Homework Title",
             "description": "Updated description",
-            "course": self.course.id,
             "due_date": "2030-02-01T00:00:00",
             "llm_config": "",
             "sections-TOTAL_FORMS": "2",
@@ -201,11 +277,10 @@ class HomeworkEditViewTestCase(TestCase):
         # Login as teacher
         self.client.login(username="teacher", password="password")
 
-        # Prepare post data
+        # Prepare post data (note: course is NOT included, as it's not in the edit form)
         post_data = {
             "title": "Updated Homework Title",
             "description": "Updated description",
-            "course": self.course.id,
             "due_date": "2030-02-01T00:00:00",
             "llm_config": "",
             "sections-TOTAL_FORMS": "2",
@@ -239,10 +314,10 @@ class HomeworkEditViewTestCase(TestCase):
         self.client.login(username="teacher", password="password")
 
         # Prepare invalid post data (missing required fields)
+        # Note: course is NOT included, as it's not in the edit form
         post_data = {
             "title": "",  # Empty title should fail validation
             "description": "Updated description",
-            "course": self.course.id,
             "due_date": "2020-01-01T00:00:00",  # Past date should fail validation
             "llm_config": "",
             "sections-TOTAL_FORMS": "2",
