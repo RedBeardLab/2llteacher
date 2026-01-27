@@ -570,7 +570,7 @@ class HomeworkSubmissionsServiceTest(TestCase):
             first_name="Non",
             last_name="Enrolled",
         )
-        non_enrolled_student = Student.objects.create(user=non_enrolled_user)
+        Student.objects.create(user=non_enrolled_user)
 
         # Create a conversation for the non-enrolled student
         # This should still NOT make them appear in the results
