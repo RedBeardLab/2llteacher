@@ -8,7 +8,7 @@ following the testable-first architecture with typed data contracts.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, Any
 from uuid import UUID
-from django.forms import formset_factory
+from django.forms import formset_factory, BaseFormSet
 
 if TYPE_CHECKING:
     from django.forms.utils import ErrorDict, ErrorList
@@ -259,7 +259,7 @@ class HomeworkFormData:
     """Data structure for the homework form view."""
 
     form: "HomeworkEditForm"
-    section_forms: "SectionFormSet"
+    section_forms: "BaseFormSet[Any]"
     user_type: str
     action: str  # 'create' or 'edit'
     is_submitted: bool = False
