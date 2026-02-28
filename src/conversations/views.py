@@ -26,6 +26,11 @@ from django.utils.decorators import method_decorator
 from opentelemetry import trace
 from django.views.decorators.csrf import csrf_exempt
 import json
+import logging
+
+from llteacher.tracing import record_exception
+
+logger = logging.getLogger(__name__)
 
 from homeworks.models import Section
 from .models import Conversation, PasteEvent, RapidTextGrowthEvent
@@ -684,6 +689,8 @@ class PasteLogView(View):
             )
 
         except Exception as e:
+            logger.exception("Failed to log paste event")
+            record_exception(e)
             return JsonResponse(
                 {"error": f"Failed to log paste event: {str(e)}"}, status=500
             )
@@ -732,6 +739,8 @@ class RapidTextGrowthLogView(View):
             return JsonResponse({}, status=201)
 
         except Exception as e:
+            logger.exception("Failed to log rapid text growth event")
+            record_exception(e)
             return JsonResponse(
                 {"error": f"Failed to log rapid text growth event: {str(e)}"}, status=500
             )

@@ -18,6 +18,11 @@ from django.db import transaction
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from datetime import datetime
+import logging
+
+from llteacher.tracing import record_exception
+
+logger = logging.getLogger(__name__)
 
 from .forms import RegistrationForm, LoginForm, ProfileForm
 from .models import Student, User
@@ -179,7 +184,8 @@ class UserRegistrationView(View):
                 return RegistrationSuccessful(user_id=user.id)
 
         except Exception as e:
-            # Handle any errors
+            logger.exception("Error during user registration")
+            record_exception(e)
             return RegistrationError(error=str(e))
 
 

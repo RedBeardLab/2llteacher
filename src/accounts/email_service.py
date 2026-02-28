@@ -16,7 +16,11 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.conf import settings
 from django.utils import timezone
 
-from llteacher.tracing import traced
+import logging
+
+from llteacher.tracing import traced, record_exception
+
+logger = logging.getLogger(__name__)
 
 from .models import User, EmailVerification
 
@@ -94,6 +98,8 @@ class EmailVerificationService:
             return EmailSendResult(success=True, token=token)
 
         except Exception as e:
+            logger.exception("Error sending verification email")
+            record_exception(e)
             return EmailSendResult(success=False, error=str(e))
 
     @staticmethod
@@ -141,6 +147,8 @@ class EmailVerificationService:
                 success=False, error="Invalid verification link."
             )
         except Exception as e:
+            logger.exception("Error verifying email token")
+            record_exception(e)
             return EmailVerificationResult(success=False, error=str(e))
 
     @staticmethod

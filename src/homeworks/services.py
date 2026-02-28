@@ -13,7 +13,7 @@ from datetime import datetime
 import logging
 
 from django.db import transaction
-from llteacher.tracing import traced
+from llteacher.tracing import traced, record_exception
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -328,7 +328,7 @@ class HomeworkService:
                     homework_id=homework.id, section_ids=section_ids
                 )
         except Exception as e:
-            # Return failure result with error
+            record_exception(e)
             return HomeworkCreateResult(
                 homework_id=None,  # type: ignore
                 section_ids=[],
@@ -393,7 +393,9 @@ class HomeworkService:
                                 SectionStatus.NOT_STARTED
                             )  # Never started, still time
                         conversation_id = None
-            except Exception:
+            except Exception as e:
+                logger.exception("Error determining section status")
+                record_exception(e)
                 status = SectionStatus.NOT_STARTED
                 conversation_id = None
 
@@ -666,7 +668,9 @@ class HomeworkService:
 
         except Teacher.DoesNotExist:
             return None
-        except Exception:
+        except Exception as e:
+            logger.exception("Error getting homework matrix")
+            record_exception(e)
             return None
 
     @staticmethod
@@ -795,6 +799,7 @@ class HomeworkService:
                 success=False, error=f"Homework with id {homework_id} not found"
             )
         except Exception as e:
+            record_exception(e)
             return HomeworkUpdateResult(success=False, error=str(e))
 
     @staticmethod
@@ -817,7 +822,9 @@ class HomeworkService:
             return True
         except Homework.DoesNotExist:
             return False
-        except Exception:
+        except Exception as e:
+            logger.exception("Error deleting homework %s", homework_id)
+            record_exception(e)
             return False
 
     @staticmethod

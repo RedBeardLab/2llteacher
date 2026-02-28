@@ -15,7 +15,12 @@ from django.views import View
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 
+import logging
+
 from llteacher.permissions.decorators import teacher_required, get_teacher_or_student
+from llteacher.tracing import record_exception
+
+logger = logging.getLogger(__name__)
 from .services import (
     LLMService,
     LLMConfigData,
@@ -413,7 +418,9 @@ class LLMGenerateAPIView(View):
                     "message_type": request.POST.get("message_type", "student"),
                 }
             return data
-        except Exception:
+        except Exception as e:
+            logger.exception("Error parsing request data")
+            record_exception(e)
             return {}
 
     def _generate_api_response(self, user, data: dict) -> dict:
@@ -468,6 +475,8 @@ class LLMGenerateAPIView(View):
             return result
 
         except Exception as e:
+            logger.exception("Error generating API response")
+            record_exception(e)
             return {"success": False, "error": str(e)}
 
 
@@ -499,4 +508,6 @@ class LLMConfigsAPIView(View):
 
             return {"success": True, "configs": config_list}
         except Exception as e:
+            logger.exception("Error getting LLM configs")
+            record_exception(e)
             return {"success": False, "error": str(e)}

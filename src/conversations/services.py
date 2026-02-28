@@ -10,7 +10,11 @@ from typing import List, Optional, Dict, Any, Iterator, TypedDict
 from datetime import datetime
 from uuid import UUID
 from django.db import transaction
-from llteacher.tracing import traced
+import logging
+
+from llteacher.tracing import traced, record_exception
+
+logger = logging.getLogger(__name__)
 
 from accounts.models import User
 from homeworks.models import Section
@@ -176,7 +180,7 @@ class ConversationService:
                 section_id=section.id,
             )
         except Exception as e:
-            # Return failure result
+            record_exception(e)
             return ConversationStartResult(
                 conversation_id=None,
                 initial_message_id=None,
@@ -284,7 +288,9 @@ class ConversationService:
             )
         except Conversation.DoesNotExist:
             return None
-        except Exception:
+        except Exception as e:
+            logger.exception("Error getting conversation data")
+            record_exception(e)
             return None
 
     @staticmethod
@@ -311,7 +317,9 @@ class ConversationService:
                 message_type=Message.MESSAGE_TYPE_SYSTEM,
             )
             return message.id
-        except Exception:
+        except Exception as e:
+            logger.exception("Error adding system message")
+            record_exception(e)
             return None
 
     @staticmethod
@@ -334,7 +342,9 @@ class ConversationService:
             # Soft delete the conversation
             conversation.soft_delete()
             return True
-        except Exception:
+        except Exception as e:
+            logger.exception("Error deleting teacher test conversation")
+            record_exception(e)
             return False
 
     @staticmethod
@@ -386,7 +396,9 @@ class ConversationService:
                 conversation_data_list.append(conversation_data)
 
             return conversation_data_list
-        except Exception:
+        except Exception as e:
+            logger.exception("Error getting teacher test conversations")
+            record_exception(e)
             return []
 
     @staticmethod
@@ -442,7 +454,7 @@ class ConversationService:
                 has_error=has_error,
             )
         except Exception as e:
-            # Return failure result
+            record_exception(e)
             return CodeExecutionResult(success=False, error=str(e))
 
     @staticmethod
@@ -554,6 +566,7 @@ class ConversationService:
                     error=error_msg,
                 )
         except Exception as e:
+            record_exception(e)
             error_msg = str(e)
             if streaming:
                 return ConversationService._create_error_stream(error_msg)
@@ -727,6 +740,8 @@ class ConversationService:
                 type="error", timestamp=datetime.now(), data={"message": str(e)}
             )
         except Exception as e:
+            logger.exception("Unexpected error in streaming response")
+            record_exception(e)
             # Delete the empty AI message since we failed
             ai_message.delete()
 
@@ -864,7 +879,7 @@ class SubmissionService:
                         is_new=is_new,
                     )
         except Exception as e:
-            # Return failure result
+            record_exception(e)
             return SubmissionService.SubmissionResult(success=False, error=str(e))
 
     @staticmethod
@@ -907,7 +922,9 @@ class SubmissionService:
             )
         except Submission.DoesNotExist:
             return None
-        except Exception:
+        except Exception as e:
+            logger.exception("Error getting submission data")
+            record_exception(e)
             return None
 
     @staticmethod
@@ -981,7 +998,7 @@ class SubmissionService:
                 details=results["details"],
             )
         except Exception as e:
-            # Return error result
+            record_exception(e)
             return SubmissionService.AutoSubmitResult(
                 total_sections=0,
                 processed_sections=0,
@@ -1035,5 +1052,7 @@ class SubmissionService:
                 submission_data_list.append(submission_data)
 
             return submission_data_list
-        except Exception:
+        except Exception as e:
+            logger.exception("Error getting student submissions")
+            record_exception(e)
             return []

@@ -8,7 +8,6 @@ When OTel is not configured, the decorator is a no-op.
 import functools
 import inspect
 import logging
-import sys
 
 from opentelemetry import trace
 from opentelemetry.trace import StatusCode
@@ -52,15 +51,39 @@ def traced(func):
     def wrapper(*args, **kwargs):
         with tracer.start_as_current_span(func.__qualname__) as span:
             _set_args(span, args, kwargs)
-            return func(*args, **kwargs)
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(StatusCode.ERROR, str(e))
+                raise
 
     @functools.wraps(func)
     def generator_wrapper(*args, **kwargs):
         with tracer.start_as_current_span(func.__qualname__) as span:
             _set_args(span, args, kwargs)
-            yield from func(*args, **kwargs)
+            try:
+                yield from func(*args, **kwargs)
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(StatusCode.ERROR, str(e))
+                raise
 
     return generator_wrapper if is_generator else wrapper
+
+
+logger = logging.getLogger(__name__)
+
+
+def record_exception(e: Exception, message: str | None = None) -> None:
+    """Record an exception on the current span and mark it as error.
+
+    Use this in except blocks that handle exceptions without re-raising,
+    so they still appear as errors in Honeycomb.
+    """
+    span = trace.get_current_span()
+    span.record_exception(e)
+    span.set_status(StatusCode.ERROR, message or str(e))
 
 
 def set_span_attributes(attributes: dict) -> None:

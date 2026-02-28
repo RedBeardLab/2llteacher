@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from .models import LLMConfig
 
 from openai import OpenAI
-from llteacher.tracing import traced, set_span_attributes
+from llteacher.tracing import traced, set_span_attributes, record_exception
 
 
 class StreamTokenType(StrEnum):
@@ -278,6 +278,7 @@ class LLMService:
         except Exception as e:
             error_id = uuid.uuid4()
             logger.error(f"Error generating AI response [ID: {error_id}]: {str(e)}")
+            record_exception(e)
             return LLMResponseWithTools(
                 success=False,
                 error=f"Technical issue [ID: {error_id}]: {str(e)}",
@@ -953,6 +954,7 @@ class LLMService:
             return None
         except Exception as e:
             logger.error(f"Error getting default LLM config: {str(e)}")
+            record_exception(e)
             return None
 
     @staticmethod
@@ -976,6 +978,7 @@ class LLMService:
             return None
         except Exception as e:
             logger.error(f"Error getting LLM config by ID: {str(e)}")
+            record_exception(e)
             return None
 
     @staticmethod
@@ -994,6 +997,7 @@ class LLMService:
             return [LLMConfigData.from_model(config) for config in configs]
         except Exception as e:
             logger.error(f"Error getting all LLM configs: {str(e)}")
+            record_exception(e)
             return []
 
     @staticmethod
@@ -1026,6 +1030,7 @@ class LLMService:
             return LLMConfigCreateResult(config_id=config.id, success=True)
         except Exception as e:
             logger.error(f"Error creating LLM config: {str(e)}")
+            record_exception(e)
             return LLMConfigCreateResult(success=False, error=str(e))
 
     @staticmethod
@@ -1073,6 +1078,7 @@ class LLMService:
             return LLMConfigUpdateResult(success=False, error="Configuration not found")
         except Exception as e:
             logger.error(f"Error updating LLM config: {str(e)}")
+            record_exception(e)
             return LLMConfigUpdateResult(success=False, error=str(e))
 
     @staticmethod
@@ -1107,6 +1113,7 @@ class LLMService:
             return LLMConfigUpdateResult(success=False, error="Configuration not found")
         except Exception as e:
             logger.error(f"Error deleting LLM config: {str(e)}")
+            record_exception(e)
             return LLMConfigUpdateResult(success=False, error=str(e))
 
     @staticmethod
@@ -1152,6 +1159,7 @@ class LLMService:
 
         except Exception as e:
             logger.error(f"Error testing LLM config: {str(e)}")
+            record_exception(e)
             return LLMResponseWithTools(
                 response_text="", tokens_used=0, success=False, error=str(e)
             )
