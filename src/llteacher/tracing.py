@@ -7,8 +7,11 @@ When OTel is not configured, the decorator is a no-op.
 
 import functools
 import inspect
+import logging
+import sys
 
 from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 
 # Max length for attribute values to avoid bloating spans
 _MAX_ATTR_LENGTH = 256

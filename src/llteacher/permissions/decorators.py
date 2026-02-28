@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
 from accounts.models import Teacher, Student
+from llteacher.tracing import set_span_attributes
 
 # Type alias for request.user which can be either authenticated or anonymous
 RequestUser = AbstractBaseUser | AnonymousUser
