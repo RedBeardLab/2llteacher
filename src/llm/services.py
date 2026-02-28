@@ -73,6 +73,13 @@ class LLMConfigData:
         Returns:
             LLMConfigData with all fields copied from model
         """
+        if not llm_config.api_key.isascii():
+            err = ValueError(
+                f"LLM config '{llm_config.name}' (id={llm_config.id}) has non-ASCII api_key — fields may be swapped with base_prompt"
+            )
+            logger.error(str(err))
+            record_exception(err)
+
         return cls(
             id=llm_config.id,
             name=llm_config.name,
