@@ -20,6 +20,7 @@ dependencies = [
     "opentelemetry-instrumentation-django",
     "opentelemetry-instrumentation-requests",
     "opentelemetry-instrumentation-logging",
+    "opentelemetry-instrumentation-sqlite3",
 ]
 
 [build-system]

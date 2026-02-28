@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from .models import LLMConfig
 
 from openai import OpenAI
+from llteacher.tracing import traced
 
 
 class StreamTokenType(StrEnum):
@@ -200,6 +201,7 @@ class LLMService:
     """
 
     @staticmethod
+    @traced
     def get_stopping_rule_function() -> FunctionDefinition:
         """
         Get the stopping rule function definition.
@@ -224,6 +226,7 @@ class LLMService:
         )
 
     @staticmethod
+    @traced
     def get_response(
         conversation: "Conversation",
         content: str,
@@ -487,6 +490,7 @@ class LLMService:
         return len(stripped) > 0 and not stripped.isspace()
 
     @staticmethod
+    @traced
     def stream_response_with_completion(
         conversation: "Conversation",
         content: str,
@@ -933,6 +937,7 @@ class LLMService:
         return "\n".join(parts)
 
     @staticmethod
+    @traced
     def get_default_config() -> Optional[LLMConfigData]:
         """
         Get the default LLM configuration data.
@@ -953,6 +958,7 @@ class LLMService:
             return None
 
     @staticmethod
+    @traced
     def get_config_by_id(config_id: UUID) -> Optional[LLMConfigData]:
         """
         Get LLM configuration by ID.
@@ -975,6 +981,7 @@ class LLMService:
             return None
 
     @staticmethod
+    @traced
     def get_all_configs() -> List[LLMConfigData]:
         """
         Get all active LLM configurations.
@@ -992,6 +999,7 @@ class LLMService:
             return []
 
     @staticmethod
+    @traced
     def create_config(data: LLMConfigCreateData) -> LLMConfigCreateResult:
         """
         Create a new LLM configuration.
@@ -1023,6 +1031,7 @@ class LLMService:
             return LLMConfigCreateResult(success=False, error=str(e))
 
     @staticmethod
+    @traced
     def update_config(config_id: UUID, data: Dict[str, Any]) -> LLMConfigUpdateResult:
         """
         Update an existing LLM configuration.
@@ -1069,6 +1078,7 @@ class LLMService:
             return LLMConfigUpdateResult(success=False, error=str(e))
 
     @staticmethod
+    @traced
     def delete_config(config_id: UUID) -> LLMConfigUpdateResult:
         """
         Delete (deactivate) an LLM configuration.
@@ -1102,6 +1112,7 @@ class LLMService:
             return LLMConfigUpdateResult(success=False, error=str(e))
 
     @staticmethod
+    @traced
     def test_config(
         config_id: UUID, test_message: str = "Hello, this is a test message."
     ) -> LLMResponseWithTools:

@@ -16,6 +16,8 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.conf import settings
 from django.utils import timezone
 
+from llteacher.tracing import traced
+
 from .models import User, EmailVerification
 
 
@@ -41,6 +43,7 @@ class EmailVerificationService:
     """Service for managing email verification operations."""
 
     @staticmethod
+    @traced
     def send_verification_email(user: User, request=None) -> EmailSendResult:
         """
         Send email verification email to user.
@@ -94,6 +97,7 @@ class EmailVerificationService:
             return EmailSendResult(success=False, error=str(e))
 
     @staticmethod
+    @traced
     def verify_email_token(token: str) -> EmailVerificationResult:
         """
         Verify an email verification token.
@@ -140,6 +144,7 @@ class EmailVerificationService:
             return EmailVerificationResult(success=False, error=str(e))
 
     @staticmethod
+    @traced
     def resend_verification_email(user: User, request=None) -> EmailSendResult:
         """
         Resend verification email to user.
@@ -162,6 +167,7 @@ class EmailVerificationService:
         return EmailVerificationService.send_verification_email(user, request)
 
     @staticmethod
+    @traced
     def cleanup_expired_tokens():
         """
         Clean up expired verification tokens.

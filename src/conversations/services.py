@@ -10,6 +10,7 @@ from typing import List, Optional, Dict, Any, Iterator, TypedDict
 from datetime import datetime
 from uuid import UUID
 from django.db import transaction
+from llteacher.tracing import traced
 
 from accounts.models import User
 from homeworks.models import Section
@@ -140,6 +141,7 @@ class ConversationService:
     """
 
     @staticmethod
+    @traced
     def start_conversation(user: User, section: "Section") -> ConversationStartResult:
         """
         Start a new conversation for a user on a section.
@@ -184,6 +186,7 @@ class ConversationService:
             )
 
     @staticmethod
+    @traced
     def get_conversation_data(
         conversation_id: UUID, user: User
     ) -> Optional[ConversationData]:
@@ -285,6 +288,7 @@ class ConversationService:
             return None
 
     @staticmethod
+    @traced
     def add_system_message(
         conversation: "Conversation", content: str
     ) -> Optional[UUID]:
@@ -311,6 +315,7 @@ class ConversationService:
             return None
 
     @staticmethod
+    @traced
     def delete_teacher_test_conversation(conversation: "Conversation") -> bool:
         """
         Delete a teacher test conversation.
@@ -333,6 +338,7 @@ class ConversationService:
             return False
 
     @staticmethod
+    @traced
     def get_teacher_test_conversations(
         teacher: "Teacher", section: Optional["Section"] = None
     ) -> List[ConversationData]:
@@ -384,6 +390,7 @@ class ConversationService:
             return []
 
     @staticmethod
+    @traced
     def handle_r_code_execution(
         conversation: "Conversation",
         code: str,
@@ -439,6 +446,7 @@ class ConversationService:
             return CodeExecutionResult(success=False, error=str(e))
 
     @staticmethod
+    @traced
     def process_message(
         request: MessageProcessingRequest, streaming: bool = False
     ) -> MessageProcessingResult | Iterator[StreamEvent]:
@@ -558,6 +566,7 @@ class ConversationService:
                 )
 
     @staticmethod
+    @traced
     def validate_message_request(request: MessageProcessingRequest) -> Optional[str]:
         """
         Centralized validation for message requests.
@@ -579,6 +588,7 @@ class ConversationService:
         return None
 
     @staticmethod
+    @traced
     def authorize_message_request(request: MessageProcessingRequest) -> bool:
         """
         Centralized authorization for message requests.
@@ -807,6 +817,7 @@ class SubmissionService:
         details: List[Dict[str, Any]]
 
     @staticmethod
+    @traced
     def submit_section(
         user: User, conversation: "Conversation"
     ) -> "SubmissionService.SubmissionResult":
@@ -857,6 +868,7 @@ class SubmissionService:
             return SubmissionService.SubmissionResult(success=False, error=str(e))
 
     @staticmethod
+    @traced
     def get_submission_data(
         submission_id: UUID,
     ) -> Optional["SubmissionService.SubmissionData"]:
@@ -899,6 +911,7 @@ class SubmissionService:
             return None
 
     @staticmethod
+    @traced
     def auto_submit_overdue_sections() -> "SubmissionService.AutoSubmitResult":
         """
         Automatically submit overdue sections for all students.
@@ -978,6 +991,7 @@ class SubmissionService:
             )
 
     @staticmethod
+    @traced
     def get_student_submissions(
         student: "Student",
     ) -> List["SubmissionService.SubmissionData"]:

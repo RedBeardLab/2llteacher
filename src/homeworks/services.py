@@ -13,6 +13,7 @@ from datetime import datetime
 import logging
 
 from django.db import transaction
+from llteacher.tracing import traced
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -265,6 +266,7 @@ class HomeworkService:
     """
 
     @staticmethod
+    @traced
     def create_homework_with_sections(
         data: HomeworkCreateData, teacher: "Teacher"
     ) -> HomeworkCreateResult:
@@ -335,6 +337,7 @@ class HomeworkService:
             )
 
     @staticmethod
+    @traced
     def get_student_homework_progress(
         student: "Student", homework: "Homework"
     ) -> HomeworkProgressData:
@@ -417,6 +420,7 @@ class HomeworkService:
         )
 
     @staticmethod
+    @traced
     def get_homework_with_sections(homework_id: UUID) -> HomeworkDetailData | None:
         """
         Get detailed homework data with all its sections.
@@ -471,6 +475,7 @@ class HomeworkService:
             return None
 
     @staticmethod
+    @traced
     def get_all_homework_matrix(teacher_id: UUID) -> HomeworkMatrixData | None:
         """
         Get a matrix view of all students and all homeworks created by a teacher.
@@ -665,6 +670,7 @@ class HomeworkService:
             return None
 
     @staticmethod
+    @traced
     def update_homework(
         homework_id: UUID, data: HomeworkUpdateData
     ) -> HomeworkUpdateResult:
@@ -792,6 +798,7 @@ class HomeworkService:
             return HomeworkUpdateResult(success=False, error=str(e))
 
     @staticmethod
+    @traced
     def delete_homework(homework_id: UUID) -> bool:
         """
         Delete a homework and all related sections.
@@ -814,6 +821,7 @@ class HomeworkService:
             return False
 
     @staticmethod
+    @traced
     def get_homework_submissions(homework_id: UUID) -> HomeworkSubmissionsData | None:
         """
         Get all student submissions for a homework, including students with no interactions.
