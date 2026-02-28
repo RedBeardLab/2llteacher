@@ -487,6 +487,7 @@ class LLMService:
         return len(stripped) > 0 and not stripped.isspace()
 
     @staticmethod
+    @traced
     def stream_response_with_completion(
         conversation: "Conversation",
         content: str,
@@ -545,6 +546,7 @@ class LLMService:
             raise StreamingError(f"Streaming failed: {str(e)}")
 
     @staticmethod
+    @traced
     def _stream_with_intelligent_retry(
         llm_config: LLMConfigData,
         context: ConversationContext,
@@ -673,6 +675,7 @@ class LLMService:
         )
 
     @staticmethod
+    @traced
     def _stream_with_finish_reason_detection(
         llm_config: LLMConfigData,
         context: ConversationContext,
@@ -733,6 +736,7 @@ class LLMService:
             "homework_title": context.homework_title,
         }
         logger.info("LLM API request", extra=request_attrs)
+        set_span_attributes(request_attrs)
 
         # Make streaming API call with tools
         stream = client.chat.completions.create(
@@ -862,6 +866,7 @@ class LLMService:
             "message_type": context.message_type,
         }
         logger.info("LLM response timing", extra=timing_attrs)
+        set_span_attributes(timing_attrs)
 
         # Yield final finish reason and function calls (even if None for interrupted streams)
         yield "", function_calls, finish_reason
