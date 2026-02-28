@@ -900,7 +900,14 @@ class HomeworkService:
                 UUID, dict[UUID, list[Conversation]]
             ] = {}
             for conv in conversations:
-                student_id = conv.user.student_profile.id
+                student_profile = getattr(conv.user, "student_profile", None)
+                if student_profile is None:
+                    logger.warning(
+                        "Skipping conversation %s: user %s has no student_profile (homework %s)",
+                        conv.id, conv.user.id, homework_id,
+                    )
+                    continue
+                student_id = student_profile.id
                 section_id = conv.section.id
 
                 if student_id not in student_section_conversations_map:
