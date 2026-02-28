@@ -206,8 +206,7 @@ class HomeworkListView(View):
 
                 # Check if all sections are submitted (based on Submission records)
                 is_submitted = (
-                    total_sections > 0
-                    and completed_sections == total_sections
+                    total_sections > 0 and completed_sections == total_sections
                 )
 
                 homeworks.append(
@@ -937,7 +936,9 @@ class HomeworkSubmissionsView(View):
         submissions_data = HomeworkService.get_homework_submissions(homework_id)
 
         if submissions_data is None:
-            logger.error("get_homework_submissions returned None for homework %s", homework_id)
+            logger.error(
+                "get_homework_submissions returned None for homework %s", homework_id
+            )
             messages.error(request, "Unable to load submissions data.")
             return redirect("homeworks:detail", homework_id=homework_id)
 

@@ -375,32 +375,34 @@ class ConversationDetailView(View):
         # Add all messages with type marker
         if conversation_data.messages:
             for message in conversation_data.messages:
-                timeline.append({
-                    'type': 'message',
-                    'data': message,
-                    'timestamp': message.timestamp
-                })
+                timeline.append(
+                    {"type": "message", "data": message, "timestamp": message.timestamp}
+                )
 
         # Add paste events if teacher is viewing
         if is_teacher_viewing and conversation_data.paste_events:
             for paste_event in conversation_data.paste_events:
-                timeline.append({
-                    'type': 'paste_event',
-                    'data': paste_event,
-                    'timestamp': paste_event.timestamp
-                })
+                timeline.append(
+                    {
+                        "type": "paste_event",
+                        "data": paste_event,
+                        "timestamp": paste_event.timestamp,
+                    }
+                )
 
         # Add rapid text growth events if teacher is viewing
         if is_teacher_viewing and conversation_data.rapid_text_growth_events:
             for rapid_text_growth_event in conversation_data.rapid_text_growth_events:
-                timeline.append({
-                    'type': 'rapid_text_growth_event',
-                    'data': rapid_text_growth_event,
-                    'timestamp': rapid_text_growth_event.timestamp
-                })
+                timeline.append(
+                    {
+                        "type": "rapid_text_growth_event",
+                        "data": rapid_text_growth_event,
+                        "timestamp": rapid_text_growth_event.timestamp,
+                    }
+                )
 
         # Sort by timestamp
-        timeline.sort(key=lambda x: x['timestamp'])
+        timeline.sort(key=lambda x: x["timestamp"])
 
         return timeline
 
@@ -648,9 +650,7 @@ class PasteLogView(View):
             # Parse the JSON request first
             data = json.loads(request.body)
         except json.JSONDecodeError:
-            return JsonResponse(
-                {"error": "Invalid JSON data."}, status=400
-            )
+            return JsonResponse({"error": "Invalid JSON data."}, status=400)
 
         # Get the conversation and check permissions
         # get_object_or_404 will raise Http404 which Django handles automatically
@@ -710,9 +710,7 @@ class RapidTextGrowthLogView(View):
             # Parse the JSON request first
             data = json.loads(request.body)
         except json.JSONDecodeError:
-            return JsonResponse(
-                {"error": "Invalid JSON data."}, status=400
-            )
+            return JsonResponse({"error": "Invalid JSON data."}, status=400)
 
         # Get the conversation and check permissions
         conversation = get_object_or_404(Conversation, id=conversation_id)
@@ -720,7 +718,9 @@ class RapidTextGrowthLogView(View):
         # Check if user owns this conversation
         if conversation.user != request.user:
             return JsonResponse(
-                {"error": "You can only log rapid text growth events in your own conversations."},
+                {
+                    "error": "You can only log rapid text growth events in your own conversations."
+                },
                 status=403,
             )
 
@@ -742,5 +742,6 @@ class RapidTextGrowthLogView(View):
             logger.exception("Failed to log rapid text growth event")
             record_exception(e)
             return JsonResponse(
-                {"error": f"Failed to log rapid text growth event: {str(e)}"}, status=500
+                {"error": f"Failed to log rapid text growth event: {str(e)}"},
+                status=500,
             )

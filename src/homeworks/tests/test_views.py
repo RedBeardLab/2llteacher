@@ -253,7 +253,9 @@ class HomeworkListViewTests(TestCase):
         self.assertEqual(data.homeworks[0].completed_percentage, 100)
 
     @patch("homeworks.services.HomeworkService.get_student_homework_progress")
-    def test_is_submitted_false_when_some_sections_not_submitted(self, mock_get_progress):
+    def test_is_submitted_false_when_some_sections_not_submitted(
+        self, mock_get_progress
+    ):
         """Test that is_submitted is False when some sections are not submitted."""
         from homeworks.services import SectionStatus
 
