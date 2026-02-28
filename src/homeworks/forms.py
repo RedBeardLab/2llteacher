@@ -146,7 +146,7 @@ class HomeworkEditForm(forms.ModelForm):
         return due_date
 
 
-class SectionFormSet(forms.BaseFormSet):
+class SectionFormSet(forms.BaseFormSet[SectionForm]):
     """Formset for managing multiple sections in a homework."""
 
     def clean(self):

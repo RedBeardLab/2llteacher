@@ -374,6 +374,7 @@ class HomeworkEditView(View):
         section_formset = SectionFormset(
             prefix="sections", initial=initial_section_data
         )
+        assert isinstance(section_formset, SectionFormSet)
 
         # Return form data
         return HomeworkFormData(
@@ -394,6 +395,7 @@ class HomeworkEditView(View):
         # Create formset for sections
         SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
         section_formset = SectionFormset(request.POST, prefix="sections")
+        assert isinstance(section_formset, SectionFormSet)
 
         # Check form validity
         if form.is_valid() and section_formset.is_valid():
