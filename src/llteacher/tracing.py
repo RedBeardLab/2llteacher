@@ -52,3 +52,21 @@ def traced(func):
             return func(*args, **kwargs)
 
     return wrapper
+
+
+def set_span_attributes(attributes: dict) -> None:
+    """Set attributes on the current active span.
+
+    Use this inside a @traced function to record computed values
+    (e.g. response times, token counts) on the span.
+
+    Values that are not str, bool, int, or float are converted
+    via _safe_repr. None values are skipped.
+    """
+    span = trace.get_current_span()
+    for key, value in attributes.items():
+        if value is None:
+            continue
+        if not isinstance(value, (str, bool, int, float)):
+            value = _safe_repr(value)
+        span.set_attribute(key, value)

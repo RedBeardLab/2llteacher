@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from .models import LLMConfig
 
 from openai import OpenAI
-from llteacher.tracing import traced
+from llteacher.tracing import traced, set_span_attributes
 
 
 class StreamTokenType(StrEnum):
@@ -284,6 +284,7 @@ class LLMService:
             )
 
     @staticmethod
+    @traced
     def _generate_openai_response(
         llm_config: LLMConfigData,
         context: ConversationContext,
@@ -328,21 +329,20 @@ class LLMService:
             tools = [func.to_openai_format() for func in available_functions]
 
             # Log LLM request details
-            logger.info(
-                "LLM API request",
-                extra={
-                    "event_type": "llm_request",
-                    "model_name": llm_config.model_name,
-                    "response_mode": "non_streaming",
-                    "messages_count": len(messages),
-                    "tools_count": len(tools),
-                    "tools": tools,
-                    "temperature": llm_config.temperature,
-                    "max_completion_tokens": llm_config.max_completion_tokens,
-                    "section_title": context.section_title,
-                    "homework_title": context.homework_title,
-                },
-            )
+            request_attrs = {
+                "event_type": "llm_request",
+                "model_name": llm_config.model_name,
+                "response_mode": "non_streaming",
+                "messages_count": len(messages),
+                "tools_count": len(tools),
+                "tools": tools,
+                "temperature": llm_config.temperature,
+                "max_completion_tokens": llm_config.max_completion_tokens,
+                "section_title": context.section_title,
+                "homework_title": context.homework_title,
+            }
+            logger.info("LLM API request", extra=request_attrs)
+            set_span_attributes(request_attrs)
 
             # Make API call with tools
             response = client.chat.completions.create(
@@ -393,25 +393,24 @@ class LLMService:
                         )
 
                 # Log response timing
-                logger.info(
-                    "LLM response timing",
-                    extra={
-                        "event_type": "llm_response_timing",
-                        "model_name": llm_config.model_name,
-                        "response_mode": "non_streaming",
-                        "query_preparation_ms": query_preparation_ms,
-                        "api_response_time_ms": api_response_time_ms,
-                        "total_response_time_ms": total_response_time_ms,
-                        "token_count": tokens_used,
-                        "success": True,
-                        "has_function_calls": len(function_calls) > 0,
-                        "function_calls_count": len(function_calls),
-                        "finish_reason": finish_reason.value if finish_reason else None,
-                        "section_title": context.section_title,
-                        "homework_title": context.homework_title,
-                        "message_type": context.message_type,
-                    },
-                )
+                response_attrs = {
+                    "event_type": "llm_response_timing",
+                    "model_name": llm_config.model_name,
+                    "response_mode": "non_streaming",
+                    "query_preparation_ms": query_preparation_ms,
+                    "api_response_time_ms": api_response_time_ms,
+                    "total_response_time_ms": total_response_time_ms,
+                    "token_count": tokens_used,
+                    "success": True,
+                    "has_function_calls": len(function_calls) > 0,
+                    "function_calls_count": len(function_calls),
+                    "finish_reason": finish_reason.value if finish_reason else None,
+                    "section_title": context.section_title,
+                    "homework_title": context.homework_title,
+                    "message_type": context.message_type,
+                }
+                logger.info("LLM response timing", extra=response_attrs)
+                set_span_attributes(response_attrs)
 
                 return LLMResponseWithTools(
                     response_text=response_text if response_text else None,
@@ -422,23 +421,22 @@ class LLMService:
                 )
             else:
                 # Log failed response timing
-                logger.info(
-                    "LLM response timing",
-                    extra={
-                        "event_type": "llm_response_timing",
-                        "model_name": llm_config.model_name,
-                        "response_mode": "non_streaming",
-                        "query_preparation_ms": query_preparation_ms,
-                        "api_response_time_ms": api_response_time_ms,
-                        "total_response_time_ms": total_response_time_ms,
-                        "token_count": 0,
-                        "success": False,
-                        "error": "No response generated from OpenAI API",
-                        "section_title": context.section_title,
-                        "homework_title": context.homework_title,
-                        "message_type": context.message_type,
-                    },
-                )
+                error_attrs = {
+                    "event_type": "llm_response_timing",
+                    "model_name": llm_config.model_name,
+                    "response_mode": "non_streaming",
+                    "query_preparation_ms": query_preparation_ms,
+                    "api_response_time_ms": api_response_time_ms,
+                    "total_response_time_ms": total_response_time_ms,
+                    "token_count": 0,
+                    "success": False,
+                    "error": "No response generated from OpenAI API",
+                    "section_title": context.section_title,
+                    "homework_title": context.homework_title,
+                    "message_type": context.message_type,
+                }
+                logger.info("LLM response timing", extra=error_attrs)
+                set_span_attributes(error_attrs)
 
                 return LLMResponseWithTools(
                     tokens_used=0,
@@ -452,21 +450,20 @@ class LLMService:
             total_response_time_ms = int((end_time - start_time) * 1000)
 
             # Log error timing
-            logger.info(
-                "LLM response timing",
-                extra={
-                    "event_type": "llm_response_timing",
-                    "model_name": llm_config.model_name,
-                    "response_mode": "non_streaming",
-                    "total_response_time_ms": total_response_time_ms,
-                    "token_count": 0,
-                    "success": False,
-                    "error": str(e),
-                    "section_title": context.section_title,
-                    "homework_title": context.homework_title,
-                    "message_type": context.message_type,
-                },
-            )
+            exc_attrs = {
+                "event_type": "llm_response_timing",
+                "model_name": llm_config.model_name,
+                "response_mode": "non_streaming",
+                "total_response_time_ms": total_response_time_ms,
+                "token_count": 0,
+                "success": False,
+                "error": str(e),
+                "section_title": context.section_title,
+                "homework_title": context.homework_title,
+                "message_type": context.message_type,
+            }
+            logger.info("LLM response timing", extra=exc_attrs)
+            set_span_attributes(exc_attrs)
 
             logger.error(f"OpenAI API error: {str(e)}")
             return LLMResponseWithTools(tokens_used=0, success=False, error=str(e))
@@ -549,6 +546,7 @@ class LLMService:
             raise StreamingError(f"Streaming failed: {str(e)}")
 
     @staticmethod
+    @traced
     def _stream_with_intelligent_retry(
         llm_config: LLMConfigData,
         context: ConversationContext,
@@ -677,6 +675,7 @@ class LLMService:
         )
 
     @staticmethod
+    @traced
     def _stream_with_finish_reason_detection(
         llm_config: LLMConfigData,
         context: ConversationContext,
@@ -724,21 +723,20 @@ class LLMService:
         tools = [func.to_openai_format() for func in available_functions]
 
         # Log LLM request details
-        logger.info(
-            "LLM API request",
-            extra={
-                "event_type": "llm_request",
-                "model_name": llm_config.model_name,
-                "response_mode": "streaming",
-                "messages_count": len(messages),
-                "tools_count": len(tools),
-                "tools": tools,
-                "temperature": llm_config.temperature,
-                "max_completion_tokens": llm_config.max_completion_tokens,
-                "section_title": context.section_title,
-                "homework_title": context.homework_title,
-            },
-        )
+        request_attrs = {
+            "event_type": "llm_request",
+            "model_name": llm_config.model_name,
+            "response_mode": "streaming",
+            "messages_count": len(messages),
+            "tools_count": len(tools),
+            "tools": tools,
+            "temperature": llm_config.temperature,
+            "max_completion_tokens": llm_config.max_completion_tokens,
+            "section_title": context.section_title,
+            "homework_title": context.homework_title,
+        }
+        logger.info("LLM API request", extra=request_attrs)
+        set_span_attributes(request_attrs)
 
         # Make streaming API call with tools
         stream = client.chat.completions.create(
@@ -848,33 +846,33 @@ class LLMService:
             total_streaming_time_ms = 0
 
         # Log streaming timing
-        logger.info(
-            "LLM response timing",
-            extra={
-                "event_type": "llm_response_timing",
-                "model_name": llm_config.model_name,
-                "response_mode": "streaming",
-                "query_preparation_ms": query_preparation_ms,
-                "time_to_first_token_ms": time_to_first_token_ms,
-                "total_streaming_time_ms": total_streaming_time_ms,
-                "total_response_time_ms": total_response_time_ms,
-                "token_count": token_count,
-                "success": finish_reason in [FinishReason.STOP, FinishReason.TOOL_CALLS]
-                if finish_reason
-                else False,
-                "finish_reason": finish_reason.value if finish_reason else None,
-                "has_function_calls": len(function_calls) > 0,
-                "function_calls_count": len(function_calls),
-                "section_title": context.section_title,
-                "homework_title": context.homework_title,
-                "message_type": context.message_type,
-            },
-        )
+        timing_attrs = {
+            "event_type": "llm_response_timing",
+            "model_name": llm_config.model_name,
+            "response_mode": "streaming",
+            "query_preparation_ms": query_preparation_ms,
+            "time_to_first_token_ms": time_to_first_token_ms,
+            "total_streaming_time_ms": total_streaming_time_ms,
+            "total_response_time_ms": total_response_time_ms,
+            "token_count": token_count,
+            "success": finish_reason in [FinishReason.STOP, FinishReason.TOOL_CALLS]
+            if finish_reason
+            else False,
+            "finish_reason": finish_reason.value if finish_reason else None,
+            "has_function_calls": len(function_calls) > 0,
+            "function_calls_count": len(function_calls),
+            "section_title": context.section_title,
+            "homework_title": context.homework_title,
+            "message_type": context.message_type,
+        }
+        logger.info("LLM response timing", extra=timing_attrs)
+        set_span_attributes(timing_attrs)
 
         # Yield final finish reason and function calls (even if None for interrupted streams)
         yield "", function_calls, finish_reason
 
     @staticmethod
+    @traced
     def _build_conversation_context(
         conversation: "Conversation", content: str, message_type: str
     ) -> ConversationContext:
