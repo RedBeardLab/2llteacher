@@ -6,8 +6,23 @@ When OTel is not configured, the decorator is a no-op.
 """
 
 import functools
+import inspect
 
 from opentelemetry import trace
+
+# Max length for attribute values to avoid bloating spans
+_MAX_ATTR_LENGTH = 256
+
+
+def _safe_repr(value) -> str:
+    """Convert a value to a string safe for use as a span attribute."""
+    try:
+        r = repr(value)
+    except Exception:
+        r = f"<{type(value).__name__}>"
+    if len(r) > _MAX_ATTR_LENGTH:
+        return r[:_MAX_ATTR_LENGTH] + "..."
+    return r
 
 
 def traced(func):
@@ -15,12 +30,25 @@ def traced(func):
 
     The span name is set to "Module.QualifiedName" (e.g.
     "HomeworkService.get_homework_submissions").
+
+    Function arguments are recorded as span attributes.
     """
     tracer = trace.get_tracer(func.__module__)
+    sig = inspect.signature(func)
+    param_names = list(sig.parameters.keys())
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        with tracer.start_as_current_span(func.__qualname__):
+        with tracer.start_as_current_span(func.__qualname__) as span:
+            # Record positional arguments
+            for i, value in enumerate(args):
+                if i < len(param_names):
+                    span.set_attribute(param_names[i], _safe_repr(value))
+
+            # Record keyword arguments
+            for key, value in kwargs.items():
+                span.set_attribute(key, _safe_repr(value))
+
             return func(*args, **kwargs)
 
     return wrapper
