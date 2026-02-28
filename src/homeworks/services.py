@@ -10,7 +10,11 @@ from typing import Any, List
 from uuid import UUID
 from enum import Enum, StrEnum
 from datetime import datetime
+import logging
+
 from django.db import transaction
+
+logger = logging.getLogger(__name__)
 
 # Import for type hints
 from typing import TYPE_CHECKING
@@ -1046,4 +1050,5 @@ class HomeworkService:
         except Homework.DoesNotExist:
             return None
         except Exception:
+            logger.exception("Failed to load submissions for homework %s", homework_id)
             return None
