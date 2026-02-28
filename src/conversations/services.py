@@ -694,13 +694,13 @@ class ConversationService:
                     ai_message.save()
 
                     # Prepare completion data
-                    completion_data = {
+                    completion_data: dict[str, Any] = {
                         "message_id": str(ai_message.id),
                         "final_content": final_content,
                     }
 
                     # Include function calls if present
-                    if stream_token.has_function_calls:
+                    if stream_token.function_calls:
                         completion_data["function_calls"] = [
                             {
                                 "id": call.id,
