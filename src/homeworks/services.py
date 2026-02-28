@@ -1062,7 +1062,13 @@ class HomeworkService:
             )
 
         except Homework.DoesNotExist:
+            logger.warning("Homework not found for submissions: %s", homework_id)
+            record_exception(
+                Homework.DoesNotExist(f"Homework {homework_id} not found"),
+                "Homework not found",
+            )
             return None
-        except Exception:
+        except Exception as e:
             logger.exception("Failed to load submissions for homework %s", homework_id)
+            record_exception(e)
             return None

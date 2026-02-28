@@ -18,6 +18,9 @@ from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
+import logging
+
+logger = logging.getLogger(__name__)
 from django.utils import timezone
 from django.contrib import messages
 import csv
@@ -934,6 +937,7 @@ class HomeworkSubmissionsView(View):
         submissions_data = HomeworkService.get_homework_submissions(homework_id)
 
         if submissions_data is None:
+            logger.error("get_homework_submissions returned None for homework %s", homework_id)
             messages.error(request, "Unable to load submissions data.")
             return redirect("homeworks:detail", homework_id=homework_id)
 
