@@ -5,6 +5,8 @@ This module provides forms for creating and editing homeworks and sections,
 following the testable-first architecture.
 """
 
+from typing import TYPE_CHECKING
+
 from django import forms
 from django.utils import timezone
 
@@ -146,7 +148,13 @@ class HomeworkEditForm(forms.ModelForm):
         return due_date
 
 
-class SectionFormSet(forms.BaseFormSet[SectionForm]):
+if TYPE_CHECKING:
+    BaseSectionFormSet = forms.BaseFormSet[SectionForm]
+else:
+    BaseSectionFormSet = forms.BaseFormSet
+
+
+class SectionFormSet(BaseSectionFormSet):
     """Formset for managing multiple sections in a homework."""
 
     def clean(self):
