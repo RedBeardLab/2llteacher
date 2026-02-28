@@ -291,7 +291,7 @@ class CourseDetailView(View):
             has_access = course.is_student_enrolled(student_profile)
             user_type = "student"
 
-        if not has_access:
+        if not has_access or user_type is None:
             return HttpResponseForbidden("You do not have access to this course.")
 
         # Get the appropriate data based on user type
@@ -438,6 +438,7 @@ class CourseHomeworkCreateView(View):
 
         # Create empty section form (we'll start with one)
         SectionFormset = formset_factory(SectionForm, extra=1, formset=SectionFormSet)
+        assert issubclass(SectionFormset, SectionFormSet)
         section_formset = SectionFormset(prefix="sections")
 
         # Return form data
@@ -464,12 +465,13 @@ class CourseHomeworkCreateView(View):
 
         # Create a mutable copy of POST data and inject course
         post_data = request.POST.copy()
-        post_data["course"] = course.id
+        post_data["course"] = str(course.id)
 
         # Create forms from POST data
         form = HomeworkCreateForm(post_data)
 
         SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        assert issubclass(SectionFormset, SectionFormSet)
         section_formset = SectionFormset(request.POST, prefix="sections")
 
         # Check form validity
