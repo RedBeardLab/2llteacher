@@ -173,7 +173,9 @@ class PasteLogViewTests(TestCase):
 
         url = reverse("conversations:api_log_paste", args=[self.conversation.id])
 
-        response = self.client.post(url, "invalid json", content_type="application/json")
+        response = self.client.post(
+            url, "invalid json", content_type="application/json"
+        )
 
         self.assertEqual(response.status_code, 400)
 

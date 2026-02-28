@@ -16,6 +16,7 @@ from django.db import transaction
 from llteacher.tracing import traced, record_exception
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from accounts.models import Teacher, Student
     from .models import Homework
@@ -904,7 +905,9 @@ class HomeworkService:
                 if student_profile is None:
                     logger.warning(
                         "Skipping conversation %s: user %s has no student_profile (homework %s)",
-                        conv.id, conv.user.id, homework_id,
+                        conv.id,
+                        conv.user.id,
+                        homework_id,
                     )
                     continue
                 student_id = student_profile.id

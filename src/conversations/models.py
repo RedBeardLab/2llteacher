@@ -182,7 +182,9 @@ class RapidTextGrowthEvent(models.Model):
         blank=True,
         help_text="Last message sent before this rapid text growth event occurred",
     )
-    added_text = models.TextField(help_text="Text that was added during the 100ms window")
+    added_text = models.TextField(
+        help_text="Text that was added during the 100ms window"
+    )
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:

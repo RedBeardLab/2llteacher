@@ -104,7 +104,12 @@ class HomeworkEditForm(forms.ModelForm):
 
     class Meta:
         model = Homework
-        fields = ["title", "description", "due_date", "llm_config"]  # Note: course is excluded
+        fields = [
+            "title",
+            "description",
+            "due_date",
+            "llm_config",
+        ]  # Note: course is excluded
         widgets = {
             "title": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Homework Title"}
