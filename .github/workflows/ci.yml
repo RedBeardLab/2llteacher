@@ -6,12 +6,15 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install
 
       - name: Install dependencies
         run: uv sync
@@ -23,12 +26,15 @@ jobs:
         run: uv run ruff check src/
 
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install
 
       - name: Install dependencies
         run: uv sync
@@ -37,12 +43,15 @@ jobs:
         run: uv run mypy src/
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install
 
       - name: Install dependencies
         run: uv sync
