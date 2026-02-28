@@ -11,7 +11,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     DJANGO_SETTINGS_MODULE=llteacher.production \
-    DATABASE_PATH=/data/llteacher.sqlite
+    DATABASE_PATH=/data/llteacher.sqlite \
+    OTEL_SERVICE_NAME=llteacher \
+    OTEL_EXPORTER_OTLP_ENDPOINT=https://api.honeycomb.io \
+    OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
+    OTEL_TRACES_EXPORTER=otlp \
+    OTEL_METRICS_EXPORTER=none \
+    OTEL_LOGS_EXPORTER=otlp \
+    OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -64,7 +71,8 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 
 # Set entrypoint and default command
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["uv", "run", "gunicorn", \
+CMD ["uv", "run", "opentelemetry-instrument", \
+                    "gunicorn", \
                     "--bind", "0.0.0.0:8000", \
                     "--workers", "8", \
                     "--timeout", "120", \

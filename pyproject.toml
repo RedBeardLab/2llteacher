@@ -15,6 +15,11 @@ dependencies = [
     "django-stubs>=5.2.7",
     "openai>=1.0.0",
     "requests>=2.31.0",
+    "opentelemetry-distro",
+    "opentelemetry-exporter-otlp-proto-http",
+    "opentelemetry-instrumentation-django",
+    "opentelemetry-instrumentation-requests",
+    "opentelemetry-instrumentation-logging",
 ]
 
 [build-system]
