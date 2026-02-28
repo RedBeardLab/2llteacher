@@ -183,7 +183,9 @@ class PasteEventAdmin(admin.ModelAdmin):
     def conversation_link(self, obj):
         """Create a clickable link to the conversation's admin page."""
         if obj.conversation:
-            url = reverse("admin:conversations_conversation_change", args=[obj.conversation.pk])
+            url = reverse(
+                "admin:conversations_conversation_change", args=[obj.conversation.pk]
+            )
             return format_html('<a href="{}">{}</a>', url, str(obj.conversation.id)[:8])
         return "N/A"
 
@@ -192,7 +194,9 @@ class PasteEventAdmin(admin.ModelAdmin):
         """Create a clickable link to the user's admin page."""
         if obj.conversation:
             url = reverse("admin:accounts_user_change", args=[obj.conversation.user.pk])
-            return format_html('<a href="{}">{}</a>', url, obj.conversation.user.username)
+            return format_html(
+                '<a href="{}">{}</a>', url, obj.conversation.user.username
+            )
         return "N/A"
 
     @admin.display(description="Content Preview")
@@ -273,7 +277,9 @@ class RapidTextGrowthEventAdmin(admin.ModelAdmin):
     def conversation_link(self, obj):
         """Create a clickable link to the conversation's admin page."""
         if obj.conversation:
-            url = reverse("admin:conversations_conversation_change", args=[obj.conversation.pk])
+            url = reverse(
+                "admin:conversations_conversation_change", args=[obj.conversation.pk]
+            )
             return format_html('<a href="{}">{}</a>', url, str(obj.conversation.id)[:8])
         return "N/A"
 
@@ -282,7 +288,9 @@ class RapidTextGrowthEventAdmin(admin.ModelAdmin):
         """Create a clickable link to the user's admin page."""
         if obj.conversation:
             url = reverse("admin:accounts_user_change", args=[obj.conversation.user.pk])
-            return format_html('<a href="{}">{}</a>', url, obj.conversation.user.username)
+            return format_html(
+                '<a href="{}">{}</a>', url, obj.conversation.user.username
+            )
         return "N/A"
 
     @admin.display(description="Characters")

@@ -100,7 +100,9 @@ class RapidTextGrowthLogViewTests(TestCase):
             last_message_before_event__conversation=self.conversation
         )
         self.assertEqual(rapid_text_growth_event.added_text, data["added_text"])
-        self.assertEqual(rapid_text_growth_event.last_message_before_event, self.message)
+        self.assertEqual(
+            rapid_text_growth_event.last_message_before_event, self.message
+        )
 
     def test_log_rapid_text_growth_event_without_messages(self):
         """Test logging a rapid text growth event in a conversation without messages."""
@@ -166,7 +168,9 @@ class RapidTextGrowthLogViewTests(TestCase):
 
         url = reverse("conversations:api_log_events", args=[self.conversation.id])
 
-        response = self.client.post(url, "invalid json", content_type="application/json")
+        response = self.client.post(
+            url, "invalid json", content_type="application/json"
+        )
 
         self.assertEqual(response.status_code, 400)
 
