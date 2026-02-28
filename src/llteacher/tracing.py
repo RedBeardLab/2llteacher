@@ -39,22 +39,28 @@ def traced(func):
     tracer = trace.get_tracer(func.__module__)
     sig = inspect.signature(func)
     param_names = list(sig.parameters.keys())
+    is_generator = inspect.isgeneratorfunction(func)
+
+    def _set_args(span, args, kwargs):
+        for i, value in enumerate(args):
+            if i < len(param_names):
+                span.set_attribute(param_names[i], _safe_repr(value))
+        for key, value in kwargs.items():
+            span.set_attribute(key, _safe_repr(value))
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         with tracer.start_as_current_span(func.__qualname__) as span:
-            # Record positional arguments
-            for i, value in enumerate(args):
-                if i < len(param_names):
-                    span.set_attribute(param_names[i], _safe_repr(value))
-
-            # Record keyword arguments
-            for key, value in kwargs.items():
-                span.set_attribute(key, _safe_repr(value))
-
+            _set_args(span, args, kwargs)
             return func(*args, **kwargs)
 
-    return wrapper
+    @functools.wraps(func)
+    def generator_wrapper(*args, **kwargs):
+        with tracer.start_as_current_span(func.__qualname__) as span:
+            _set_args(span, args, kwargs)
+            yield from func(*args, **kwargs)
+
+    return generator_wrapper if is_generator else wrapper
 
 
 def set_span_attributes(attributes: dict) -> None:
