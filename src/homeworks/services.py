@@ -14,14 +14,12 @@ import logging
 
 from django.db import transaction
 
-logger = logging.getLogger(__name__)
-
-# Import for type hints
 from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from accounts.models import Teacher, Student
     from .models import Homework
+
+logger = logging.getLogger(__name__)
 
 
 class SectionStatus(str, Enum):
@@ -875,6 +873,7 @@ class HomeworkService:
 
             # Create a map of conversation_id -> paste event count for quick lookup
             from collections import defaultdict
+
             paste_event_count_map = defaultdict(int)
             for paste_event in paste_events:
                 if paste_event.last_message_before_paste:
