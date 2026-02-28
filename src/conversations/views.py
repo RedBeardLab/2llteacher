@@ -23,6 +23,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
+from opentelemetry import trace
 from django.views.decorators.csrf import csrf_exempt
 import json
 
@@ -478,26 +479,32 @@ class ConversationStreamView(MessageProcessingMixin, View):
         """Stream LLM response via Server-Sent Events."""
 
         def stream_llm_response():
-            try:
-                # Use unified validation and authorization
-                message_request, error = self.validate_and_authorize_request(
-                    request, conversation_id
-                )
-                if error or message_request is None:
-                    yield self._format_sse_error(error or "Invalid request")
-                    return
+            tracer = trace.get_tracer(__name__)
+            with tracer.start_as_current_span("SSE stream_llm_response") as span:
+                try:
+                    span.set_attribute("conversation_id", str(conversation_id))
 
-                # Use unified service for streaming processing
-                event_stream = ConversationService.process_message(
-                    message_request, streaming=True
-                )
+                    # Use unified validation and authorization
+                    message_request, error = self.validate_and_authorize_request(
+                        request, conversation_id
+                    )
+                    if error or message_request is None:
+                        yield self._format_sse_error(error or "Invalid request")
+                        return
 
-                # Convert StreamEvent objects to SSE format
-                for event in event_stream:
-                    yield self._format_sse_event(event)
+                    # Use unified service for streaming processing
+                    event_stream = ConversationService.process_message(
+                        message_request, streaming=True
+                    )
 
-            except Exception as e:
-                yield self._format_sse_error(str(e))
+                    # Convert StreamEvent objects to SSE format
+                    for event in event_stream:
+                        yield self._format_sse_event(event)
+
+                except Exception as e:
+                    span.record_exception(e)
+                    span.set_status(trace.StatusCode.ERROR, str(e))
+                    yield self._format_sse_error(str(e))
 
         response = StreamingHttpResponse(
             stream_llm_response(), content_type="text/event-stream"
