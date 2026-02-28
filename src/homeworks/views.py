@@ -369,7 +369,8 @@ class HomeworkEditView(View):
             initial_section_data.append(section_data)
 
         # Create section formset with initial data
-        SectionFormset: type[SectionFormSet] = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        assert issubclass(SectionFormset, SectionFormSet)
         section_formset = SectionFormset(
             prefix="sections", initial=initial_section_data
         )
@@ -392,7 +393,8 @@ class HomeworkEditView(View):
         form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
-        SectionFormset: type[SectionFormSet] = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        assert issubclass(SectionFormset, SectionFormSet)
         section_formset = SectionFormset(request.POST, prefix="sections")
         assert_type(section_formset, SectionFormSet)
 
