@@ -57,4 +57,4 @@ jobs:
         run: uv sync
 
       - name: Run tests
-        run: uv run python run_tests.py --settings=src.llteacher.test_settings
+        run: uv run python manage.py test --settings=src.llteacher.test_settings src
