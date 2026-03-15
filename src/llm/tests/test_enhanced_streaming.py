@@ -373,6 +373,7 @@ class EnhancedStreamingTest(TestCase):
         mock_openai_class.return_value = mock_client
 
         from openai import APITimeoutError
+
         # Create a mock request object
         mock_request = MagicMock()
         timeout_error = APITimeoutError(request=mock_request)
@@ -394,7 +395,9 @@ class EnhancedStreamingTest(TestCase):
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
 
         # Verify success
-        completion_tokens = [t for t in stream_tokens if t.type == StreamTokenType.COMPLETE]
+        completion_tokens = [
+            t for t in stream_tokens if t.type == StreamTokenType.COMPLETE
+        ]
         self.assertEqual(len(completion_tokens), 1)
 
     def test_timeout_fails_after_max_retries(self, mock_openai_class):
@@ -403,6 +406,7 @@ class EnhancedStreamingTest(TestCase):
         mock_openai_class.return_value = mock_client
 
         from openai import APITimeoutError
+
         # Create a mock request object
         mock_request = MagicMock()
         timeout_error = APITimeoutError(request=mock_request)
@@ -427,6 +431,7 @@ class EnhancedStreamingTest(TestCase):
         mock_openai_class.return_value = mock_client
 
         from openai import APIConnectionError
+
         # Create a mock request object
         mock_request = MagicMock()
         connection_error = APIConnectionError(request=mock_request)
@@ -446,5 +451,7 @@ class EnhancedStreamingTest(TestCase):
 
         # Verify retry and success
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
-        completion_tokens = [t for t in stream_tokens if t.type == StreamTokenType.COMPLETE]
+        completion_tokens = [
+            t for t in stream_tokens if t.type == StreamTokenType.COMPLETE
+        ]
         self.assertEqual(len(completion_tokens), 1)

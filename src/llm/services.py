@@ -639,16 +639,20 @@ class LLMService:
                     # Add retry monitoring context
                     if retry_history:
                         retry_reasons = [reason for _, reason in retry_history]
-                        set_span_attributes({
-                            "total_attempts": attempt + 1,
-                            "had_retries": True,
-                            "retry_reasons": retry_reasons,
-                        })
+                        set_span_attributes(
+                            {
+                                "total_attempts": attempt + 1,
+                                "had_retries": True,
+                                "retry_reasons": retry_reasons,
+                            }
+                        )
                     else:
-                        set_span_attributes({
-                            "total_attempts": 1,
-                            "had_retries": False,
-                        })
+                        set_span_attributes(
+                            {
+                                "total_attempts": 1,
+                                "had_retries": False,
+                            }
+                        )
                     yield StreamToken(
                         type=StreamTokenType.COMPLETE,
                         content=accumulated_response,
@@ -663,16 +667,20 @@ class LLMService:
                     # Add retry monitoring context
                     if retry_history:
                         retry_reasons = [reason for _, reason in retry_history]
-                        set_span_attributes({
-                            "total_attempts": attempt + 1,
-                            "had_retries": True,
-                            "retry_reasons": retry_reasons,
-                        })
+                        set_span_attributes(
+                            {
+                                "total_attempts": attempt + 1,
+                                "had_retries": True,
+                                "retry_reasons": retry_reasons,
+                            }
+                        )
                     else:
-                        set_span_attributes({
-                            "total_attempts": 1,
-                            "had_retries": False,
-                        })
+                        set_span_attributes(
+                            {
+                                "total_attempts": 1,
+                                "had_retries": False,
+                            }
+                        )
                     yield StreamToken(
                         type=StreamTokenType.COMPLETE,
                         content=accumulated_response if accumulated_response else "",
@@ -707,7 +715,9 @@ class LLMService:
                 raise
             except (APITimeoutError, APIConnectionError) as e:
                 # Log timeout/connection errors with retry context
-                error_type = "timeout" if isinstance(e, APITimeoutError) else "connection"
+                error_type = (
+                    "timeout" if isinstance(e, APITimeoutError) else "connection"
+                )
                 retry_history.append((attempt + 1, error_type))
 
                 logger.warning(
@@ -722,12 +732,14 @@ class LLMService:
                         "section_title": context.section_title,
                         "homework_title": context.homework_title,
                         "response_mode": "streaming",
+                    },
+                )
+                set_span_attributes(
+                    {
+                        "retry_attempt": attempt + 1,
+                        "retry_reason": error_type,
                     }
                 )
-                set_span_attributes({
-                    "retry_attempt": attempt + 1,
-                    "retry_reason": error_type,
-                })
                 record_exception(e)
 
                 if attempt == max_retries - 1:
@@ -754,13 +766,15 @@ class LLMService:
                         "section_title": context.section_title,
                         "homework_title": context.homework_title,
                         "response_mode": "streaming",
+                    },
+                )
+                set_span_attributes(
+                    {
+                        "retry_attempt": attempt + 1,
+                        "retry_reason": "api_error",
+                        "error_type": error_type,
                     }
                 )
-                set_span_attributes({
-                    "retry_attempt": attempt + 1,
-                    "retry_reason": "api_error",
-                    "error_type": error_type,
-                })
                 record_exception(e)
 
                 if attempt == max_retries - 1:
