@@ -19,7 +19,9 @@ if TYPE_CHECKING:
     from conversations.models import Conversation
     from .models import LLMConfig
 
-from openai import OpenAI
+from django.conf import settings
+import httpx
+from openai import OpenAI, APITimeoutError, APIConnectionError
 from llteacher.tracing import traced, set_span_attributes, record_exception
 
 
@@ -314,7 +316,14 @@ class LLMService:
         try:
             # Initialize OpenAI client with OpenRouter endpoint
             client = OpenAI(
-                base_url="https://openrouter.ai/api/v1", api_key=llm_config.api_key
+                base_url="https://openrouter.ai/api/v1",
+                api_key=llm_config.api_key,
+                timeout=httpx.Timeout(
+                    connect=settings.LLM_API_CONNECTION_TIMEOUT,
+                    read=settings.LLM_API_TIMEOUT,
+                    write=10.0,
+                    pool=5.0,
+                ),
             )
 
             # Build messages for OpenAI API with proper typing
@@ -577,6 +586,7 @@ class LLMService:
         Raises:
             StreamingError: When all retries fail or length limit hit
         """
+        retry_history = []  # Track (attempt, reason) for monitoring
         for attempt in range(max_retries):
             try:
                 accumulated_response = ""
@@ -619,12 +629,26 @@ class LLMService:
                         f"Insufficient content on attempt {attempt + 1}/{max_retries} "
                         f"(chunks: {chunk_count}, meaningful: {meaningful_chunks}, length: {response_length})"
                     )
+                    retry_history.append((attempt + 1, "insufficient_content"))
                     # Treat as interrupted stream, continue to retry
                     continue
 
                 # Check completion reason
                 if finish_reason == FinishReason.STOP:
                     # Success! Signal completion with full response
+                    # Add retry monitoring context
+                    if retry_history:
+                        retry_reasons = [reason for _, reason in retry_history]
+                        set_span_attributes({
+                            "total_attempts": attempt + 1,
+                            "had_retries": True,
+                            "retry_reasons": retry_reasons,
+                        })
+                    else:
+                        set_span_attributes({
+                            "total_attempts": 1,
+                            "had_retries": False,
+                        })
                     yield StreamToken(
                         type=StreamTokenType.COMPLETE,
                         content=accumulated_response,
@@ -636,6 +660,19 @@ class LLMService:
                     return
                 elif finish_reason == FinishReason.TOOL_CALLS:
                     # LLM wants to call functions
+                    # Add retry monitoring context
+                    if retry_history:
+                        retry_reasons = [reason for _, reason in retry_history]
+                        set_span_attributes({
+                            "total_attempts": attempt + 1,
+                            "had_retries": True,
+                            "retry_reasons": retry_reasons,
+                        })
+                    else:
+                        set_span_attributes({
+                            "total_attempts": 1,
+                            "had_retries": False,
+                        })
                     yield StreamToken(
                         type=StreamTokenType.COMPLETE,
                         content=accumulated_response if accumulated_response else "",
@@ -656,6 +693,7 @@ class LLMService:
                     logger.warning(
                         f"Stream interrupted on attempt {attempt + 1}/{max_retries}, retrying..."
                     )
+                    retry_history.append((attempt + 1, "interrupted_stream"))
                     continue
                 else:
                     # Unknown finish reason - treat as error and retry
@@ -665,17 +703,71 @@ class LLMService:
                     continue
 
             except StreamingError:
-                # Re-raise streaming errors (don't retry)
+                # Re-raise streaming errors (don't retry for LENGTH, CONTENT_FILTER)
                 raise
-            except Exception as e:
-                logger.error(
-                    f"Streaming error on attempt {attempt + 1}/{max_retries}: {str(e)}"
+            except (APITimeoutError, APIConnectionError) as e:
+                # Log timeout/connection errors with retry context
+                error_type = "timeout" if isinstance(e, APITimeoutError) else "connection"
+                retry_history.append((attempt + 1, error_type))
+
+                logger.warning(
+                    f"API {error_type} error on attempt {attempt + 1}/{max_retries}: {str(e)}",
+                    extra={
+                        "event_type": "llm_retry",
+                        "retry_attempt": attempt + 1,
+                        "max_retries": max_retries,
+                        "retry_reason": error_type,
+                        "error_message": str(e),
+                        "model_name": llm_config.model_name,
+                        "section_title": context.section_title,
+                        "homework_title": context.homework_title,
+                        "response_mode": "streaming",
+                    }
                 )
+                set_span_attributes({
+                    "retry_attempt": attempt + 1,
+                    "retry_reason": error_type,
+                })
+                record_exception(e)
+
                 if attempt == max_retries - 1:
-                    # Final attempt failed
                     raise StreamingError(
-                        f"Failed to generate response after {max_retries} attempts"
+                        f"LLM API {error_type} after {max_retries} attempts: {str(e)}"
                     )
+                continue
+
+            except Exception as e:
+                # Other errors (API errors, network issues)
+                error_type = type(e).__name__
+                retry_history.append((attempt + 1, "api_error"))
+
+                logger.error(
+                    f"Streaming error on attempt {attempt + 1}/{max_retries}: {str(e)}",
+                    extra={
+                        "event_type": "llm_retry",
+                        "retry_attempt": attempt + 1,
+                        "max_retries": max_retries,
+                        "retry_reason": "api_error",
+                        "error_type": error_type,
+                        "error_message": str(e),
+                        "model_name": llm_config.model_name,
+                        "section_title": context.section_title,
+                        "homework_title": context.homework_title,
+                        "response_mode": "streaming",
+                    }
+                )
+                set_span_attributes({
+                    "retry_attempt": attempt + 1,
+                    "retry_reason": "api_error",
+                    "error_type": error_type,
+                })
+                record_exception(e)
+
+                if attempt == max_retries - 1:
+                    raise StreamingError(
+                        f"Failed to generate response after {max_retries} attempts: {str(e)}"
+                    )
+                continue
 
         # All retries exhausted - this should be the primary path for max retries
         raise StreamingError(
@@ -708,7 +800,14 @@ class LLMService:
 
         # Initialize OpenAI client with OpenRouter endpoint
         client = OpenAI(
-            base_url="https://openrouter.ai/api/v1", api_key=llm_config.api_key
+            base_url="https://openrouter.ai/api/v1",
+            api_key=llm_config.api_key,
+            timeout=httpx.Timeout(
+                connect=settings.LLM_API_CONNECTION_TIMEOUT,
+                read=settings.LLM_API_TIMEOUT,
+                write=10.0,
+                pool=5.0,
+            ),
         )
 
         # Build messages for OpenAI API
@@ -742,6 +841,8 @@ class LLMService:
             "max_completion_tokens": llm_config.max_completion_tokens,
             "section_title": context.section_title,
             "homework_title": context.homework_title,
+            "timeout_connect_seconds": settings.LLM_API_CONNECTION_TIMEOUT,
+            "timeout_read_seconds": settings.LLM_API_TIMEOUT,
         }
         logger.info("LLM API request", extra=request_attrs)
         set_span_attributes(request_attrs)
