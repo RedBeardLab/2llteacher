@@ -353,7 +353,7 @@ class HomeworkMatrixExportViewTest(TestCase):
             first_name="Non",
             last_name="Enrolled",
         )
-        non_enrolled_student = Student.objects.create(user=non_enrolled_user)
+        _non_enrolled_student = Student.objects.create(user=non_enrolled_user)
 
         # Create conversations and submissions for the non-enrolled student
         # This should still NOT make them appear in the CSV

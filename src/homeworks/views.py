@@ -20,7 +20,6 @@ from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 import logging
 
-logger = logging.getLogger(__name__)
 from django.utils import timezone
 from django.contrib import messages
 import csv
@@ -36,6 +35,8 @@ from .services import (
     SectionData,
 )
 from .forms import HomeworkCreateForm, HomeworkEditForm, SectionForm, SectionFormSet
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
