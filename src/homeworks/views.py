@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Any, assert_type
+from typing import TYPE_CHECKING, Dict, Any, assert_type, cast
 from uuid import UUID
 from django.forms import formset_factory
 
@@ -35,7 +35,7 @@ from .services import (
     SectionStatus,
     SectionData,
 )
-from .forms import HomeworkCreateForm, HomeworkEditForm, SectionForm, SectionFormSet
+from .forms import HomeworkEditForm, SectionForm, SectionFormSet
 
 
 @dataclass
@@ -161,9 +161,7 @@ class HomeworkListView(View):
             homework_objects = (
                 Homework.objects.filter(course__in=enrolled_courses)
                 .filter(is_hidden=False)
-                .filter(
-                    Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
-                )
+                .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()))
                 .order_by("-created_at")
                 .prefetch_related("sections")
             )
@@ -390,7 +388,10 @@ class HomeworkEditView(View):
             initial_section_data.append(section_data)
 
         # Create section formset with initial data
-        SectionFormset: type[SectionFormSet] = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
+        )
         section_formset = SectionFormset(
             prefix="sections", initial=initial_section_data
         )
@@ -413,7 +414,10 @@ class HomeworkEditView(View):
         form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
-        SectionFormset: type[SectionFormSet] = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
+        )
         section_formset = SectionFormset(request.POST, prefix="sections")
         assert_type(section_formset, SectionFormSet)
 
@@ -708,9 +712,15 @@ class HomeworkDetailView(View):
             is_overdue=homework_detail.due_date < timezone.now(),
             user_type=user_type,
             can_edit=can_edit,
-            expires_at=homework_obj_for_expiry.expires_at if homework_obj_for_expiry else None,
-            is_hidden=homework_obj_for_expiry.is_hidden if homework_obj_for_expiry else False,
-            is_accessible_to_students=homework_obj_for_expiry.is_accessible_to_students if homework_obj_for_expiry else True,
+            expires_at=homework_obj_for_expiry.expires_at
+            if homework_obj_for_expiry
+            else None,
+            is_hidden=homework_obj_for_expiry.is_hidden
+            if homework_obj_for_expiry
+            else False,
+            is_accessible_to_students=homework_obj_for_expiry.is_accessible_to_students
+            if homework_obj_for_expiry
+            else True,
             llm_config={"id": homework_detail.llm_config}
             if homework_detail.llm_config
             else None,

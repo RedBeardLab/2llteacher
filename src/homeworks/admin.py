@@ -4,7 +4,14 @@ from .models import Homework, Section, SectionSolution
 
 @admin.register(Homework)
 class HomeworkAdmin(admin.ModelAdmin):
-    list_display = ("title", "course", "due_date", "expires_at", "is_hidden", "accessible_to_students")
+    list_display = (
+        "title",
+        "course",
+        "due_date",
+        "expires_at",
+        "is_hidden",
+        "accessible_to_students",
+    )
     list_filter = ("is_hidden", "course")
     readonly_fields = ("accessible_to_students",)
 

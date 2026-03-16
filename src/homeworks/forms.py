@@ -107,9 +107,7 @@ class HomeworkCreateForm(forms.ModelForm):
                     "type": "datetime-local",
                 }
             ),
-            "is_hidden": forms.CheckboxInput(
-                attrs={"class": "form-check-input"}
-            ),
+            "is_hidden": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "llm_config": forms.Select(
                 attrs={"class": "form-select", "placeholder": "LLM Configuration"}
             ),
@@ -132,7 +130,11 @@ class HomeworkCreateForm(forms.ModelForm):
         due_date = _make_aware_if_naive(self.cleaned_data.get("due_date"))
 
         if due_date:
-            today = timezone.now().date() if not settings.USE_TZ else timezone.localtime(timezone.now()).date()
+            today = (
+                timezone.now().date()
+                if not settings.USE_TZ
+                else timezone.localtime(timezone.now()).date()
+            )
             if due_date.date() < today:
                 raise forms.ValidationError("Due date cannot be in the past.")
 
@@ -191,9 +193,7 @@ class HomeworkEditForm(forms.ModelForm):
                     "type": "datetime-local",
                 }
             ),
-            "is_hidden": forms.CheckboxInput(
-                attrs={"class": "form-check-input"}
-            ),
+            "is_hidden": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "llm_config": forms.Select(
                 attrs={"class": "form-select", "placeholder": "LLM Configuration"}
             ),

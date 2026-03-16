@@ -5,7 +5,7 @@ This module provides views for managing conversations between users and AI tutor
 following the testable-first architecture with typed data contracts.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -107,9 +107,11 @@ class ConversationDetailData:
     messages: List[MessageViewData]
     can_submit: bool
     is_teacher_test: bool
-    paste_events: List[PasteEventViewData] = None
-    rapid_text_growth_events: List[RapidTextGrowthEventViewData] = None
-    user_id: UUID = None
+    paste_events: Optional[List[PasteEventViewData]] = field(default=None)
+    rapid_text_growth_events: Optional[List[RapidTextGrowthEventViewData]] = field(
+        default=None
+    )
+    user_id: Optional[UUID] = field(default=None)
 
 
 @dataclass
@@ -155,7 +157,7 @@ class MessageProcessingMixin:
         # Create processing request
         processing_request = MessageProcessingRequest(
             conversation_id=conversation_id,
-            user=request.user,
+            user=request.user,  # type: ignore[arg-type]
             content=content,
             message_type=message_type,
         )

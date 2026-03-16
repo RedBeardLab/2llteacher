@@ -46,8 +46,12 @@ class HomeworkExpiryViewSetUpMixin(TestCase):
 
         # Course
         self.course = Course.objects.create(name="Course", code="C1", is_active=True)
-        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
-        CourseEnrollment.objects.create(course=self.course, student=self.student, is_active=True)
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student, is_active=True
+        )
 
         # Visible homework (control)
         self.visible_hw = Homework.objects.create(
@@ -97,8 +101,8 @@ class HomeworkExpiryViewSetUpMixin(TestCase):
 
 # ─── HomeworkListView ─────────────────────────────────────────────────────────
 
-class HomeworkListViewExpiryTests(HomeworkExpiryViewSetUpMixin):
 
+class HomeworkListViewExpiryTests(HomeworkExpiryViewSetUpMixin):
     def _get_student_list_data(self):
         request = self.factory.get("/homeworks/")
         request.user = self.student_user
@@ -154,8 +158,8 @@ class HomeworkListViewExpiryTests(HomeworkExpiryViewSetUpMixin):
 
 # ─── HomeworkDetailView ───────────────────────────────────────────────────────
 
-class HomeworkDetailViewExpiryTests(HomeworkExpiryViewSetUpMixin):
 
+class HomeworkDetailViewExpiryTests(HomeworkExpiryViewSetUpMixin):
     def test_student_cannot_access_hidden_homework_detail(self):
         self.client.login(username="student", password="pass")
         url = reverse("homeworks:detail", kwargs={"homework_id": self.hidden_hw.id})
@@ -199,13 +203,16 @@ class HomeworkDetailViewExpiryTests(HomeworkExpiryViewSetUpMixin):
 
 # ─── SectionDetailView ────────────────────────────────────────────────────────
 
-class SectionDetailViewExpiryTests(HomeworkExpiryViewSetUpMixin):
 
+class SectionDetailViewExpiryTests(HomeworkExpiryViewSetUpMixin):
     def test_student_blocked_from_section_of_expired_homework(self):
         self.client.login(username="student", password="pass")
         url = reverse(
             "homeworks:section_detail",
-            kwargs={"homework_id": self.expired_hw.id, "section_id": self.expired_section.id},
+            kwargs={
+                "homework_id": self.expired_hw.id,
+                "section_id": self.expired_section.id,
+            },
         )
         response = self.client.get(url)
         self.assertEqual(response.status_code, 403)
@@ -239,7 +246,10 @@ class SectionDetailViewExpiryTests(HomeworkExpiryViewSetUpMixin):
         self.client.login(username="teacher", password="pass")
         url = reverse(
             "homeworks:section_detail",
-            kwargs={"homework_id": self.expired_hw.id, "section_id": self.expired_section.id},
+            kwargs={
+                "homework_id": self.expired_hw.id,
+                "section_id": self.expired_section.id,
+            },
         )
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
@@ -247,8 +257,8 @@ class SectionDetailViewExpiryTests(HomeworkExpiryViewSetUpMixin):
 
 # ─── Form validation ──────────────────────────────────────────────────────────
 
-class HomeworkFormExpiryValidationTests(TestCase):
 
+class HomeworkFormExpiryValidationTests(TestCase):
     def setUp(self):
         user = User.objects.create_user(username="t", password="p")
         self.teacher = Teacher.objects.create(user=user)
@@ -260,7 +270,9 @@ class HomeworkFormExpiryValidationTests(TestCase):
             "description": "desc",
             "course": self.course.id,
             "due_date": (timezone.now() + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M"),
-            "expires_at": (timezone.now() + timedelta(days=10)).strftime("%Y-%m-%dT%H:%M"),
+            "expires_at": (timezone.now() + timedelta(days=10)).strftime(
+                "%Y-%m-%dT%H:%M"
+            ),
             "is_hidden": False,
         }
         data.update(overrides)

@@ -376,18 +376,20 @@ class LLMService:
                 function_calls = []
                 if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
                     for tool_call in choice.message.tool_calls:
+                        if not hasattr(tool_call, "function"):
+                            continue
                         try:
-                            arguments = json.loads(tool_call.function.arguments)
+                            arguments = json.loads(tool_call.function.arguments)  # type: ignore[union-attr]
                             function_calls.append(
                                 FunctionCall(
                                     id=tool_call.id,
-                                    name=tool_call.function.name,
+                                    name=tool_call.function.name,  # type: ignore[union-attr]
                                     arguments=arguments,
                                 )
                             )
                         except json.JSONDecodeError as e:
                             logger.error(
-                                f"Failed to parse function arguments: {tool_call.function.arguments}, error: {e}"
+                                f"Failed to parse function arguments: {tool_call.function.arguments}, error: {e}"  # type: ignore[union-attr]
                             )
 
                 # Determine finish reason
@@ -763,8 +765,8 @@ class LLMService:
         tool_calls_accumulator = {}  # Accumulate tool call deltas by index
 
         for chunk in stream:
-            if chunk.choices and len(chunk.choices) > 0:
-                choice = chunk.choices[0]
+            if chunk.choices and len(chunk.choices) > 0:  # type: ignore[union-attr]
+                choice = chunk.choices[0]  # type: ignore[union-attr]
 
                 # Extract token content
                 if hasattr(choice.delta, "content") and choice.delta.content:
