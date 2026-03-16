@@ -22,11 +22,12 @@ import logging
 
 from llteacher.tracing import record_exception
 
-logger = logging.getLogger(__name__)
 
 from .forms import RegistrationForm, LoginForm, ProfileForm
 from .models import Student, User
 from .email_service import EmailVerificationService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
