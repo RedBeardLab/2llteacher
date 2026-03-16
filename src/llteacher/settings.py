@@ -196,3 +196,9 @@ LOGGING = {
         "level": "INFO",
     },
 }
+
+# LLM API Timeout Configuration
+LLM_API_TIMEOUT = int(os.getenv("LLM_API_TIMEOUT", "30"))  # seconds
+LLM_API_CONNECTION_TIMEOUT = int(
+    os.getenv("LLM_API_CONNECTION_TIMEOUT", "10")
+)  # seconds

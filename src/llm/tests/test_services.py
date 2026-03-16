@@ -7,8 +7,10 @@ the testing-first architecture approach.
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from unittest.mock import patch, MagicMock
 import uuid
+import httpx
 
 from llm.models import LLMConfig
 from llm.services import (
@@ -176,7 +178,14 @@ class TestLLMServiceResponses(LLMServiceTestCase):
 
         # Check OpenAI client was initialized with OpenRouter endpoint and API key
         mock_openai_class.assert_called_once_with(
-            base_url="https://openrouter.ai/api/v1", api_key=self.llm_config.api_key
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self.llm_config.api_key,
+            timeout=httpx.Timeout(
+                connect=settings.LLM_API_CONNECTION_TIMEOUT,
+                read=settings.LLM_API_TIMEOUT,
+                write=10.0,
+                pool=5.0,
+            ),
         )
 
         # Check API was called with tools parameter

@@ -30,7 +30,6 @@ import logging
 
 from llteacher.tracing import record_exception
 
-logger = logging.getLogger(__name__)
 
 from homeworks.models import Section
 from .models import Conversation, PasteEvent, RapidTextGrowthEvent
@@ -40,6 +39,8 @@ from .services import (
     MessageProcessingRequest,
     StreamEvent,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

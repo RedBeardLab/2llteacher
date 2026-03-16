@@ -122,7 +122,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
 
         # Make a new request (5th message in conversation)
         current_message = "Can variables change their type?"
-        response = LLMService.get_response(
+        _response = LLMService.get_response(
             self.conversation,
             current_message,
             "student",
@@ -247,7 +247,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
 
         # Send first message
         first_message = "What is a variable?"
-        response = LLMService.get_response(
+        _response = LLMService.get_response(
             new_conversation,
             first_message,
             "student",

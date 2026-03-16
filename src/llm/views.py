@@ -20,7 +20,6 @@ import logging
 from llteacher.permissions.decorators import teacher_required, get_teacher_or_student
 from llteacher.tracing import record_exception
 
-logger = logging.getLogger(__name__)
 from .services import (
     LLMService,
     LLMConfigData,
@@ -29,6 +28,8 @@ from .services import (
     LLMConfigUpdateResult,
     LLMResponseResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # Data contracts for views

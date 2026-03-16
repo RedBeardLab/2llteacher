@@ -14,8 +14,6 @@ import logging
 
 from llteacher.tracing import traced, record_exception
 
-logger = logging.getLogger(__name__)
-
 from accounts.models import User
 from homeworks.models import Section
 
@@ -27,6 +25,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from accounts.models import Teacher, Student
+
+logger = logging.getLogger(__name__)
 
 
 # Data Contracts

@@ -20,9 +20,9 @@ import logging
 
 from llteacher.tracing import traced, record_exception
 
-logger = logging.getLogger(__name__)
-
 from .models import User, EmailVerification
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
