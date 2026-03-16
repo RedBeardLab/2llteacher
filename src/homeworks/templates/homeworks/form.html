@@ -23,6 +23,11 @@
     cursor: pointer;
     color: #dc3545;
   }
+  .field-hint {
+    font-size: 0.85rem;
+    color: #8a9ab0;
+    margin-top: 0.25rem;
+  }
 </style>
 {% endblock %}
 
@@ -96,11 +101,38 @@
           </div>
           {% endif %}
         </div>
-        
+
+        <!-- Student Visibility -->
+        <div class="card mb-3 border-primary">
+          <div class="card-header text-white bg-primary">
+            <h6 class="mb-0"><i class="bi bi-eye-slash"></i> Student Visibility</h6>
+          </div>
+          <div class="card-body">
+            <div class="form-check mb-3">
+              {{ data.form.is_hidden }}
+              <label class="form-check-label fw-semibold" for="{{ data.form.is_hidden.id_for_label }}">
+                Hide from students immediately
+              </label>
+              <div class="field-hint">Students will not be able to see or access this homework regardless of dates.</div>
+              {% if data.form.is_hidden.errors %}
+              <div class="invalid-feedback d-block">{{ data.form.is_hidden.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-0">
+              <label for="{{ data.form.expires_at.id_for_label }}" class="form-label">Hide from students after</label>
+              {{ data.form.expires_at }}
+              <div class="field-hint">Leave blank to never auto-hide. Must be after the due date.</div>
+              {% if data.form.expires_at.errors %}
+              <div class="invalid-feedback d-block">{{ data.form.expires_at.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
         <div class="mb-3">
           <label for="{{ data.form.llm_config.id_for_label }}" class="form-label">LLM Configuration</label>
           {{ data.form.llm_config }}
-          <div class="form-text">Select a configuration for the LLM assistant (optional)</div>
+          <div class="field-hint">Select a configuration for the LLM assistant (optional)</div>
           {% if data.form.llm_config.errors %}
           <div class="invalid-feedback d-block">
             {{ data.form.llm_config.errors|join:", " }}

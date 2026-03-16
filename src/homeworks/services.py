@@ -890,7 +890,7 @@ class HomeworkService:
             # Create a map of conversation_id -> paste event count for quick lookup
             from collections import defaultdict
 
-            paste_event_count_map = defaultdict(int)
+            paste_event_count_map: defaultdict[UUID, int] = defaultdict(int)
             for paste_event in paste_events:
                 if paste_event.last_message_before_paste:
                     conv_id = paste_event.last_message_before_paste.conversation.id

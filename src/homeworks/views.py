@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Any, assert_type
+from typing import TYPE_CHECKING, Dict, Any, assert_type, cast
 from uuid import UUID
 from django.forms import formset_factory
 
@@ -50,6 +50,9 @@ class HomeworkListItem:
     section_count: int
     created_at: Any  # datetime
     is_overdue: bool
+    expires_at: Any = None  # datetime or None
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
     sections: list[SectionData] | None = None
     completed_percentage: int = 0
     in_progress_percentage: int = 0
@@ -135,6 +138,9 @@ class HomeworkListView(View):
                         section_count=homework.section_count,
                         created_at=homework.created_at,
                         is_overdue=homework.is_overdue,
+                        expires_at=homework.expires_at,
+                        is_hidden=homework.is_hidden,
+                        is_accessible_to_students=homework.is_accessible_to_students,
                         sections=None,  # No section data needed for teacher view
                     )
                 )
@@ -149,9 +155,14 @@ class HomeworkListView(View):
                 courseenrollment__is_active=True
             )
 
-            # Get homeworks for courses student is enrolled in (direct FK now)
+            # Get homeworks for courses student is enrolled in (direct FK now),
+            # excluding homeworks that are hidden or have expired.
+            from django.db.models import Q
+
             homework_objects = (
                 Homework.objects.filter(course__in=enrolled_courses)
+                .filter(is_hidden=False)
+                .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()))
                 .order_by("-created_at")
                 .prefetch_related("sections")
             )
@@ -254,6 +265,9 @@ class HomeworkDetailData:
     is_overdue: bool
     user_type: str  # 'teacher', 'student', or 'unknown'
     can_edit: bool
+    expires_at: Any = None  # datetime or None
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
     llm_config: Dict[str, Any] | None = None
 
 
@@ -343,6 +357,11 @@ class HomeworkEditView(View):
 
         if data.is_submitted:
             messages.success(request, "Homework updated successfully!")
+            if getattr(data.form, "expires_at_adjusted", False):
+                messages.warning(
+                    request,
+                    "Note: the expiry date is set before the due date. Students will lose access before the homework is officially due.",
+                )
             return redirect("homeworks:detail", homework_id=homework_id)
 
         return render(request, "homeworks/form.html", {"data": data})
@@ -370,8 +389,9 @@ class HomeworkEditView(View):
             initial_section_data.append(section_data)
 
         # Create section formset with initial data
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(
             prefix="sections", initial=initial_section_data
@@ -395,8 +415,9 @@ class HomeworkEditView(View):
         form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(request.POST, prefix="sections")
         assert_type(section_formset, SectionFormSet)
@@ -581,7 +602,7 @@ class HomeworkDetailView(View):
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
 
-        # For students, check if they're enrolled in the course that has this homework
+        # For students, check enrollment and visibility
         if student_profile:
             homework = Homework.objects.filter(id=homework_id).first()
             if homework and homework.course:
@@ -591,6 +612,9 @@ class HomeworkDetailView(View):
                 has_access = homework.course in enrolled_courses
 
                 if not has_access:
+                    return None
+
+                if not homework.is_accessible_to_students:
                     return None
             else:
                 return None
@@ -673,6 +697,9 @@ class HomeworkDetailView(View):
             else "Unknown Teacher"
         )
 
+        # Fetch the raw homework object for expiry fields (may already be fetched above)
+        homework_obj_for_expiry = Homework.objects.filter(id=homework_id).first()
+
         # Create and return the view data
         return HomeworkDetailData(
             id=homework_detail.id,
@@ -686,6 +713,15 @@ class HomeworkDetailView(View):
             is_overdue=homework_detail.due_date < timezone.now(),
             user_type=user_type,
             can_edit=can_edit,
+            expires_at=homework_obj_for_expiry.expires_at
+            if homework_obj_for_expiry
+            else None,
+            is_hidden=homework_obj_for_expiry.is_hidden
+            if homework_obj_for_expiry
+            else False,
+            is_accessible_to_students=homework_obj_for_expiry.is_accessible_to_students
+            if homework_obj_for_expiry
+            else True,
             llm_config={"id": homework_detail.llm_config}
             if homework_detail.llm_config
             else None,
@@ -751,13 +787,17 @@ class SectionDetailView(View):
             if not (created_by_teacher or teaches_course_with_homework):
                 return HttpResponseForbidden("Access denied.")
 
-        # For students, check if they're enrolled in the course that has this homework
+        # For students, check enrollment and visibility
         if student_profile:
             if homework.course:
                 is_enrolled = homework.course.is_student_enrolled(student_profile)
                 if not is_enrolled:
                     return HttpResponseForbidden(
                         "Access denied. You are not enrolled in the course that has this homework."
+                    )
+                if not homework.is_accessible_to_students:
+                    return HttpResponseForbidden(
+                        "This assignment is no longer available."
                     )
             else:
                 return HttpResponseForbidden(

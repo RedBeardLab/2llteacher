@@ -17,6 +17,15 @@ class Homework(models.Model):
         "courses.Course", on_delete=models.CASCADE, related_name="homeworks"
     )
     due_date = models.DateTimeField()
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Automatically hide from students after this date. Leave blank to never auto-hide.",
+    )
+    is_hidden = models.BooleanField(
+        default=False,
+        help_text="Immediately hide this homework from students.",
+    )
     llm_config = models.ForeignKey(
         "llm.LLMConfig", on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -37,6 +46,20 @@ class Homework(models.Model):
     @property
     def is_overdue(self):
         return timezone.now() > self.due_date
+
+    @property
+    def is_expired(self) -> bool:
+        """True if the auto-expiry date has passed."""
+        return self.expires_at is not None and timezone.now() > self.expires_at
+
+    @property
+    def is_accessible_to_students(self) -> bool:
+        """False if the teacher has hidden it or the expiry date has passed."""
+        if self.is_hidden:
+            return False
+        if self.is_expired:
+            return False
+        return True
 
 
 class Section(models.Model):
