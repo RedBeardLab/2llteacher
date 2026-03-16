@@ -34,7 +34,7 @@ from .services import (
     SectionStatus,
     SectionData,
 )
-from .forms import HomeworkCreateForm, HomeworkEditForm, SectionForm, SectionFormSet
+from .forms import HomeworkEditForm, SectionForm, SectionFormSet
 
 logger = logging.getLogger(__name__)
 
