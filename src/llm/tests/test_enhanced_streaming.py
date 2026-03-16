@@ -366,3 +366,92 @@ class EnhancedStreamingTest(TestCase):
         # StreamTokenType enum values
         self.assertEqual(StreamTokenType.TOKEN, "token")
         self.assertEqual(StreamTokenType.COMPLETE, "complete")
+
+    def test_timeout_triggers_retry(self, mock_openai_class):
+        """Test that timeout exceptions trigger retry logic."""
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+
+        from openai import APITimeoutError
+
+        # Create a mock request object
+        mock_request = MagicMock()
+        timeout_error = APITimeoutError(request=mock_request)
+        mock_client.chat.completions.create.side_effect = [
+            timeout_error,
+            iter(self._create_mock_chunks(["Success"], FinishReason.STOP)),
+        ]
+
+        stream_tokens = list(
+            LLMService.stream_response_with_completion(
+                self.conversation,
+                "Test message",
+                "student",
+                available_functions=[LLMService.get_stopping_rule_function()],
+            )
+        )
+
+        # Verify retry occurred
+        self.assertEqual(mock_client.chat.completions.create.call_count, 2)
+
+        # Verify success
+        completion_tokens = [
+            t for t in stream_tokens if t.type == StreamTokenType.COMPLETE
+        ]
+        self.assertEqual(len(completion_tokens), 1)
+
+    def test_timeout_fails_after_max_retries(self, mock_openai_class):
+        """Test that persistent timeouts fail after max retries."""
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+
+        from openai import APITimeoutError
+
+        # Create a mock request object
+        mock_request = MagicMock()
+        timeout_error = APITimeoutError(request=mock_request)
+        mock_client.chat.completions.create.side_effect = timeout_error
+
+        with self.assertRaises(StreamingError) as context:
+            list(
+                LLMService.stream_response_with_completion(
+                    self.conversation,
+                    "Test message",
+                    "student",
+                    available_functions=[LLMService.get_stopping_rule_function()],
+                )
+            )
+
+        self.assertIn("timeout after 3 attempts", str(context.exception))
+        self.assertEqual(mock_client.chat.completions.create.call_count, 3)
+
+    def test_connection_error_triggers_retry(self, mock_openai_class):
+        """Test that connection errors trigger retry logic."""
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+
+        from openai import APIConnectionError
+
+        # Create a mock request object
+        mock_request = MagicMock()
+        connection_error = APIConnectionError(request=mock_request)
+        mock_client.chat.completions.create.side_effect = [
+            connection_error,
+            iter(self._create_mock_chunks(["Success"], FinishReason.STOP)),
+        ]
+
+        stream_tokens = list(
+            LLMService.stream_response_with_completion(
+                self.conversation,
+                "Test message",
+                "student",
+                available_functions=[LLMService.get_stopping_rule_function()],
+            )
+        )
+
+        # Verify retry and success
+        self.assertEqual(mock_client.chat.completions.create.call_count, 2)
+        completion_tokens = [
+            t for t in stream_tokens if t.type == StreamTokenType.COMPLETE
+        ]
+        self.assertEqual(len(completion_tokens), 1)
