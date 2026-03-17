@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 from django.views import View
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
@@ -16,6 +16,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
 if TYPE_CHECKING:
+    from django.forms import BaseFormSet
     from homeworks.forms import HomeworkCreateForm, SectionFormSet
 
 from llteacher.permissions.decorators import (
@@ -368,7 +369,7 @@ class HomeworkFormData:
     """Data structure for homework form view."""
 
     form: "HomeworkCreateForm"
-    section_forms: "SectionFormSet"
+    section_forms: "BaseFormSet[Any]"
     course_name: str
     course_id: UUID
     action: str  # 'create'
@@ -464,7 +465,7 @@ class CourseHomeworkCreateView(View):
 
         # Create a mutable copy of POST data and inject course
         post_data = request.POST.copy()
-        post_data["course"] = course.id
+        post_data["course"] = str(course.id)
 
         # Create forms from POST data
         form = HomeworkCreateForm(post_data)
