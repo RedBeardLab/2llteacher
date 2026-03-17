@@ -385,18 +385,21 @@ class LLMService:
                 function_calls = []
                 if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
                     for tool_call in choice.message.tool_calls:
+                        func = getattr(tool_call, "function", None)
+                        if func is None:
+                            continue
                         try:
-                            arguments = json.loads(tool_call.function.arguments)
+                            arguments = json.loads(func.arguments)
                             function_calls.append(
                                 FunctionCall(
                                     id=tool_call.id,
-                                    name=tool_call.function.name,
+                                    name=func.name,
                                     arguments=arguments,
                                 )
                             )
                         except json.JSONDecodeError as e:
                             logger.error(
-                                f"Failed to parse function arguments: {tool_call.function.arguments}, error: {e}"
+                                f"Failed to parse function arguments: {func.arguments}, error: {e}"
                             )
 
                 # Determine finish reason
@@ -878,8 +881,9 @@ class LLMService:
         tool_calls_accumulator = {}  # Accumulate tool call deltas by index
 
         for chunk in stream:
-            if chunk.choices and len(chunk.choices) > 0:
-                choice = chunk.choices[0]
+            choices = getattr(chunk, "choices", None)
+            if choices and len(choices) > 0:
+                choice = choices[0]
 
                 # Extract token content
                 if hasattr(choice.delta, "content") and choice.delta.content:
