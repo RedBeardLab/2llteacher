@@ -8,6 +8,7 @@ following the testable-first architecture with typed data contracts.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
+from django import forms
 from django.views import View
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
@@ -368,7 +369,7 @@ class HomeworkFormData:
     """Data structure for homework form view."""
 
     form: "HomeworkCreateForm"
-    section_forms: "SectionFormSet"
+    section_forms: "forms.BaseFormSet"
     course_name: str
     course_id: UUID
     action: str  # 'create'
@@ -464,7 +465,7 @@ class CourseHomeworkCreateView(View):
 
         # Create a mutable copy of POST data and inject course
         post_data = request.POST.copy()
-        post_data["course"] = course.id
+        post_data["course"] = str(course.id)
 
         # Create forms from POST data
         form = HomeworkCreateForm(post_data)
