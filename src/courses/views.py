@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 from django.views import View
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
@@ -14,6 +14,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.forms.formsets import BaseFormSet
 
 if TYPE_CHECKING:
     from homeworks.forms import HomeworkCreateForm, SectionFormSet
@@ -294,6 +295,8 @@ class CourseDetailView(View):
         if not has_access:
             return HttpResponseForbidden("You do not have access to this course.")
 
+        assert user_type is not None
+
         # Get the appropriate data based on user type
         data = self._get_view_data(course, user_type, teacher_profile, student_profile)
 
@@ -368,7 +371,7 @@ class HomeworkFormData:
     """Data structure for homework form view."""
 
     form: "HomeworkCreateForm"
-    section_forms: "SectionFormSet"
+    section_forms: BaseFormSet[Any]
     course_name: str
     course_id: UUID
     action: str  # 'create'
@@ -464,7 +467,7 @@ class CourseHomeworkCreateView(View):
 
         # Create a mutable copy of POST data and inject course
         post_data = request.POST.copy()
-        post_data["course"] = course.id
+        post_data["course"] = str(course.id)
 
         # Create forms from POST data
         form = HomeworkCreateForm(post_data)
