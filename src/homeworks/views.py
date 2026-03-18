@@ -6,9 +6,10 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Any, assert_type
+from typing import TYPE_CHECKING, Dict, Any
 from uuid import UUID
 from django.forms import formset_factory
+from django.forms.formsets import BaseFormSet
 
 if TYPE_CHECKING:
     from django.forms.utils import ErrorDict, ErrorList
@@ -262,7 +263,7 @@ class HomeworkFormData:
     """Data structure for the homework form view."""
 
     form: "HomeworkEditForm"
-    section_forms: "SectionFormSet"
+    section_forms: BaseFormSet[Any]
     user_type: str
     action: str  # 'create' or 'edit'
     is_submitted: bool = False
@@ -370,13 +371,9 @@ class HomeworkEditView(View):
             initial_section_data.append(section_data)
 
         # Create section formset with initial data
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
-        )
-        section_formset = SectionFormset(
+        section_formset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)(
             prefix="sections", initial=initial_section_data
         )
-        assert_type(section_formset, SectionFormSet)
 
         # Return form data
         return HomeworkFormData(
@@ -395,11 +392,9 @@ class HomeworkEditView(View):
         form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        section_formset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)(
+            request.POST, prefix="sections"
         )
-        section_formset = SectionFormset(request.POST, prefix="sections")
-        assert_type(section_formset, SectionFormSet)
 
         # Check form validity
         if form.is_valid() and section_formset.is_valid():
