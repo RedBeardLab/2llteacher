@@ -23,37 +23,61 @@
     cursor: pointer;
     color: #dc3545;
   }
+  .field-hint {
+    font-size: 0.85rem;
+    color: #8a9ab0;
+    margin-top: 0.25rem;
+  }
+  #publish-at-wrapper {
+    transition: opacity 0.2s ease;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
+  {% if data.action == 'create' and data.course_id %}
+  <div class="row mb-2">
+    <div class="col">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'courses:list' %}">Courses</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'courses:detail' data.course_id %}">{{ data.course_name }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Create Homework</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+  {% endif %}
   <div class="row mb-4">
     <div class="col">
       <h1>
         {% if data.action == 'create' %}Create New Homework{% else %}Edit Homework{% endif %}
       </h1>
+      {% if data.action == 'create' and data.course_name %}
+      <p class="text-muted">for {{ data.course_name }}</p>
+      {% endif %}
     </div>
     <div class="col-auto">
+      {% if data.action == 'create' and data.course_id %}
+      <a href="{% url 'courses:detail' data.course_id %}" class="btn btn-outline-secondary">
+        <i class="bi bi-x-circle"></i> Cancel
+      </a>
+      {% else %}
       <a href="{% url 'homeworks:list' %}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back to List
       </a>
+      {% endif %}
     </div>
   </div>
 
-  {% if data.errors %}
-  <div class="alert alert-danger">
-    <strong>There were errors with your submission:</strong>
-    <ul>
-      {% for field, errors in data.errors.homework.items %}
-      <li>{{ field }}: {{ errors|join:", " }}</li>
+  {% if data.form.errors %}
+  <div class="alert alert-danger" role="alert">
+    <strong><i class="bi bi-exclamation-triangle-fill"></i> Please fix the following before publishing:</strong>
+    <ul class="mb-0 mt-1">
+      {% for field, errors in data.form.errors.items %}
+      <li><strong>{{ field|capfirst }}</strong>: {{ errors|join:", " }}</li>
       {% endfor %}
-
-      {% if data.errors.formset %}
-      {% for error in data.errors.formset %}
-      <li>{{ error }}</li>
-      {% endfor %}
-      {% endif %}
     </ul>
   </div>
   {% endif %}
@@ -68,39 +92,85 @@
       </div>
       <div class="card-body">
         <div class="mb-3">
-          <label for="{{ data.form.title.id_for_label }}" class="form-label">Title</label>
+          <label for="{{ data.form.title.id_for_label }}" class="form-label">
+            Title <span class="text-danger">*</span>
+          </label>
           {{ data.form.title }}
           {% if data.form.title.errors %}
-          <div class="invalid-feedback d-block">
-            {{ data.form.title.errors|join:", " }}
+          <div class="text-danger small mt-1">
+            <i class="bi bi-exclamation-circle"></i> {{ data.form.title.errors|join:", " }}
           </div>
           {% endif %}
         </div>
-        
+
         <div class="mb-3">
-          <label for="{{ data.form.description.id_for_label }}" class="form-label">Description</label>
+          <label for="{{ data.form.description.id_for_label }}" class="form-label">
+            Description
+            <span class="text-muted small">(required to publish)</span>
+          </label>
           {{ data.form.description }}
           {% if data.form.description.errors %}
-          <div class="invalid-feedback d-block">
-            {{ data.form.description.errors|join:", " }}
+          <div class="text-danger small mt-1">
+            <i class="bi bi-exclamation-circle"></i> {{ data.form.description.errors|join:", " }}
           </div>
           {% endif %}
         </div>
-        
+
         <div class="mb-3">
-          <label for="{{ data.form.due_date.id_for_label }}" class="form-label">Due Date</label>
+          <label for="{{ data.form.due_date.id_for_label }}" class="form-label">
+            Due Date
+            <span class="text-muted small">(required to publish)</span>
+          </label>
           {{ data.form.due_date }}
           {% if data.form.due_date.errors %}
-          <div class="invalid-feedback d-block">
-            {{ data.form.due_date.errors|join:", " }}
+          <div class="text-danger small mt-1">
+            <i class="bi bi-exclamation-circle"></i> {{ data.form.due_date.errors|join:", " }}
           </div>
           {% endif %}
         </div>
-        
+
+        <!-- Scheduling -->
+        <div class="card mb-3">
+          <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-calendar-event"></i> Scheduling</h6>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="publish-now-toggle" name="publish_now"
+                       {% if not data.form.instance.publish_at %}checked{% endif %}>
+                <label class="form-check-label fw-semibold" for="publish-now-toggle">
+                  Publish now
+                </label>
+              </div>
+              <div class="field-hint">When enabled, "Save &amp; Publish" makes this homework visible to students immediately.</div>
+            </div>
+            <div class="mb-3" id="publish-at-wrapper">
+              <label for="{{ data.form.publish_at.id_for_label }}" class="form-label">
+                Publish at <span class="text-danger">*</span>
+              </label>
+              {{ data.form.publish_at }}
+              <div class="field-hint">Set a future date/time to automatically publish this draft.</div>
+              {% if data.form.publish_at.errors %}
+              <div class="invalid-feedback d-block">{{ data.form.publish_at.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-0">
+              <label for="{{ data.form.expires_at.id_for_label }}" class="form-label">Hide from students after</label>
+              {{ data.form.expires_at }}
+              <div class="field-hint">Leave blank to never auto-hide. Must be after the due date.</div>
+              {% if data.form.expires_at.errors %}
+              <div class="invalid-feedback d-block">{{ data.form.expires_at.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
         <div class="mb-3">
           <label for="{{ data.form.llm_config.id_for_label }}" class="form-label">LLM Configuration</label>
           {{ data.form.llm_config }}
-          <div class="form-text">Select a configuration for the LLM assistant (optional)</div>
+          <div class="field-hint">Select a configuration for the LLM assistant (optional)</div>
           {% if data.form.llm_config.errors %}
           <div class="invalid-feedback d-block">
             {{ data.form.llm_config.errors|join:", " }}
@@ -111,74 +181,100 @@
     </div>
     
     <!-- Sections -->
-    <h2>Sections</h2>
+    <h2>Sections <span class="text-muted fs-6 fw-normal">(required to publish)</span></h2>
     <div class="alert alert-info">
-      <p><i class="bi bi-info-circle"></i> Add at least one section to your homework. Sections are ordered numerically starting from 1.</p>
+      <p><i class="bi bi-info-circle"></i> At least one section is required before publishing. You can save a draft without sections and add them later.</p>
     </div>
     
     {{ data.section_forms.management_form }}
     
+    <!-- Hidden template used by JS to add new sections. Inputs are disabled so they never submit. -->
+    <div id="section-template" style="display:none" aria-hidden="true">
+      <div class="section-form">
+        <div class="section-header">
+          <h5>Section</h5>
+          <div class="d-flex gap-2 align-items-center">
+            <a class="text-secondary" onclick="moveSection(this, 'up')" title="Move up" style="cursor:pointer">
+              <i class="bi bi-arrow-up"></i>
+            </a>
+            <a class="text-secondary" onclick="moveSection(this, 'down')" title="Move down" style="cursor:pointer">
+              <i class="bi bi-arrow-down"></i>
+            </a>
+            <a class="delete-section" onclick="deleteSection(this)">
+              <i class="bi bi-trash"></i> Remove
+            </a>
+          </div>
+        </div>
+        <input type="hidden" name="sections-0-id" id="id_sections-0-id" disabled>
+        <input type="hidden" name="sections-0-order" id="id_sections-0-order" disabled>
+        <div class="mb-3">
+          <label for="id_sections-0-title" class="form-label">Section Title</label>
+          <input type="text" name="sections-0-title" id="id_sections-0-title" disabled
+                 class="form-control" placeholder="Section Title">
+        </div>
+        <div class="mb-3">
+          <label for="id_sections-0-content" class="form-label">Section Content</label>
+          <textarea name="sections-0-content" id="id_sections-0-content" disabled
+                    class="form-control" rows="5" placeholder="Section content..."></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="id_sections-0-solution" class="form-label">Solution (Optional)</label>
+          <textarea name="sections-0-solution" id="id_sections-0-solution" disabled
+                    class="form-control" rows="3" placeholder="Optional solution..."></textarea>
+          <div class="form-text">Add an optional solution that can be viewed by teachers only</div>
+        </div>
+      </div>
+    </div>
+
     <div id="section-container">
       {% for section_form in data.section_forms %}
       <div class="section-form">
         <div class="section-header">
           <h5>Section {{ forloop.counter }}</h5>
-          {% if forloop.counter > 1 %}
-          <a class="delete-section" onclick="deleteSection(this)">
-            <i class="bi bi-trash"></i> Remove
-          </a>
-          {% endif %}
+          <div class="d-flex gap-2 align-items-center">
+            <a class="text-secondary" onclick="moveSection(this, 'up')" title="Move up" style="cursor:pointer">
+              <i class="bi bi-arrow-up"></i>
+            </a>
+            <a class="text-secondary" onclick="moveSection(this, 'down')" title="Move down" style="cursor:pointer">
+              <i class="bi bi-arrow-down"></i>
+            </a>
+            <a class="delete-section" onclick="deleteSection(this)">
+              <i class="bi bi-trash"></i> Remove
+            </a>
+          </div>
         </div>
-        
+
         {{ section_form.id }}
-        
+        {{ section_form.order }}
+
         <div class="mb-3">
           <label for="{{ section_form.prefix }}-title" class="form-label">Section Title</label>
           {{ section_form.title }}
           {% if section_form.title.errors %}
-          <div class="invalid-feedback d-block">
-            {{ section_form.title.errors|join:", " }}
-          </div>
+          <div class="invalid-feedback d-block">{{ section_form.title.errors|join:", " }}</div>
           {% endif %}
         </div>
-        
+
         <div class="mb-3">
           <label for="{{ section_form.prefix }}-content" class="form-label">Section Content</label>
           {{ section_form.content }}
           {% if section_form.content.errors %}
-          <div class="invalid-feedback d-block">
-            {{ section_form.content.errors|join:", " }}
-          </div>
+          <div class="invalid-feedback d-block">{{ section_form.content.errors|join:", " }}</div>
           {% endif %}
         </div>
-        
-        <div class="row mb-3">
-          <div class="col-md-2">
-            <label for="{{ section_form.prefix }}-order" class="form-label">Order</label>
-            {{ section_form.order }}
-            {% if section_form.order.errors %}
-            <div class="invalid-feedback d-block">
-              {{ section_form.order.errors|join:", " }}
-            </div>
-            {% endif %}
-          </div>
-        </div>
-        
+
         <div class="mb-3">
           <label for="{{ section_form.prefix }}-solution" class="form-label">Solution (Optional)</label>
           {{ section_form.solution }}
           <div class="form-text">Add an optional solution that can be viewed by teachers only</div>
           {% if section_form.solution.errors %}
-          <div class="invalid-feedback d-block">
-            {{ section_form.solution.errors|join:", " }}
-          </div>
+          <div class="invalid-feedback d-block">{{ section_form.solution.errors|join:", " }}</div>
           {% endif %}
         </div>
-        
+
         {% if not forloop.first %}
-        <div class="mb-3">
+        <div class="mb-3" style="display:none">
           {{ section_form.DELETE }}
-          <label for="{{ section_form.DELETE.id_for_label }}" class="form-check-label">Delete this section</label>
         </div>
         {% endif %}
       </div>
@@ -191,10 +287,13 @@
       </button>
     </div>
     
-    <!-- Submit Button -->
-    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-      <button type="submit" class="btn btn-primary">
-        {% if data.action == 'create' %}Create Homework{% else %}Save Changes{% endif %}
+    <!-- Submit Buttons -->
+    <div class="d-flex gap-2 justify-content-end">
+      <button type="submit" name="save_draft" formnovalidate class="btn btn-outline-secondary">
+        <i class="bi bi-floppy"></i> Save as Draft
+      </button>
+      <button type="submit" name="publish" class="btn btn-success">
+        <i class="bi bi-send"></i> {% if data.action == 'create' %}Create & Publish{% else %}Save & Publish{% endif %}
       </button>
     </div>
   </form>
@@ -203,6 +302,31 @@
 
 {% block extra_js %}
 <script>
+  // --- Publish now toggle: gray out publish_at when publishing immediately ---
+  (function() {
+    const toggle = document.getElementById('publish-now-toggle');
+    const wrapper = document.getElementById('publish-at-wrapper');
+
+    function applyPublishNow(publishNow) {
+      if (!wrapper) return;
+      const input = wrapper.querySelector('input');
+      if (publishNow) {
+        wrapper.style.opacity = '0.4';
+        wrapper.style.pointerEvents = 'none';
+        if (input) input.disabled = true;
+      } else {
+        wrapper.style.opacity = '';
+        wrapper.style.pointerEvents = '';
+        if (input) input.disabled = false;
+      }
+    }
+
+    if (toggle) {
+      applyPublishNow(toggle.checked);
+      toggle.addEventListener('change', () => applyPublishNow(toggle.checked));
+    }
+  })();
+
   document.addEventListener('DOMContentLoaded', function() {
     // Get the total forms field to track the number of forms
     const totalFormsField = document.getElementById('id_sections-TOTAL_FORMS');
@@ -212,86 +336,90 @@
     // Add section button click handler
     addSectionBtn.addEventListener('click', function() {
       const formCount = parseInt(totalFormsField.value);
-      
-      // Clone the first form as a template
-      const formTemplate = sectionContainer.querySelector('.section-form').cloneNode(true);
-      
-      // Update form index
       const newIndex = formCount;
+
+      // Always clone from the hidden template (never from existing sections)
+      const template = document.getElementById('section-template');
+      const formTemplate = template.querySelector('.section-form').cloneNode(true);
+
+      // Update indices from 0 → newIndex
       updateFormIndex(formTemplate, 0, newIndex);
-      
-      // Add a remove button
-      const header = formTemplate.querySelector('.section-header');
-      header.innerHTML = `<h5>Section ${formCount + 1}</h5><a class="delete-section" onclick="deleteSection(this)"><i class="bi bi-trash"></i> Remove</a>`;
-      
-      // Clear input values
-      const inputs = formTemplate.querySelectorAll('input, textarea');
-      inputs.forEach(input => {
-        if (input.type !== 'hidden' || input.name.includes('id')) {
-          input.value = '';
-        }
-      });
-      
-      // Set default order value for new section
+
+      // Update header with correct section number
+      formTemplate.querySelector('.section-header h5').textContent = `Section ${formCount + 1}`;
+
+      // Enable all inputs (they are disabled in the template to prevent accidental submission)
+      formTemplate.querySelectorAll('input, textarea').forEach(el => el.disabled = false);
+
+      // Set default order
       const orderInput = formTemplate.querySelector('input[name$="-order"]');
-      if (orderInput) {
-        orderInput.value = formCount + 1;
-      }
-      
-      // Add the new form to the container
+      if (orderInput) orderInput.value = formCount + 1;
+
       sectionContainer.appendChild(formTemplate);
-      
-      // Update total form count
       totalFormsField.value = formCount + 1;
+      updateSectionNumbers();
     });
   });
-  
-  // Function to update form indices
-  function updateFormIndex(form, oldIndex, newIndex) {
-    const elements = form.querySelectorAll('input, textarea, select, label');
-    
-    elements.forEach(element => {
-      if (element.name) {
-        element.name = element.name.replace(`sections-${oldIndex}`, `sections-${newIndex}`);
-      }
-      if (element.id) {
-        element.id = element.id.replace(`sections-${oldIndex}`, `sections-${newIndex}`);
-      }
-      if (element.htmlFor) {
-        element.htmlFor = element.htmlFor.replace(`sections-${oldIndex}`, `sections-${newIndex}`);
-      }
+
+  // Update section headings and hidden order values to match current DOM order
+  function updateSectionNumbers() {
+    const container = document.getElementById('section-container');
+    const visible = Array.from(container.querySelectorAll('.section-form'))
+      .filter(s => s.style.display !== 'none');
+    visible.forEach((section, idx) => {
+      const h5 = section.querySelector('.section-header h5');
+      if (h5) h5.textContent = `Section ${idx + 1}`;
+      const orderInput = section.querySelector('input[name$="-order"]');
+      if (orderInput) orderInput.value = idx + 1;
     });
   }
-  
-  // Function to delete a section
+
+  // Move a section up or down
+  function moveSection(button, direction) {
+    const section = button.closest('.section-form');
+    const container = document.getElementById('section-container');
+    const visible = Array.from(container.querySelectorAll('.section-form'))
+      .filter(s => s.style.display !== 'none');
+    const idx = visible.indexOf(section);
+    if (direction === 'up' && idx > 0) {
+      container.insertBefore(section, visible[idx - 1]);
+    } else if (direction === 'down' && idx < visible.length - 1) {
+      container.insertBefore(visible[idx + 1], section);
+    }
+    updateSectionNumbers();
+  }
+
+  // Function to update form indices (name/id attributes)
+  function updateFormIndex(form, oldIndex, newIndex) {
+    form.querySelectorAll('input, textarea, select, label').forEach(el => {
+      if (el.name) el.name = el.name.replace(`sections-${oldIndex}`, `sections-${newIndex}`);
+      if (el.id) el.id = el.id.replace(`sections-${oldIndex}`, `sections-${newIndex}`);
+      if (el.htmlFor) el.htmlFor = el.htmlFor.replace(`sections-${oldIndex}`, `sections-${newIndex}`);
+    });
+  }
+
+  // Delete a section
   function deleteSection(button) {
     const section = button.closest('.section-form');
     const deleteInput = section.querySelector('input[type=checkbox][name$="-DELETE"]');
-    
+
     if (deleteInput) {
-      // If there's a DELETE checkbox (for existing sections), check it
+      // Existing server-side section: mark for deletion and hide
       deleteInput.checked = true;
       section.style.display = 'none';
     } else {
-      // For new sections, remove the DOM element entirely
+      // New JS-added section: remove from DOM and reindex
       const totalFormsField = document.getElementById('id_sections-TOTAL_FORMS');
-      const sectionContainer = document.getElementById('section-container');
-      const forms = sectionContainer.querySelectorAll('.section-form');
-      
-      // Get the index of the form to remove
-      const formIndex = Array.from(forms).indexOf(section);
-      
-      // Remove the form
+      const container = document.getElementById('section-container');
+      const forms = Array.from(container.querySelectorAll('.section-form'));
+      const formIndex = forms.indexOf(section);
       section.remove();
-      
-      // Update indices for all following forms
       for (let i = formIndex + 1; i < forms.length; i++) {
         updateFormIndex(forms[i], i, i - 1);
       }
-      
-      // Update total form count
       totalFormsField.value = parseInt(totalFormsField.value) - 1;
     }
+    updateSectionNumbers();
   }
 </script>
 {% endblock %}

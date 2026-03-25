@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Any, assert_type
+from typing import TYPE_CHECKING, Dict, Any, assert_type, cast
 from uuid import UUID
 from django.forms import formset_factory
 
@@ -39,6 +39,16 @@ from .forms import HomeworkEditForm, SectionForm, SectionFormSet
 logger = logging.getLogger(__name__)
 
 
+def _mark_invalid_fields(form) -> None:
+    """Add Bootstrap is-invalid CSS class to any form widget that has errors."""
+    for field_name in form.errors:
+        if field_name in form.fields:
+            widget = form.fields[field_name].widget
+            css = widget.attrs.get("class", "")
+            if "is-invalid" not in css:
+                widget.attrs["class"] = f"{css} is-invalid".strip()
+
+
 @dataclass
 class HomeworkListItem:
     """Data structure for a single homework item in the list view."""
@@ -50,6 +60,11 @@ class HomeworkListItem:
     section_count: int
     created_at: Any  # datetime
     is_overdue: bool
+    expires_at: Any = None  # datetime or None
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
+    is_draft: bool = False
+    publish_at: Any = None  # datetime or None
     sections: list[SectionData] | None = None
     completed_percentage: int = 0
     in_progress_percentage: int = 0
@@ -108,6 +123,12 @@ class HomeworkListView(View):
             # Teacher view - show homeworks from courses this teacher teaches
             user_type = "teacher"
 
+            # Auto-publish any scheduled drafts before building the list
+            try:
+                HomeworkService.auto_publish_due_drafts()
+            except Exception:
+                pass  # Never break the page load
+
             # Get courses where this teacher is teaching
             teacher_courses = teacher_profile.courses.all()
 
@@ -135,6 +156,11 @@ class HomeworkListView(View):
                         section_count=homework.section_count,
                         created_at=homework.created_at,
                         is_overdue=homework.is_overdue,
+                        expires_at=homework.expires_at,
+                        is_hidden=homework.is_hidden,
+                        is_accessible_to_students=homework.is_accessible_to_students,
+                        is_draft=homework.is_draft,
+                        publish_at=homework.publish_at,
                         sections=None,  # No section data needed for teacher view
                     )
                 )
@@ -149,9 +175,14 @@ class HomeworkListView(View):
                 courseenrollment__is_active=True
             )
 
-            # Get homeworks for courses student is enrolled in (direct FK now)
+            # Get homeworks for courses student is enrolled in (direct FK now),
+            # excluding homeworks that are hidden or have expired.
+            from django.db.models import Q
+
             homework_objects = (
                 Homework.objects.filter(course__in=enrolled_courses)
+                .filter(is_hidden=False)
+                .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()))
                 .order_by("-created_at")
                 .prefetch_related("sections")
             )
@@ -254,19 +285,26 @@ class HomeworkDetailData:
     is_overdue: bool
     user_type: str  # 'teacher', 'student', or 'unknown'
     can_edit: bool
+    expires_at: Any = None  # datetime or None
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
+    is_draft: bool = False
+    publish_at: Any = None  # datetime or None
     llm_config: Dict[str, Any] | None = None
 
 
 @dataclass
 class HomeworkFormData:
-    """Data structure for the homework form view."""
+    """Data structure for the homework form view (create and edit)."""
 
-    form: "HomeworkEditForm"
+    form: Any  # HomeworkCreateForm or HomeworkEditForm
     section_forms: "SectionFormSet"
     user_type: str
     action: str  # 'create' or 'edit'
     is_submitted: bool = False
     errors: Dict[str, Any] | None = None
+    course_name: str = ""
+    course_id: Any = None  # UUID or None
 
 
 class HomeworkEditView(View):
@@ -343,6 +381,11 @@ class HomeworkEditView(View):
 
         if data.is_submitted:
             messages.success(request, "Homework updated successfully!")
+            if getattr(data.form, "expires_at_adjusted", False):
+                messages.warning(
+                    request,
+                    "Note: the expiry date is set before the due date. Students will lose access before the homework is officially due.",
+                )
             return redirect("homeworks:detail", homework_id=homework_id)
 
         return render(request, "homeworks/form.html", {"data": data})
@@ -370,8 +413,9 @@ class HomeworkEditView(View):
             initial_section_data.append(section_data)
 
         # Create section formset with initial data
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(
             prefix="sections", initial=initial_section_data
@@ -390,23 +434,69 @@ class HomeworkEditView(View):
     def _process_form_submission(
         self, request: TeacherRequest, homework: Homework
     ) -> HomeworkFormData:
-        """Process the form submission for updating a homework."""
-        # Create forms from POST data with homework instance
+        """Process the form submission for updating a homework.
+
+        The submit button name determines the publish action:
+          name="save_draft"   → keep/set as draft (is_hidden=True, homework_type=draft)
+          name="publish"      → publish immediately (is_hidden=False, homework_type=published)
+          anything else       → preserve existing homework_type
+        """
+        is_draft_save = "save_draft" in request.POST
+
+        # Draft save: bypass all validation, update only the raw text fields
+        if is_draft_save:
+            from .models import HomeworkType
+
+            homework.title = request.POST.get("title") or homework.title
+            homework.description = request.POST.get("description") or homework.description
+            homework.homework_type = HomeworkType.DRAFT
+            homework.is_hidden = True
+            homework.save(update_fields=["title", "description", "homework_type", "is_hidden", "updated_at"])
+            return HomeworkFormData(
+                form=HomeworkEditForm(instance=homework),
+                section_forms=None,  # type: ignore[arg-type]
+                user_type="teacher",
+                action="edit",
+                is_submitted=True,
+            )
+
+        # Publish path: run full validation
         form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(request.POST, prefix="sections")
         assert_type(section_formset, SectionFormSet)
 
-        # Check form validity
+        # Check form validity (publish path only)
         if form.is_valid() and section_formset.is_valid():
-            # Save basic homework data
-            homework = form.save()
+            from .models import HomeworkType
 
-            # Process sections
+            publish_now = "publish_now" in request.POST
+            homework_instance = form.save(commit=False)
+
+            if publish_now:
+                homework_instance.homework_type = HomeworkType.PUBLISHED
+                homework_instance.is_hidden = False
+                homework_instance.publish_at = None
+                # Clear expires_at if it has already passed (re-publish expired homework)
+                if (
+                    homework_instance.expires_at
+                    and homework_instance.expires_at <= timezone.now()
+                ):
+                    homework_instance.expires_at = None
+            else:
+                # Scheduled publish: keep as draft until auto_publish_due_drafts runs
+                homework_instance.homework_type = HomeworkType.DRAFT
+                homework_instance.is_hidden = True
+                # publish_at already set from form.save()
+
+            homework = homework_instance
+            homework.save()
+
             sections_to_update = []
             sections_to_create = []
             sections_to_delete = []
@@ -416,24 +506,19 @@ class HomeworkEditView(View):
                     continue
 
                 if section_form.cleaned_data.get("DELETE", False):
-                    # Section marked for deletion
                     if section_form.cleaned_data.get("id"):
                         sections_to_delete.append(section_form.cleaned_data["id"])
                 else:
-                    # Get section data
                     section_data = {
                         "title": section_form.cleaned_data["title"],
                         "content": section_form.cleaned_data["content"],
                         "order": section_form.cleaned_data["order"],
                         "solution": section_form.cleaned_data["solution"],
                     }
-
                     if section_form.cleaned_data.get("id"):
-                        # Existing section to update
                         section_data["id"] = section_form.cleaned_data["id"]
                         sections_to_update.append(section_data)
                     else:
-                        # New section to create
                         sections_to_create.append(
                             SectionCreateData(
                                 title=section_data["title"],
@@ -443,7 +528,6 @@ class HomeworkEditView(View):
                             )
                         )
 
-            # Create update data
             update_data = HomeworkUpdateData(
                 title=homework.title,
                 description=homework.description,
@@ -454,11 +538,9 @@ class HomeworkEditView(View):
                 sections_to_delete=sections_to_delete,
             )
 
-            # Update homework using service
             result = HomeworkService.update_homework(homework.id, update_data)
 
             if result.success:
-                # Return success data
                 return HomeworkFormData(
                     form=form,
                     section_forms=section_formset,
@@ -467,10 +549,11 @@ class HomeworkEditView(View):
                     is_submitted=True,
                 )
             else:
-                # Service error
                 messages.error(request, f"Error updating homework: {result.error}")
 
-        # Form validation error or service error
+        # Highlight fields with errors and re-render
+        _mark_invalid_fields(form)
+
         errors: dict[str, ErrorDict | list[ErrorList]] = {}
         if form.errors:
             errors["homework"] = form.errors
@@ -479,7 +562,6 @@ class HomeworkEditView(View):
         if section_formset.non_form_errors():
             errors["formset"] = [section_formset.non_form_errors()]
 
-        # Return form data with errors
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
@@ -516,14 +598,46 @@ class HomeworkDetailView(View):
         return render(request, "homeworks/detail.html", {"data": data})
 
     def post(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
-        """Handle POST requests for homework actions (like deletion)."""
-        # Check if this is a delete action
+        """Handle POST requests for homework actions (like deletion or publishing)."""
         action = request.POST.get("action")
 
         if action == "delete":
             return self._handle_delete(request, homework_id)
 
+        if action == "publish_now":
+            return self._handle_publish_now(request, homework_id)
+
         # If no valid action, redirect to detail view
+        return redirect("homeworks:detail", homework_id=homework_id)
+
+    def _handle_publish_now(
+        self, request: HttpRequest, homework_id: UUID
+    ) -> HttpResponse:
+        """Immediately publish a draft homework."""
+        teacher_profile = getattr(request.user, "teacher_profile", None)
+        if not teacher_profile:
+            return HttpResponseForbidden("Only teachers can publish homeworks.")
+
+        try:
+            homework = Homework.objects.get(id=homework_id)
+            created_by_teacher = homework.created_by == teacher_profile
+            teaches_course = False
+            if homework.course:
+                teaches_course = homework.course in teacher_profile.courses.all()
+            if not (created_by_teacher or teaches_course):
+                return HttpResponseForbidden(
+                    "You don't have permission to publish this homework."
+                )
+        except Homework.DoesNotExist:
+            messages.error(request, "Homework not found.")
+            return redirect("homeworks:list")
+
+        result = HomeworkService.publish_homework(homework_id)
+        if result.success:
+            messages.success(request, f"'{homework.title}' has been published.")
+        else:
+            messages.error(request, "Failed to publish homework. Please try again.")
+
         return redirect("homeworks:detail", homework_id=homework_id)
 
     def _handle_delete(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
@@ -577,11 +691,17 @@ class HomeworkDetailView(View):
         Returns:
             HomeworkDetailData with homework details, or None if not found or access denied
         """
+        # Auto-publish any scheduled drafts before access checks
+        try:
+            HomeworkService.auto_publish_due_drafts()
+        except Exception:
+            pass  # Never break the page load
+
         # Determine user type
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
 
-        # For students, check if they're enrolled in the course that has this homework
+        # For students, check enrollment and visibility
         if student_profile:
             homework = Homework.objects.filter(id=homework_id).first()
             if homework and homework.course:
@@ -591,6 +711,9 @@ class HomeworkDetailView(View):
                 has_access = homework.course in enrolled_courses
 
                 if not has_access:
+                    return None
+
+                if not homework.is_accessible_to_students:
                     return None
             else:
                 return None
@@ -673,6 +796,9 @@ class HomeworkDetailView(View):
             else "Unknown Teacher"
         )
 
+        # Fetch the raw homework object for expiry fields (may already be fetched above)
+        homework_obj_for_expiry = Homework.objects.filter(id=homework_id).first()
+
         # Create and return the view data
         return HomeworkDetailData(
             id=homework_detail.id,
@@ -683,9 +809,24 @@ class HomeworkDetailView(View):
             created_by_name=created_by_name,
             created_at=homework_detail.created_at,
             sections=sections,
-            is_overdue=homework_detail.due_date < timezone.now(),
+            is_overdue=homework_detail.due_date is not None and homework_detail.due_date < timezone.now(),
             user_type=user_type,
             can_edit=can_edit,
+            expires_at=homework_obj_for_expiry.expires_at
+            if homework_obj_for_expiry
+            else None,
+            is_hidden=homework_obj_for_expiry.is_hidden
+            if homework_obj_for_expiry
+            else False,
+            is_accessible_to_students=homework_obj_for_expiry.is_accessible_to_students
+            if homework_obj_for_expiry
+            else True,
+            is_draft=homework_obj_for_expiry.is_draft
+            if homework_obj_for_expiry
+            else False,
+            publish_at=homework_obj_for_expiry.publish_at
+            if homework_obj_for_expiry
+            else None,
             llm_config={"id": homework_detail.llm_config}
             if homework_detail.llm_config
             else None,
@@ -751,13 +892,17 @@ class SectionDetailView(View):
             if not (created_by_teacher or teaches_course_with_homework):
                 return HttpResponseForbidden("Access denied.")
 
-        # For students, check if they're enrolled in the course that has this homework
+        # For students, check enrollment and visibility
         if student_profile:
             if homework.course:
                 is_enrolled = homework.course.is_student_enrolled(student_profile)
                 if not is_enrolled:
                     return HttpResponseForbidden(
                         "Access denied. You are not enrolled in the course that has this homework."
+                    )
+                if not homework.is_accessible_to_students:
+                    return HttpResponseForbidden(
+                        "This assignment is no longer available."
                     )
             else:
                 return HttpResponseForbidden(

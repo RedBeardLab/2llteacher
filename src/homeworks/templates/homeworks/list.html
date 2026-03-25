@@ -48,6 +48,20 @@
                     {% elif homework.is_overdue %}
                     <span class="badge bg-danger">Overdue</span>
                     {% endif %}
+                    {% if data.user_type == 'teacher' %}
+                        {% if homework.is_draft %}
+                        <span class="badge bg-warning text-dark ms-1"><i class="bi bi-pencil-square"></i> Draft</span>
+                        {% if homework.publish_at %}
+                        <span class="badge bg-info text-dark ms-1"><i class="bi bi-clock"></i> Publishes {{ homework.publish_at|date:"M d, H:i" }}</span>
+                        {% endif %}
+                        {% elif homework.is_hidden %}
+                        <span class="badge bg-secondary ms-1">Hidden</span>
+                        {% elif not homework.is_accessible_to_students %}
+                        <span class="badge bg-danger ms-1">Expired</span>
+                        {% elif homework.expires_at %}
+                        <span class="badge bg-primary ms-1" title="Expires {{ homework.expires_at|date:'M d, Y' }}">Expires {{ homework.expires_at|date:"M d" }}</span>
+                        {% endif %}
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     <div class="card-text">

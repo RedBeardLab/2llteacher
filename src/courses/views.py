@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 from django.views import View
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
@@ -15,8 +15,10 @@ from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
+from homeworks.views import HomeworkFormData, _mark_invalid_fields
+
 if TYPE_CHECKING:
-    from homeworks.forms import HomeworkCreateForm, SectionFormSet
+    from homeworks.forms import SectionFormSet
 
 from llteacher.permissions.decorators import (
     student_required,
@@ -229,6 +231,13 @@ class HomeworkItem:
     title: str
     description: str
     due_date: str  # Formatted due date
+    is_draft: bool = False
+    is_overdue: bool = False
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
+    expires_at: Any = None
+    publish_at: Any = None
+    section_count: int = 0
 
 
 @dataclass
@@ -291,7 +300,7 @@ class CourseDetailView(View):
             has_access = course.is_student_enrolled(student_profile)
             user_type = "student"
 
-        if not has_access:
+        if not has_access or user_type is None:
             return HttpResponseForbidden("You do not have access to this course.")
 
         # Get the appropriate data based on user type
@@ -318,7 +327,11 @@ class CourseDetailView(View):
         # Get homeworks for this course (direct FK relationship)
         from homeworks.models import Homework
 
-        course_homeworks = Homework.objects.filter(course=course).order_by("due_date")
+        hw_qs = Homework.objects.filter(course=course).order_by("due_date")
+        # Students must not see hidden homeworks (drafts included)
+        if user_type == "student":
+            hw_qs = hw_qs.filter(is_hidden=False)
+        course_homeworks = hw_qs
 
         homeworks = []
         for hw in course_homeworks:
@@ -327,7 +340,14 @@ class CourseDetailView(View):
                     id=hw.id,
                     title=hw.title,
                     description=hw.description,
-                    due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p"),
+                    due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p") if hw.due_date else "No due date",
+                    is_draft=hw.is_draft,
+                    is_overdue=hw.is_overdue,
+                    is_hidden=hw.is_hidden,
+                    is_accessible_to_students=hw.is_accessible_to_students,
+                    expires_at=hw.expires_at,
+                    publish_at=hw.publish_at,
+                    section_count=hw.section_count,
                 )
             )
 
@@ -363,18 +383,6 @@ class CourseDetailView(View):
         )
 
 
-@dataclass
-class HomeworkFormData:
-    """Data structure for homework form view."""
-
-    form: "HomeworkCreateForm"
-    section_forms: "SectionFormSet"
-    course_name: str
-    course_id: UUID
-    action: str  # 'create'
-    is_submitted: bool
-
-
 class CourseHomeworkCreateView(View):
     """
     View for creating a new homework for a specific course.
@@ -401,7 +409,7 @@ class CourseHomeworkCreateView(View):
             )
 
         data = self._get_view_data(request, course)
-        return render(request, "courses/homework_form.html", {"data": data})
+        return render(request, "homeworks/form.html", {"data": data})
 
     def post(self, request: TeacherRequest, course_id: UUID) -> HttpResponse:
         """Handle POST requests to process the form submission."""
@@ -419,7 +427,7 @@ class CourseHomeworkCreateView(View):
             messages.success(request, "Homework created successfully!")
             return redirect("courses:detail", course_id=course.id)
 
-        return render(request, "courses/homework_form.html", {"data": data})
+        return render(request, "homeworks/form.html", {"data": data})
 
     def _can_teacher_create_homework(self, teacher_profile, course: Course) -> bool:
         """Check if teacher can create homework for this course."""
@@ -437,17 +445,21 @@ class CourseHomeworkCreateView(View):
         form = HomeworkCreateForm(initial={"course": course})
 
         # Create empty section form (we'll start with one)
-        SectionFormset = formset_factory(SectionForm, extra=1, formset=SectionFormSet)
+        SectionFormset = cast(
+            "type[SectionFormSet]",
+            formset_factory(SectionForm, extra=1, formset=SectionFormSet),
+        )
         section_formset = SectionFormset(prefix="sections")
 
         # Return form data
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
-            course_name=course.name,
-            course_id=course.id,
+            user_type="teacher",
             action="create",
             is_submitted=False,
+            course_name=course.name,
+            course_id=course.id,
         )
 
     def _process_form_submission(
@@ -462,37 +474,64 @@ class CourseHomeworkCreateView(View):
         )
         from django.forms import formset_factory
 
-        # Create a mutable copy of POST data and inject course
-        post_data = request.POST.copy()
-        post_data["course"] = course.id
+        is_draft_save = "save_draft" in request.POST
 
-        # Create forms from POST data
+        # Draft save: bypass all validation, write directly to the ORM
+        if is_draft_save:
+            from homeworks.models import Homework, HomeworkType
+
+            Homework.objects.create(
+                title=request.POST.get("title") or "Untitled Draft",
+                description=request.POST.get("description") or "",
+                course=course,
+                created_by=request.user.teacher_profile,
+                homework_type=HomeworkType.DRAFT,
+                is_hidden=True,
+            )
+            return HomeworkFormData(
+                form=HomeworkCreateForm(is_draft_save=True),
+                section_forms=None,  # type: ignore[arg-type]
+                user_type="teacher",
+                action="create",
+                is_submitted=True,
+                course_name=course.name,
+                course_id=course.id,
+            )
+
+        # Publish path: run full validation
+        post_data = request.POST.copy()
+        post_data["course"] = str(course.id)
         form = HomeworkCreateForm(post_data)
 
-        SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        SectionFormset = cast(
+            "type[SectionFormSet]",
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
+        )
         section_formset = SectionFormset(request.POST, prefix="sections")
 
-        # Check form validity
         if form.is_valid() and section_formset.is_valid():
-            # Extract homework data from form
+            publish_now = "publish_now" in request.POST
+            homework_type = "published" if publish_now else "draft"
+            publish_at = None if publish_now else form.cleaned_data.get("publish_at")
+
             homework_data = HomeworkCreateData(
                 title=form.cleaned_data["title"],
-                description=form.cleaned_data["description"],
-                due_date=form.cleaned_data["due_date"],
+                description=form.cleaned_data.get("description") or "",
+                due_date=form.cleaned_data.get("due_date"),
                 course_id=course.id,
                 sections=[],
                 llm_config=form.cleaned_data["llm_config"].id
                 if form.cleaned_data["llm_config"]
                 else None,
+                homework_type=homework_type,
+                publish_at=publish_at,
             )
 
-            # Extract sections data from formset
             section_data = []
             for section_form in section_formset.forms:
                 if section_form.cleaned_data and not section_form.cleaned_data.get(
                     "DELETE", False
                 ):
-                    # Extract data from form
                     section_data.append(
                         SectionCreateData(
                             title=section_form.cleaned_data["title"],
@@ -501,35 +540,34 @@ class CourseHomeworkCreateView(View):
                             solution=section_form.cleaned_data["solution"],
                         )
                     )
-
-            # Add sections to homework data
             homework_data.sections = section_data
 
-            # Use service to create homework with sections (course already included in data)
             result = HomeworkService.create_homework_with_sections(
                 homework_data, request.user.teacher_profile
             )
 
             if result.success:
-                # Return success data
                 return HomeworkFormData(
                     form=form,
                     section_forms=section_formset,
-                    course_name=course.name,
-                    course_id=course.id,
+                    user_type="teacher",
                     action="create",
                     is_submitted=True,
+                    course_name=course.name,
+                    course_id=course.id,
                 )
             else:
-                # Service returned error
                 messages.error(request, "Failed to create homework. Please try again.")
 
-        # Form has errors, re-render with errors
+        # Highlight fields with errors
+        _mark_invalid_fields(form)
+
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
-            course_name=course.name,
-            course_id=course.id,
+            user_type="teacher",
             action="create",
             is_submitted=False,
+            course_name=course.name,
+            course_id=course.id,
         )

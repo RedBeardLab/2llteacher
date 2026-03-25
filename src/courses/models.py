@@ -11,10 +11,10 @@ class Course(models.Model):
     code = models.CharField(max_length=256, unique=True)
 
     # Many-to-many relationships
-    teachers = models.ManyToManyField(
+    teachers: models.ManyToManyField = models.ManyToManyField(
         "accounts.Teacher", through="CourseTeacher", related_name="courses"
     )
-    students = models.ManyToManyField(
+    students: models.ManyToManyField = models.ManyToManyField(
         "accounts.Student", through="CourseEnrollment", related_name="enrolled_courses"
     )
 

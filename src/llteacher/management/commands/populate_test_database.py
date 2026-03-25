@@ -8,6 +8,7 @@ from accounts.models import Teacher, Student
 from llm.models import LLMConfig
 from homeworks.models import Homework, Section, SectionSolution
 from conversations.models import Conversation, Message, Submission
+from courses.models import Course, CourseTeacher, CourseEnrollment
 
 User = get_user_model()
 
@@ -36,8 +37,11 @@ class Command(BaseCommand):
             # Create LLM configuration
             llm_config = self.create_llm_config()
 
+            # Create courses
+            courses = self.create_courses(users["teachers"], users["students"])
+
             # Create homeworks with sections
-            homeworks = self.create_homeworks(users["teachers"], llm_config)
+            homeworks = self.create_homeworks(users["teachers"], llm_config, courses)
 
             # Create conversations and messages
             self.create_conversations_and_messages(users["students"], homeworks)
@@ -53,6 +57,9 @@ class Command(BaseCommand):
         SectionSolution.objects.all().delete()
         Section.objects.all().delete()
         Homework.objects.all().delete()
+        CourseEnrollment.objects.all().delete()
+        CourseTeacher.objects.all().delete()
+        Course.objects.all().delete()
         LLMConfig.objects.all().delete()
         Teacher.objects.all().delete()
         Student.objects.all().delete()
@@ -161,7 +168,32 @@ And explain the syntaz and how to add values.""",
         self.stdout.write("  ✓ Created LLM configuration")
         return llm_config
 
-    def create_homeworks(self, teachers, llm_config):
+    def create_courses(self, teachers, students):
+        """Create sample courses and enroll users."""
+        self.stdout.write("Creating courses...")
+
+        course1 = Course.objects.create(
+            name="Introduction to Python",
+            description="A beginner course on Python programming.",
+            code="CS101",
+        )
+        CourseTeacher.objects.create(course=course1, teacher=teachers[0], role="owner")
+        for student in students:
+            CourseEnrollment.objects.create(course=course1, student=student)
+
+        course2 = Course.objects.create(
+            name="Data Analysis with Python",
+            description="Learn data analysis techniques using Python.",
+            code="CS201",
+        )
+        CourseTeacher.objects.create(course=course2, teacher=teachers[1], role="owner")
+        for student in students:
+            CourseEnrollment.objects.create(course=course2, student=student)
+
+        self.stdout.write("  ✓ Created 2 courses")
+        return [course1, course2]
+
+    def create_homeworks(self, teachers, llm_config, courses):
         """Create sample homeworks with sections."""
         self.stdout.write("Creating homeworks and sections...")
 
@@ -172,6 +204,7 @@ And explain the syntaz and how to add values.""",
             title="Python Basics",
             description="Introduction to Python programming fundamentals including variables, data types, and control structures.",
             created_by=teachers[0],
+            course=courses[0],
             due_date=timezone.now() + timedelta(days=7),
             llm_config=llm_config,
         )
@@ -317,6 +350,7 @@ else:
             title="Data Analysis with Python",
             description="Learn to analyze data using Python lists and dictionaries. Practice with real-world data scenarios.",
             created_by=teachers[1],
+            course=courses[1],
             due_date=timezone.now() + timedelta(days=10),
             llm_config=llm_config,
         )
