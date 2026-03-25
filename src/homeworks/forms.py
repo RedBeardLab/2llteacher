@@ -50,9 +50,7 @@ class SectionForm(forms.Form):
     order = forms.IntegerField(
         min_value=1,
         max_value=20,
-        widget=forms.NumberInput(
-            attrs={"class": "form-control", "placeholder": "Order (1-20)"}
-        ),
+        widget=forms.HiddenInput(),
     )
     solution = forms.CharField(
         required=False,
@@ -77,7 +75,7 @@ class HomeworkCreateForm(forms.ModelForm):
             "course",
             "due_date",
             "expires_at",
-            "is_hidden",
+            "publish_at",
             "llm_config",
         ]
         widgets = {
@@ -107,16 +105,26 @@ class HomeworkCreateForm(forms.ModelForm):
                     "type": "datetime-local",
                 }
             ),
-            "is_hidden": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "publish_at": forms.DateTimeInput(
+                attrs={
+                    "class": "form-control",
+                    "type": "datetime-local",
+                }
+            ),
             "llm_config": forms.Select(
                 attrs={"class": "form-select", "placeholder": "LLM Configuration"}
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, is_draft_save=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["llm_config"].required = False
         self.fields["expires_at"].required = False
+        self.fields["publish_at"].required = False
+        # due_date is nullable on the model so ModelForm won't auto-require it
+        self.fields["due_date"].required = not is_draft_save
+        if is_draft_save:
+            self.fields["description"].required = False
         self.expires_at_adjusted = False  # flag for view to flash a warning
 
         # Display stored datetimes in server local time, not raw UTC
@@ -124,6 +132,8 @@ class HomeworkCreateForm(forms.ModelForm):
             self.initial["due_date"] = _to_local_str(self.instance.due_date)
         if self.instance and self.instance.expires_at:
             self.initial["expires_at"] = _to_local_str(self.instance.expires_at)
+        if self.instance and self.instance.publish_at:
+            self.initial["publish_at"] = _to_local_str(self.instance.publish_at)
 
     def clean_due_date(self):
         """Make aware. Reject only strictly past dates — today is allowed."""
@@ -143,6 +153,18 @@ class HomeworkCreateForm(forms.ModelForm):
     def clean_expires_at(self):
         """Make aware if naive."""
         return _make_aware_if_naive(self.cleaned_data.get("expires_at"))
+
+    def clean_publish_at(self):
+        """Make aware if naive. Required (and future) when publishing without 'Publish now'."""
+        publish_at = _make_aware_if_naive(self.cleaned_data.get("publish_at"))
+        publishing_scheduled = "publish" in self.data and "publish_now" not in self.data
+        if publishing_scheduled and not publish_at:
+            raise forms.ValidationError(
+                'Set a future publish date, or enable "Publish now".'
+            )
+        if publish_at and publish_at <= timezone.now():
+            raise forms.ValidationError("Scheduled publish time must be in the future.")
+        return publish_at
 
     def clean(self):
         """Warn if expires_at precedes due_date, but allow it."""
@@ -166,9 +188,9 @@ class HomeworkEditForm(forms.ModelForm):
             "description",
             "due_date",
             "expires_at",
-            "is_hidden",
+            "publish_at",
             "llm_config",
-        ]  # Note: course is excluded
+        ]  # Note: course and is_hidden are excluded (managed automatically)
         widgets = {
             "title": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Homework Title"}
@@ -193,16 +215,26 @@ class HomeworkEditForm(forms.ModelForm):
                     "type": "datetime-local",
                 }
             ),
-            "is_hidden": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "publish_at": forms.DateTimeInput(
+                attrs={
+                    "class": "form-control",
+                    "type": "datetime-local",
+                }
+            ),
             "llm_config": forms.Select(
                 attrs={"class": "form-select", "placeholder": "LLM Configuration"}
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, is_draft_save=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["llm_config"].required = False
         self.fields["expires_at"].required = False
+        self.fields["publish_at"].required = False
+        # due_date is nullable on the model so ModelForm won't auto-require it
+        self.fields["due_date"].required = not is_draft_save
+        if is_draft_save:
+            self.fields["description"].required = False
         self.expires_at_adjusted = False  # flag for view to flash a warning
 
         # Display stored datetimes in server local time, not raw UTC
@@ -210,6 +242,8 @@ class HomeworkEditForm(forms.ModelForm):
             self.initial["due_date"] = _to_local_str(self.instance.due_date)
         if self.instance and self.instance.expires_at:
             self.initial["expires_at"] = _to_local_str(self.instance.expires_at)
+        if self.instance and self.instance.publish_at:
+            self.initial["publish_at"] = _to_local_str(self.instance.publish_at)
 
     def clean_due_date(self):
         """Make aware. No date restrictions on edit — teacher has full control."""
@@ -218,6 +252,16 @@ class HomeworkEditForm(forms.ModelForm):
     def clean_expires_at(self):
         """Make aware if naive."""
         return _make_aware_if_naive(self.cleaned_data.get("expires_at"))
+
+    def clean_publish_at(self):
+        """Make aware if naive. Required when publishing without 'Publish now'."""
+        publish_at = _make_aware_if_naive(self.cleaned_data.get("publish_at"))
+        publishing_scheduled = "publish" in self.data and "publish_now" not in self.data
+        if publishing_scheduled and not publish_at:
+            raise forms.ValidationError(
+                'Set a future publish date, or enable "Publish now".'
+            )
+        return publish_at
 
     def clean(self):
         """Warn if expires_at precedes due_date, but allow it."""
@@ -234,16 +278,21 @@ class HomeworkEditForm(forms.ModelForm):
 class SectionFormSet(forms.BaseFormSet):
     """Formset for managing multiple sections in a homework."""
 
+    is_draft_save: bool = False
+
     def clean(self):
         """Validate the formset as a whole.
 
         Checks that:
-        1. At least one section exists
+        1. At least one section exists (skipped for draft saves)
         2. No duplicate orders
         3. Orders are sequential
         """
         if any(self.errors):
             return
+
+        if self.is_draft_save:
+            return  # Sections are optional for drafts
 
         if not any(
             form.cleaned_data

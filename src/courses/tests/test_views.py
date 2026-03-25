@@ -727,7 +727,7 @@ class CourseHomeworkCreateViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "courses/homework_form.html")
+        self.assertTemplateUsed(response, "homeworks/form.html")
 
     def test_create_homework_for_course_success(self):
         """Test that teachers can create homeworks for their courses."""

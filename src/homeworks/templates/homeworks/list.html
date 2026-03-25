@@ -49,7 +49,12 @@
                     <span class="badge bg-danger">Overdue</span>
                     {% endif %}
                     {% if data.user_type == 'teacher' %}
-                        {% if homework.is_hidden %}
+                        {% if homework.is_draft %}
+                        <span class="badge bg-warning text-dark ms-1"><i class="bi bi-pencil-square"></i> Draft</span>
+                        {% if homework.publish_at %}
+                        <span class="badge bg-info text-dark ms-1"><i class="bi bi-clock"></i> Publishes {{ homework.publish_at|date:"M d, H:i" }}</span>
+                        {% endif %}
+                        {% elif homework.is_hidden %}
                         <span class="badge bg-secondary ms-1">Hidden</span>
                         {% elif not homework.is_accessible_to_students %}
                         <span class="badge bg-danger ms-1">Expired</span>
