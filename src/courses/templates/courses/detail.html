@@ -25,6 +25,8 @@
                 <span class="badge bg-primary ms-2">Teaching</span>
                 {% elif data.user_type == 'student' %}
                 <span class="badge bg-success ms-2">Enrolled</span>
+                {% elif data.user_type == 'teacher_assistant' %}
+                <span class="badge bg-info ms-2">TA</span>
                 {% endif %}
             </p>
             {% if data.course_description %}
@@ -112,6 +114,67 @@
                 </div>
             </div>
             {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Teacher Assistants Section (Teachers Only) -->
+    {% if data.user_type == 'teacher' and data.teacher_assistants %}
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-person-badge"></i> Teacher Assistants</h2>
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        <strong>{{ data.teacher_assistants|length }}</strong> teacher assistant{{ data.teacher_assistants|length|pluralize }} assigned
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Assigned At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ta in data.teacher_assistants %}
+                                <tr>
+                                    <td>{{ ta.username }}</td>
+                                    <td>{{ ta.email }}</td>
+                                    <td>{{ ta.assigned_at }}</td>
+                                    <td>
+                                        <form method="post" action="{% url 'courses:ta-remove' course_id=data.course_id ta_id=ta.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Assign TA Section (Teachers Only) -->
+    {% if data.user_type == 'teacher' %}
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-person-plus"></i> Assign Teacher Assistant</h2>
+            <form method="post" action="{% url 'courses:ta-assign' course_id=data.course_id %}" class="row g-3">
+                {% csrf_token %}
+                <div class="col-auto">
+                    <input type="email" name="ta_email" class="form-control" placeholder="TA Email" required>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Assign</button>
+                </div>
+            </form>
         </div>
     </div>
     {% endif %}

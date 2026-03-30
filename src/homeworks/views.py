@@ -100,6 +100,7 @@ class HomeworkListView(View):
         # Determine user type
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
+        teacher_assistant_profile = getattr(user, "teacher_assistant_profile", None)
 
         homeworks = []
         has_progress_data = False
@@ -223,6 +224,36 @@ class HomeworkListView(View):
                         completed_percentage=completed_percentage,
                         in_progress_percentage=in_progress_percentage,
                         is_submitted=is_submitted,
+                    )
+                )
+
+        elif teacher_assistant_profile:
+            # TA view - show homeworks from courses this TA is assigned to
+            user_type = "teacher_assistant"
+
+            # Get courses where this TA is assigned
+            ta_courses = teacher_assistant_profile.courses.all()
+
+            # Get homeworks for courses the TA is assigned to
+            homework_objects = (
+                Homework.objects.filter(course__in=ta_courses)
+                .distinct()
+                .order_by("-created_at")
+                .prefetch_related("sections")
+            )
+
+            # Transform to view-specific data (similar to teacher but with test capability)
+            for homework in homework_objects:
+                homeworks.append(
+                    HomeworkListItem(
+                        id=homework.id,
+                        title=homework.title,
+                        description=homework.description,
+                        due_date=homework.due_date,
+                        section_count=homework.section_count,
+                        created_at=homework.created_at,
+                        is_overdue=homework.is_overdue,
+                        sections=None,  # No section data needed for TA view
                     )
                 )
 
@@ -580,6 +611,7 @@ class HomeworkDetailView(View):
         # Determine user type
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
+        teacher_assistant_profile = getattr(user, "teacher_assistant_profile", None)
 
         # For students, check if they're enrolled in the course that has this homework
         if student_profile:
@@ -591,6 +623,15 @@ class HomeworkDetailView(View):
                 has_access = homework.course in enrolled_courses
 
                 if not has_access:
+                    return None
+            else:
+                return None
+
+        # For TAs, check if they're assigned to the course that has this homework
+        if teacher_assistant_profile:
+            homework = Homework.objects.filter(id=homework_id).first()
+            if homework and homework.course:
+                if not homework.course.is_teacher_assistant(teacher_assistant_profile):
                     return None
             else:
                 return None
@@ -624,6 +665,11 @@ class HomeworkDetailView(View):
         elif student_profile:
             user_type = "student"
             # Students can't edit homeworks
+            can_edit = False
+
+        elif teacher_assistant_profile:
+            user_type = "teacher_assistant"
+            # TAs can't edit homeworks
             can_edit = False
 
         # Format sections data
@@ -708,6 +754,7 @@ class SectionDetailViewData:
     submission: Dict[str, Any] | None = None
     is_teacher: bool = False
     is_student: bool = False
+    is_teacher_assistant: bool = False
 
 
 class SectionDetailView(View):
@@ -737,6 +784,9 @@ class SectionDetailView(View):
         # Check user access permissions
         teacher_profile = getattr(request.user, "teacher_profile", None)
         student_profile = getattr(request.user, "student_profile", None)
+        teacher_assistant_profile = getattr(
+            request.user, "teacher_assistant_profile", None
+        )
 
         # Teacher must either own the homework OR teach the course that has it
         if teacher_profile:
@@ -752,7 +802,7 @@ class SectionDetailView(View):
                 return HttpResponseForbidden("Access denied.")
 
         # For students, check if they're enrolled in the course that has this homework
-        if student_profile:
+        elif student_profile:
             if homework.course:
                 is_enrolled = homework.course.is_student_enrolled(student_profile)
                 if not is_enrolled:
@@ -764,8 +814,20 @@ class SectionDetailView(View):
                     "Access denied. This homework is not assigned to a course."
                 )
 
-        # If user is neither teacher nor student, deny access
-        if not teacher_profile and not student_profile:
+        # For TAs, check if they're assigned to the course that has this homework
+        elif teacher_assistant_profile:
+            if homework.course:
+                if not homework.course.is_teacher_assistant(teacher_assistant_profile):
+                    return HttpResponseForbidden(
+                        "Access denied. You are not assigned to this course as TA."
+                    )
+            else:
+                return HttpResponseForbidden(
+                    "Access denied. This homework is not assigned to a course."
+                )
+
+        # If user is neither teacher nor student nor TA, deny access
+        else:
             return HttpResponseForbidden("Access denied.")
 
         # Get the appropriate data for the view
@@ -797,6 +859,7 @@ class SectionDetailView(View):
         # Determine user type
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
+        teacher_assistant_profile = getattr(user, "teacher_assistant_profile", None)
 
         # Get homework and section
         try:
@@ -810,6 +873,7 @@ class SectionDetailView(View):
         # Initialize variables
         is_teacher = False
         is_student = False
+        is_teacher_assistant = False
         conversations = None
         submission = None
 
@@ -884,6 +948,32 @@ class SectionDetailView(View):
                     "submitted_at": student_submission.submitted_at,
                 }
 
+        elif teacher_assistant_profile:
+            is_teacher_assistant = True
+
+            # TAs can view test conversations (created by them)
+            ta_conversations = (
+                Conversation.objects.filter(
+                    user=user, section=section, is_deleted=False
+                )
+                .select_related("user")
+                .prefetch_related("messages")
+            )
+
+            if ta_conversations.exists():
+                conversations = []
+                for conv in ta_conversations:
+                    conversations.append(
+                        {
+                            "id": conv.id,
+                            "created_at": conv.created_at,
+                            "updated_at": conv.updated_at,
+                            "message_count": conv.message_count,
+                            "is_ta_test": True,
+                            "label": f"Test conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
+                        }
+                    )
+
         # Create and return the view data
         return SectionDetailViewData(
             homework_id=homework.id,
@@ -898,6 +988,7 @@ class SectionDetailView(View):
             submission=submission,
             is_teacher=is_teacher,
             is_student=is_student,
+            is_teacher_assistant=is_teacher_assistant,
         )
 
 
@@ -905,7 +996,7 @@ class HomeworkSubmissionsView(View):
     """
     View for displaying all student submissions for a homework assignment.
 
-    Teacher-only view that shows:
+    Teacher or TA view that shows:
     - All students in the system (including those with no interactions)
     - For each student: all conversations in reverse chronological order
     - Submission status and warning indicators for non-participating students
@@ -913,28 +1004,48 @@ class HomeworkSubmissionsView(View):
     """
 
     @method_decorator(login_required, name="dispatch")
-    @method_decorator(teacher_required, name="dispatch")
     def dispatch(self, *args, **kwargs):
-        """Ensure user is a logged-in teacher."""
+        """Ensure user is logged in."""
         return super().dispatch(*args, **kwargs)
 
-    def get(self, request: TeacherRequest, homework_id: UUID) -> HttpResponse:
+    def get(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
         """Handle GET requests to display homework submissions."""
+        teacher_profile = getattr(request.user, "teacher_profile", None)
+        teacher_assistant_profile = getattr(
+            request.user, "teacher_assistant_profile", None
+        )
+
         # Get the homework and check permissions
         try:
             homework = Homework.objects.get(id=homework_id)
 
             # Check if teacher can view submissions (created it OR teaches the course that has it)
-            created_by_teacher = homework.created_by == request.user.teacher_profile
-            teaches_course_with_homework = False
-            if homework.course:
-                teacher_courses = request.user.teacher_profile.courses.all()
-                teaches_course_with_homework = homework.course in teacher_courses
+            if teacher_profile:
+                created_by_teacher = homework.created_by == teacher_profile
+                teaches_course_with_homework = False
+                if homework.course:
+                    teacher_courses = teacher_profile.courses.all()
+                    teaches_course_with_homework = homework.course in teacher_courses
 
-            if not (created_by_teacher or teaches_course_with_homework):
-                return HttpResponseForbidden(
-                    "You can only view submissions for homeworks from courses you teach."
-                )
+                if not (created_by_teacher or teaches_course_with_homework):
+                    return HttpResponseForbidden(
+                        "You can only view submissions for homeworks from courses you teach."
+                    )
+            elif teacher_assistant_profile:
+                # TA check - must be assigned to the course
+                if homework.course:
+                    if not homework.course.is_teacher_assistant(
+                        teacher_assistant_profile
+                    ):
+                        return HttpResponseForbidden(
+                            "You can only view submissions for courses you are assigned to as TA."
+                        )
+                else:
+                    return HttpResponseForbidden(
+                        "This homework is not assigned to a course."
+                    )
+            else:
+                return HttpResponseForbidden("Access denied.")
         except Homework.DoesNotExist:
             messages.error(request, "Homework not found.")
             return redirect("homeworks:list")

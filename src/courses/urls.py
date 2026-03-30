@@ -17,4 +17,14 @@ urlpatterns = [
         views.CourseHomeworkCreateView.as_view(),
         name="homework-create",
     ),
+    path(
+        "<uuid:course_id>/ta/assign/",
+        views.CourseTAAssignView.as_view(),
+        name="ta-assign",
+    ),
+    path(
+        "<uuid:course_id>/ta/<uuid:ta_id>/remove/",
+        views.CourseTARemoveView.as_view(),
+        name="ta-remove",
+    ),
 ]
