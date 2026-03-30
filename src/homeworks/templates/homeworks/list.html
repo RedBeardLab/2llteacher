@@ -13,7 +13,7 @@
         <div class="col">
             <h1>Homeworks</h1>
         </div>
-        {% if data.user_type == 'teacher' %}
+        {% if 'teacher' in data.user_types %}
         <div class="col-auto">
             <a href="{% url 'homeworks:matrix' %}" class="btn btn-info">
                 <i class="bi bi-grid-3x3-gap"></i> Matrix Dashboard
@@ -24,9 +24,9 @@
 
     {% if data.total_count == 0 %}
     <div class="alert alert-info">
-        {% if data.user_type == 'teacher' %}
+        {% if 'teacher' in data.user_types %}
             You haven't created any homeworks yet. Go to a course and create a homework from there.
-        {% elif data.user_type == 'student' %}
+        {% elif 'student' in data.user_types %}
             No homeworks have been assigned to you yet.
         {% else %}
             No homeworks are available.
@@ -43,11 +43,23 @@
                             {{ homework.title }}
                         </a>
                     </h5>
-                    {% if homework.is_submitted %}
-                    <span class="badge bg-success">Submitted</span>
-                    {% elif homework.is_overdue %}
-                    <span class="badge bg-danger">Overdue</span>
-                    {% endif %}
+                    <div>
+                        {% if 'teacher' in homework.roles %}
+                            <span class="badge bg-primary">Teaching</span>
+                        {% endif %}
+                        {% if 'student' in homework.roles %}
+                            {% if homework.is_submitted %}
+                                <span class="badge bg-success">Submitted</span>
+                            {% elif homework.is_overdue %}
+                                <span class="badge bg-danger">Overdue</span>
+                            {% else %}
+                                <span class="badge bg-info">Student</span>
+                            {% endif %}
+                        {% endif %}
+                        {% if 'teacher_assistant' in homework.roles %}
+                            <span class="badge bg-warning text-dark">TA</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="card-text">
@@ -111,9 +123,9 @@
                 </div>
                 <div class="card-footer">
                     <a href="{% url 'homeworks:detail' homework.id %}" class="btn btn-primary">
-                        {% if data.user_type == 'teacher' %}View & Edit{% else %}Start Working{% endif %}
+                        {% if 'teacher' in homework.roles %}View & Edit{% else %}Start Working{% endif %}
                     </a>
-                    {% if data.user_type == 'teacher' %}
+                    {% if 'teacher' in homework.roles %}
                     <a href="{% url 'homeworks:submissions' homework.id %}" class="btn btn-outline-info ms-2">
                         <i class="bi bi-people"></i> Submissions
                     </a>

@@ -12,15 +12,19 @@
     <div class="row mb-4">
         <div class="col">
             <h1>Courses</h1>
-            {% if data.user_type == 'student' %}
-            <p class="text-muted">Browse and enroll in available courses</p>
-            {% elif data.user_type == 'teacher' %}
-            <p class="text-muted">Your teaching courses</p>
-            {% elif data.user_type == 'teacher_assistant' %}
-            <p class="text-muted">Courses you are assisting as TA</p>
+            {% if 'student' in data.user_types %}
+                {% if 'teacher' in data.user_types or 'teacher_assistant' in data.user_types %}
+                    <p class="text-muted">Your courses (teaching, enrolled, and assisting)</p>
+                {% else %}
+                    <p class="text-muted">Browse and enroll in available courses</p>
+                {% endif %}
+            {% elif 'teacher' in data.user_types %}
+                <p class="text-muted">Your teaching courses</p>
+            {% elif 'teacher_assistant' in data.user_types %}
+                <p class="text-muted">Courses you are assisting as TA</p>
             {% endif %}
         </div>
-        {% if data.user_type == 'teacher' %}
+        {% if 'teacher' in data.user_types %}
         <div class="col-auto">
             <a href="{% url 'courses:create' %}" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Create New Course
@@ -31,9 +35,9 @@
 
     {% if data.courses|length == 0 %}
     <div class="alert alert-info">
-        {% if data.user_type == 'student' %}
+        {% if 'student' in data.user_types %}
             No courses are currently available.
-        {% elif data.user_type == 'teacher' %}
+        {% elif 'teacher' in data.user_types %}
             You are not teaching any courses yet. <a href="{% url 'courses:create' %}">Create a course</a> to get started.
         {% else %}
             No courses available.
@@ -50,9 +54,17 @@
                             {{ course.name }}
                         </a>
                     </h5>
-                    {% if course.is_enrolled %}
-                    <span class="badge bg-success">Enrolled</span>
-                    {% endif %}
+                    <div>
+                        {% if 'teacher' in course.roles %}
+                            <span class="badge bg-primary">Teaching</span>
+                        {% endif %}
+                        {% if 'student' in course.roles %}
+                            <span class="badge bg-success">Enrolled</span>
+                        {% endif %}
+                        {% if 'teacher_assistant' in course.roles %}
+                            <span class="badge bg-warning text-dark">TA</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="mb-2">
@@ -67,27 +79,29 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    {% if data.user_type == 'student' %}
-                        {% if course.is_enrolled %}
-                        <button class="btn btn-success" disabled>
-                            <i class="bi bi-check-circle"></i> Already Enrolled
-                        </button>
-                        {% else %}
-                        <form method="post" action="{% url 'courses:enroll' course.id %}" class="d-inline">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-plus-circle"></i> Enroll Now
-                            </button>
-                        </form>
-                        {% endif %}
-                    {% elif data.user_type == 'teacher' %}
+                    {% if 'teacher' in course.roles %}
                         <span class="text-muted">
                             <i class="bi bi-person-badge"></i> Teaching this course
                         </span>
-                    {% elif data.user_type == 'teacher_assistant' %}
+                    {% endif %}
+                    {% if 'teacher_assistant' in course.roles %}
                         <span class="text-muted">
                             <i class="bi bi-person-badge"></i> TA for this course
                         </span>
+                    {% endif %}
+                    {% if 'student' in data.user_types %}
+                        {% if course.is_enrolled %}
+                            <button class="btn btn-success" disabled>
+                                <i class="bi bi-check-circle"></i> Already Enrolled
+                            </button>
+                        {% elif 'teacher' not in course.roles and 'teacher_assistant' not in course.roles %}
+                            <form method="post" action="{% url 'courses:enroll' course.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-plus-circle"></i> Enroll Now
+                                </button>
+                            </form>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>

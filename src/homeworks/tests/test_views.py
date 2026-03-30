@@ -91,7 +91,7 @@ class HomeworkListViewTests(TestCase):
         self.assertIsInstance(data, HomeworkListData)
 
         # Check if the user type is correctly identified
-        self.assertEqual(data.user_type, "teacher")
+        self.assertIn("teacher", data.user_types)
 
         # Check if the homework is included
         self.assertEqual(len(data.homeworks), 1)
@@ -133,7 +133,7 @@ class HomeworkListViewTests(TestCase):
         self.assertIsInstance(data, HomeworkListData)
 
         # Check if the user type is correctly identified
-        self.assertEqual(data.user_type, "student")
+        self.assertIn("student", data.user_types)
 
         # Check if the homework is included
         self.assertEqual(len(data.homeworks), 1)
@@ -156,8 +156,8 @@ class HomeworkListViewTests(TestCase):
         view = HomeworkListView()
         data = view._get_view_data(unknown_user)
 
-        # Check if the user type is correctly identified
-        self.assertEqual(data.user_type, "unknown")
+        # Check if the user type is correctly identified (should be empty list)
+        self.assertEqual(len(data.user_types), 0)
 
         # Check if no homeworks are returned
         self.assertEqual(len(data.homeworks), 0)
@@ -179,7 +179,7 @@ class HomeworkListViewTests(TestCase):
         # Check context data
         self.assertIn("data", response.context)
         data = response.context["data"]
-        self.assertEqual(data.user_type, "teacher")
+        self.assertIn("teacher", data.user_types)
         self.assertEqual(len(data.homeworks), 1)
 
     def test_get_request_as_student(self):
@@ -199,7 +199,7 @@ class HomeworkListViewTests(TestCase):
         # Check context data
         self.assertIn("data", response.context)
         data = response.context["data"]
-        self.assertEqual(data.user_type, "student")
+        self.assertIn("student", data.user_types)
         self.assertEqual(len(data.homeworks), 1)
 
     def test_get_request_unauthenticated(self):
@@ -335,3 +335,91 @@ class HomeworkListViewTests(TestCase):
         self.assertEqual(len(data.homeworks), 1)
         self.assertFalse(data.homeworks[0].is_submitted)
         self.assertEqual(data.homeworks[0].completed_percentage, 0)
+
+
+class HomeworkDetailViewTATests(TestCase):
+    """Tests for TA access to homework detail view."""
+
+    def setUp(self):
+        """Set up test data."""
+        from accounts.models import TeacherAssistant
+        from courses.models import CourseTeacherAssistant
+
+        # Create users and profiles
+        self.teacher_user = User.objects.create_user(
+            username="testteacher", email="teacher@example.com", password="password123"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        self.ta_user = User.objects.create_user(
+            username="testta", email="ta@example.com", password="password123"
+        )
+        self.ta = TeacherAssistant.objects.create(user=self.ta_user)
+
+        # Create a course
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+            is_active=True,
+        )
+
+        # Add teacher to course
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+
+        # Add TA to course
+        CourseTeacherAssistant.objects.create(
+            course=self.course, teacher_assistant=self.ta
+        )
+
+        # Create homework with course
+        self.homework = Homework.objects.create(
+            title="Test Homework",
+            description="Test Description",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+
+    def test_ta_can_see_view_submissions_button(self):
+        """Test that TAs can see the View Submissions button on homework detail page."""
+        # Login as TA
+        self.client.login(username="testta", password="password123")
+
+        # Get homework detail page
+        response = self.client.get(
+            reverse("homeworks:detail", kwargs={"homework_id": self.homework.id})
+        )
+
+        # Check response status
+        self.assertEqual(response.status_code, 200)
+
+        # Check that TA role is in user_roles
+        self.assertIn("teacher_assistant", response.context["data"].user_roles)
+
+        # Check that the View Submissions button is present in the HTML
+        self.assertContains(response, "View Submissions")
+        self.assertContains(
+            response, reverse("homeworks:submissions", kwargs={"homework_id": self.homework.id})
+        )
+
+    def test_ta_cannot_edit_homework(self):
+        """Test that TAs cannot edit homework (no Edit button)."""
+        # Login as TA
+        self.client.login(username="testta", password="password123")
+
+        # Get homework detail page
+        response = self.client.get(
+            reverse("homeworks:detail", kwargs={"homework_id": self.homework.id})
+        )
+
+        # Check response status
+        self.assertEqual(response.status_code, 200)
+
+        # Check that can_edit is False
+        self.assertFalse(response.context["data"].can_edit)
+
+        # Check that Edit button is not present
+        self.assertNotContains(response, "Edit</a>")

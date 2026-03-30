@@ -9,9 +9,9 @@ from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
-from courses.models import Course, CourseEnrollment, CourseTeacher
+from courses.models import Course, CourseEnrollment, CourseTeacher, CourseTeacherAssistant
 from courses.views import CourseListView, CourseListData
-from accounts.models import Teacher, Student
+from accounts.models import Teacher, Student, TeacherAssistant
 
 User = get_user_model()
 
@@ -67,7 +67,7 @@ class CourseListViewTests(TestCase):
         self.assertIsInstance(data, CourseListData)
 
         # Check if the user type is correctly identified
-        self.assertEqual(data.user_type, "student")
+        self.assertIn("student", data.user_types)
 
         # Check that all active courses are included
         self.assertEqual(len(data.courses), 2)
@@ -143,7 +143,7 @@ class CourseListViewTests(TestCase):
         self.assertIsInstance(data, CourseListData)
 
         # Check if the user type is correctly identified
-        self.assertEqual(data.user_type, "teacher")
+        self.assertIn("teacher", data.user_types)
 
         # Check that only course1 is included (teacher is teaching it)
         self.assertEqual(len(data.courses), 1)
@@ -192,6 +192,58 @@ class CourseListViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "courses/list.html")
+
+    def test_get_view_data_for_multi_role_user_shows_all_courses(self):
+        """Test that users with multiple profiles see courses from all roles."""
+        # Create a user with both student and TA profiles
+        multi_user = User.objects.create_user(
+            username="multirole", email="multi@example.com", password="password123"
+        )
+        student_profile = Student.objects.create(user=multi_user)
+        ta_profile = TeacherAssistant.objects.create(user=multi_user)
+
+        # Create a third course
+        course3 = Course.objects.create(
+            name="Course 3", code="C3", description="Test", is_active=True
+        )
+
+        # Enroll as student in course1
+        CourseEnrollment.objects.create(
+            course=self.course1, student=student_profile, is_active=True
+        )
+
+        # Assign as TA to course2
+        CourseTeacherAssistant.objects.create(
+            course=self.course2, teacher_assistant=ta_profile
+        )
+
+        # Get view data
+        view = CourseListView()
+        data = view._get_view_data(multi_user)
+
+        # Should have both student and TA in user_types
+        self.assertIn('student', data.user_types)
+        self.assertIn('teacher_assistant', data.user_types)
+        self.assertEqual(len(data.user_types), 2)
+
+        # Should see courses from both roles plus course3 (active, available for enrollment)
+        self.assertEqual(len(data.courses), 3)
+
+        # Find courses in list
+        course1_item = next(c for c in data.courses if c.id == self.course1.id)
+        course2_item = next(c for c in data.courses if c.id == self.course2.id)
+        course3_item = next(c for c in data.courses if c.id == course3.id)
+
+        # Verify roles
+        self.assertIn('student', course1_item.roles)
+        self.assertTrue(course1_item.is_enrolled)
+
+        self.assertIn('teacher_assistant', course2_item.roles)
+        self.assertFalse(course2_item.is_enrolled)
+
+        # course3 should have no roles (not enrolled, not TA)
+        self.assertEqual(len(course3_item.roles), 0)
+        self.assertFalse(course3_item.is_enrolled)
 
 
 class CourseEnrollViewTests(TestCase):
@@ -662,14 +714,14 @@ class CourseDetailViewTests(TestCase):
         response = self.client.get(
             reverse("courses:detail", kwargs={"course_id": self.course.id})
         )
-        self.assertEqual(response.context["data"].user_type, "teacher")
+        self.assertIn("teacher", response.context["data"].user_roles)
 
         # Test for student
         self.client.login(username="teststudent", password="password123")
         response = self.client.get(
             reverse("courses:detail", kwargs={"course_id": self.course.id})
         )
-        self.assertEqual(response.context["data"].user_type, "student")
+        self.assertIn("student", response.context["data"].user_roles)
 
 
 class CourseHomeworkCreateViewTests(TestCase):

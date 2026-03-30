@@ -21,12 +21,14 @@
             <h1>{{ data.course_name }}</h1>
             <p class="lead">
                 <code>{{ data.course_code }}</code>
-                {% if data.user_type == 'teacher' %}
+                {% if 'teacher' in data.user_roles %}
                 <span class="badge bg-primary ms-2">Teaching</span>
-                {% elif data.user_type == 'student' %}
+                {% endif %}
+                {% if 'student' in data.user_roles %}
                 <span class="badge bg-success ms-2">Enrolled</span>
-                {% elif data.user_type == 'teacher_assistant' %}
-                <span class="badge bg-info ms-2">TA</span>
+                {% endif %}
+                {% if 'teacher_assistant' in data.user_roles %}
+                <span class="badge bg-warning text-dark ms-2">TA</span>
                 {% endif %}
             </p>
             {% if data.course_description %}
@@ -48,7 +50,7 @@
         <div class="col">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h2 class="mb-0"><i class="bi bi-file-text"></i> Homeworks</h2>
-                {% if data.user_type == 'teacher' %}
+                {% if 'teacher' in data.user_roles %}
                 <a href="{% url 'courses:homework-create' data.course_id %}" class="btn btn-primary">
                     <i class="bi bi-plus-circle"></i> Create Homework
                 </a>
@@ -76,8 +78,8 @@
         </div>
     </div>
 
-    <!-- Enrolled Students Section (Teachers Only) -->
-    {% if data.user_type == 'teacher' %}
+    <!-- Enrolled Students Section (Teachers and TAs) -->
+    {% if 'teacher' in data.user_roles or 'teacher_assistant' in data.user_roles %}
     <div class="row mb-4">
         <div class="col">
             <h2><i class="bi bi-people"></i> Enrolled Students</h2>
@@ -118,8 +120,9 @@
     </div>
     {% endif %}
 
-    <!-- Teacher Assistants Section (Teachers Only) -->
-    {% if data.user_type == 'teacher' and data.teacher_assistants %}
+    <!-- Teacher Assistants Section (Teachers and TAs) -->
+    {% if data.teacher_assistants %}
+    {% if 'teacher' in data.user_roles or 'teacher_assistant' in data.user_roles %}
     <div class="row mb-4">
         <div class="col">
             <h2><i class="bi bi-person-badge"></i> Teacher Assistants</h2>
@@ -135,7 +138,9 @@
                                     <th>Username</th>
                                     <th>Email</th>
                                     <th>Assigned At</th>
+                                    {% if 'teacher' in data.user_roles %}
                                     <th>Actions</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -144,12 +149,14 @@
                                     <td>{{ ta.username }}</td>
                                     <td>{{ ta.email }}</td>
                                     <td>{{ ta.assigned_at }}</td>
+                                    {% if 'teacher' in data.user_roles %}
                                     <td>
                                         <form method="post" action="{% url 'courses:ta-remove' course_id=data.course_id ta_id=ta.id %}" class="d-inline">
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-sm btn-danger">Remove</button>
                                         </form>
                                     </td>
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -160,9 +167,10 @@
         </div>
     </div>
     {% endif %}
+    {% endif %}
 
     <!-- Assign TA Section (Teachers Only) -->
-    {% if data.user_type == 'teacher' %}
+    {% if 'teacher' in data.user_roles %}
     <div class="row mb-4">
         <div class="col">
             <h2><i class="bi bi-person-plus"></i> Assign Teacher Assistant</h2>

@@ -11,9 +11,9 @@ from uuid import UUID
 from datetime import timedelta
 from django.utils import timezone
 
-from accounts.models import User, Teacher, Student
+from accounts.models import User, Teacher, Student, TeacherAssistant
 from homeworks.models import Homework, Section
-from courses.models import Course
+from courses.models import Course, CourseTeacherAssistant
 from conversations.models import Conversation, Message
 
 
@@ -208,3 +208,58 @@ class ConversationDetailViewTests(TestCase):
 
         # Check response is a 404
         self.assertEqual(response.status_code, 404)
+
+    def test_ta_can_view_student_conversation_in_assigned_course(self):
+        """Test that a TA can view student conversations in courses they're assigned to."""
+        # Create a TA user
+        ta_user = User.objects.create_user(
+            username="tauser",
+            email="ta@example.com",
+            first_name="Test",
+            last_name="TA",
+            password="password123",
+        )
+        ta_profile = TeacherAssistant.objects.create(user=ta_user)
+
+        # Assign TA to the course
+        CourseTeacherAssistant.objects.create(
+            course=self.course, teacher_assistant=ta_profile
+        )
+
+        # Login as TA
+        self.client.login(username="tauser", password="password123")
+
+        # Access student conversation page
+        response = self.client.get(self.student_detail_url)
+
+        # Check response is successful for TA viewing student conversation
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "conversations/detail.html")
+
+        # Verify conversation data is present
+        self.assertIsNotNone(response.context["conversation_data"])
+        self.assertEqual(
+            str(response.context["conversation_data"].id),
+            str(self.student_conversation.id),
+        )
+
+    def test_ta_cannot_view_student_conversation_in_unassigned_course(self):
+        """Test that a TA cannot view student conversations in courses they're not assigned to."""
+        # Create a TA user (not assigned to any course)
+        ta_user = User.objects.create_user(
+            username="tauser",
+            email="ta@example.com",
+            first_name="Test",
+            last_name="TA",
+            password="password123",
+        )
+        TeacherAssistant.objects.create(user=ta_user)
+
+        # Login as TA
+        self.client.login(username="tauser", password="password123")
+
+        # Attempt to access student conversation page
+        response = self.client.get(self.student_detail_url)
+
+        # Check access is denied
+        self.assertEqual(response.status_code, 403)

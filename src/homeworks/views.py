@@ -50,6 +50,7 @@ class HomeworkListItem:
     section_count: int
     created_at: Any  # datetime
     is_overdue: bool
+    roles: list[str]  # ['teacher', 'student', 'teacher_assistant']
     sections: list[SectionData] | None = None
     completed_percentage: int = 0
     in_progress_percentage: int = 0
@@ -61,7 +62,7 @@ class HomeworkListData:
     """Data structure for the homework list view."""
 
     homeworks: list[HomeworkListItem]
-    user_type: str  # 'teacher', 'student', or 'unknown'
+    user_types: list[str]  # All roles this user has: ['teacher', 'student', 'teacher_assistant']
     total_count: int
     has_progress_data: bool
 
@@ -97,73 +98,101 @@ class HomeworkListView(View):
         Returns:
             HomeworkListData with homeworks and user type information
         """
+        from django.db.models import Q
+
         # Determine user type
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
         teacher_assistant_profile = getattr(user, "teacher_assistant_profile", None)
 
-        homeworks = []
-        has_progress_data = False
-
+        # Track which user types this user has
+        user_types = []
         if teacher_profile:
-            # Teacher view - show homeworks from courses this teacher teaches
-            user_type = "teacher"
+            user_types.append("teacher")
+        if student_profile:
+            user_types.append("student")
+        if teacher_assistant_profile:
+            user_types.append("teacher_assistant")
 
-            # Get courses where this teacher is teaching
+        # Use dict to track homeworks and their roles
+        homework_dict = {}
+
+        # Add teacher homeworks
+        if teacher_profile:
             teacher_courses = teacher_profile.courses.all()
-
-            # Get homeworks for courses the teacher teaches or created by this teacher
-            # Since homework now has direct course FK, this is simpler
-            from django.db.models import Q
-
-            homework_objects = (
+            teacher_homework_objects = (
                 Homework.objects.filter(
                     Q(course__in=teacher_courses) | Q(created_by=teacher_profile)
                 )
                 .distinct()
-                .order_by("-created_at")
                 .prefetch_related("sections")
             )
 
-            # Transform to view-specific data
-            for homework in homework_objects:
-                homeworks.append(
-                    HomeworkListItem(
-                        id=homework.id,
-                        title=homework.title,
-                        description=homework.description,
-                        due_date=homework.due_date,
-                        section_count=homework.section_count,
-                        created_at=homework.created_at,
-                        is_overdue=homework.is_overdue,
-                        sections=None,  # No section data needed for teacher view
-                    )
-                )
+            for hw in teacher_homework_objects:
+                if hw.id not in homework_dict:
+                    homework_dict[hw.id] = {
+                        'homework': hw,
+                        'roles': [],
+                        'progress': None
+                    }
+                homework_dict[hw.id]['roles'].append('teacher')
 
-        elif student_profile:
-            # Student view - show homeworks with progress
-            user_type = "student"
-            has_progress_data = True
-
-            # Filter homeworks by courses the student is enrolled in
+        # Add student homeworks
+        if student_profile:
             enrolled_courses = student_profile.enrolled_courses.filter(
                 courseenrollment__is_active=True
             )
-
-            # Get homeworks for courses student is enrolled in (direct FK now)
-            homework_objects = (
+            student_homework_objects = (
                 Homework.objects.filter(course__in=enrolled_courses)
-                .order_by("-created_at")
                 .prefetch_related("sections")
             )
 
-            # Transform to view-specific data with progress
-            for homework in homework_objects:
-                # Get student's progress for this homework
-                progress_data = HomeworkService.get_student_homework_progress(
-                    student_profile, homework
+            for hw in student_homework_objects:
+                if hw.id not in homework_dict:
+                    homework_dict[hw.id] = {
+                        'homework': hw,
+                        'roles': [],
+                        'progress': None
+                    }
+                homework_dict[hw.id]['roles'].append('student')
+                # Calculate progress for student view
+                homework_dict[hw.id]['progress'] = HomeworkService.get_student_homework_progress(
+                    student_profile, hw
                 )
 
+        # Add TA homeworks
+        if teacher_assistant_profile:
+            ta_courses = teacher_assistant_profile.courses.all()
+            ta_homework_objects = (
+                Homework.objects.filter(course__in=ta_courses)
+                .distinct()
+                .prefetch_related("sections")
+            )
+
+            for hw in ta_homework_objects:
+                if hw.id not in homework_dict:
+                    homework_dict[hw.id] = {
+                        'homework': hw,
+                        'roles': [],
+                        'progress': None
+                    }
+                homework_dict[hw.id]['roles'].append('teacher_assistant')
+
+        # Convert to HomeworkListItem
+        homeworks = []
+        has_progress_data = 'student' in user_types
+
+        for hw_data in sorted(homework_dict.values(), key=lambda x: x['homework'].created_at, reverse=True):
+            hw = hw_data['homework']
+            progress_data = hw_data['progress']
+
+            # Prepare section data and progress if available
+            sections = None
+            completed_percentage = 0
+            in_progress_percentage = 0
+            is_submitted = False
+
+            if progress_data:
                 # Format section data for the view using SectionData objects
                 sections = []
                 for section_progress in progress_data.sections_progress:
@@ -181,7 +210,7 @@ class HomeworkListView(View):
                         )
                     )
 
-                # Calculate percentages directly in the view
+                # Calculate percentages
                 total_sections = len(progress_data.sections_progress)
                 completed_sections = sum(
                     1
@@ -206,65 +235,31 @@ class HomeworkListView(View):
                     else 0
                 )
 
-                # Check if all sections are submitted (based on Submission records)
                 is_submitted = (
                     total_sections > 0 and completed_sections == total_sections
                 )
 
-                homeworks.append(
-                    HomeworkListItem(
-                        id=homework.id,
-                        title=homework.title,
-                        description=homework.description,
-                        due_date=homework.due_date,
-                        section_count=homework.section_count,
-                        created_at=homework.created_at,
-                        is_overdue=homework.is_overdue,
-                        sections=sections,
-                        completed_percentage=completed_percentage,
-                        in_progress_percentage=in_progress_percentage,
-                        is_submitted=is_submitted,
-                    )
+            homeworks.append(
+                HomeworkListItem(
+                    id=hw.id,
+                    title=hw.title,
+                    description=hw.description,
+                    due_date=hw.due_date,
+                    section_count=hw.section_count,
+                    created_at=hw.created_at,
+                    is_overdue=hw.is_overdue,
+                    roles=hw_data['roles'],
+                    sections=sections,
+                    completed_percentage=completed_percentage,
+                    in_progress_percentage=in_progress_percentage,
+                    is_submitted=is_submitted,
                 )
-
-        elif teacher_assistant_profile:
-            # TA view - show homeworks from courses this TA is assigned to
-            user_type = "teacher_assistant"
-
-            # Get courses where this TA is assigned
-            ta_courses = teacher_assistant_profile.courses.all()
-
-            # Get homeworks for courses the TA is assigned to
-            homework_objects = (
-                Homework.objects.filter(course__in=ta_courses)
-                .distinct()
-                .order_by("-created_at")
-                .prefetch_related("sections")
             )
-
-            # Transform to view-specific data (similar to teacher but with test capability)
-            for homework in homework_objects:
-                homeworks.append(
-                    HomeworkListItem(
-                        id=homework.id,
-                        title=homework.title,
-                        description=homework.description,
-                        due_date=homework.due_date,
-                        section_count=homework.section_count,
-                        created_at=homework.created_at,
-                        is_overdue=homework.is_overdue,
-                        sections=None,  # No section data needed for TA view
-                    )
-                )
-
-        else:
-            # Unknown user type
-            user_type = "unknown"
 
         # Create and return the view data
         return HomeworkListData(
             homeworks=homeworks,
-            user_type=user_type,
+            user_types=user_types,
             total_count=len(homeworks),
             has_progress_data=has_progress_data,
         )
@@ -283,7 +278,7 @@ class HomeworkDetailData:
     created_at: Any  # datetime
     sections: list[SectionData]
     is_overdue: bool
-    user_type: str  # 'teacher', 'student', or 'unknown'
+    user_roles: list[str]  # All roles this user has for this homework: ['teacher', 'student', 'teacher_assistant']
     can_edit: bool
     llm_config: Dict[str, Any] | None = None
 
@@ -613,28 +608,38 @@ class HomeworkDetailView(View):
         student_profile = getattr(user, "student_profile", None)
         teacher_assistant_profile = getattr(user, "teacher_assistant_profile", None)
 
-        # For students, check if they're enrolled in the course that has this homework
-        if student_profile:
-            homework = Homework.objects.filter(id=homework_id).first()
-            if homework and homework.course:
-                enrolled_courses = student_profile.enrolled_courses.filter(
-                    courseenrollment__is_active=True
-                )
-                has_access = homework.course in enrolled_courses
+        # Get homework first
+        homework = Homework.objects.filter(id=homework_id).first()
+        if not homework:
+            return None
 
-                if not has_access:
-                    return None
-            else:
-                return None
+        # Check access through any role
+        user_roles = []
 
-        # For TAs, check if they're assigned to the course that has this homework
-        if teacher_assistant_profile:
-            homework = Homework.objects.filter(id=homework_id).first()
-            if homework and homework.course:
-                if not homework.course.is_teacher_assistant(teacher_assistant_profile):
-                    return None
-            else:
-                return None
+        # Teacher access
+        if teacher_profile:
+            if homework.created_by == teacher_profile:
+                user_roles.append('teacher')
+            elif homework.course:
+                teacher_courses = teacher_profile.courses.all()
+                if homework.course in teacher_courses:
+                    user_roles.append('teacher')
+
+        # Student access (must be enrolled)
+        if student_profile and homework.course:
+            enrolled_courses = student_profile.enrolled_courses.filter(
+                courseenrollment__is_active=True
+            )
+            if homework.course in enrolled_courses:
+                user_roles.append('student')
+
+        # TA access (must be assigned to course)
+        if teacher_assistant_profile and homework.course:
+            if homework.course.is_teacher_assistant(teacher_assistant_profile):
+                user_roles.append('teacher_assistant')
+
+        if not user_roles:
+            return None
 
         # Get homework details using service
         homework_detail = HomeworkService.get_homework_with_sections(homework_id)
@@ -642,42 +647,15 @@ class HomeworkDetailView(View):
         if homework_detail is None:
             return None
 
-        # Determine user type and permissions
-        user_type = "unknown"
-        can_edit = False
-
-        if teacher_profile:
-            user_type = "teacher"
-            # Teacher can edit if they created it OR if they teach the course that has this homework
-            created_by_teacher = str(teacher_profile.id) == str(
-                homework_detail.created_by
-            )
-
-            # Check if teacher teaches the course that has this homework (direct FK now)
-            teaches_course_with_homework = False
-            homework_obj = Homework.objects.filter(id=homework_id).first()
-            if homework_obj and homework_obj.course:
-                teacher_courses = teacher_profile.courses.all()
-                teaches_course_with_homework = homework_obj.course in teacher_courses
-
-            can_edit = created_by_teacher or teaches_course_with_homework
-
-        elif student_profile:
-            user_type = "student"
-            # Students can't edit homeworks
-            can_edit = False
-
-        elif teacher_assistant_profile:
-            user_type = "teacher_assistant"
-            # TAs can't edit homeworks
-            can_edit = False
+        # Only teachers can edit
+        can_edit = 'teacher' in user_roles
 
         # Format sections data
         sections = []
 
         # Get section progress for students
         section_progress_map = {}
-        if student_profile:
+        if 'student' in user_roles:
             # Get the homework object for progress calculation
             try:
                 homework_obj = Homework.objects.get(id=homework_id)
@@ -730,7 +708,7 @@ class HomeworkDetailView(View):
             created_at=homework_detail.created_at,
             sections=sections,
             is_overdue=homework_detail.due_date < timezone.now(),
-            user_type=user_type,
+            user_roles=user_roles,
             can_edit=can_edit,
             llm_config={"id": homework_detail.llm_config}
             if homework_detail.llm_config
@@ -750,11 +728,9 @@ class SectionDetailViewData:
     section_order: int
     has_solution: bool
     solution_content: str | None
+    user_roles: list[str]  # All roles this user has for this section: ['teacher', 'student', 'teacher_assistant']
     conversations: list[Dict[str, Any]] | None = None
     submission: Dict[str, Any] | None = None
-    is_teacher: bool = False
-    is_student: bool = False
-    is_teacher_assistant: bool = False
 
 
 class SectionDetailView(View):
@@ -870,69 +846,70 @@ class SectionDetailView(View):
         except (Homework.DoesNotExist, Section.DoesNotExist):
             return None
 
-        # Initialize variables
-        is_teacher = False
-        is_student = False
-        is_teacher_assistant = False
-        conversations = None
+        # Check access and determine roles
+        user_roles = []
+
+        if teacher_profile:
+            if homework.created_by == teacher_profile:
+                user_roles.append('teacher')
+            elif homework.course:
+                teacher_courses = teacher_profile.courses.all()
+                if homework.course in teacher_courses:
+                    user_roles.append('teacher')
+
+        if student_profile and homework.course:
+            enrolled_courses = student_profile.enrolled_courses.filter(
+                courseenrollment__is_active=True
+            )
+            if homework.course in enrolled_courses:
+                user_roles.append('student')
+
+        if teacher_assistant_profile and homework.course:
+            if homework.course.is_teacher_assistant(teacher_assistant_profile):
+                user_roles.append('teacher_assistant')
+
+        if not user_roles:
+            return None
+
+        # Gather conversations based on roles
+        conversations = []
         submission = None
 
-        # Get conversations and submission data based on user type
-        if teacher_profile:
-            is_teacher = True
+        if 'teacher' in user_roles:
+            # Teachers see test conversations they created
+            teacher_conversations = Conversation.objects.filter(
+                user=user, section=section, is_deleted=False
+            ).select_related("user").prefetch_related("messages")
 
-            # Get test conversations created by this teacher for this section
-            teacher_conversations = (
-                Conversation.objects.filter(
-                    user=user, section=section, is_deleted=False
-                )
-                .select_related("user")
-                .prefetch_related("messages")
-            )
+            for conv in teacher_conversations:
+                conversations.append({
+                    "id": conv.id,
+                    "created_at": conv.created_at,
+                    "updated_at": conv.updated_at,
+                    "message_count": conv.message_count,
+                    "is_test": True,
+                    "role": "teacher",
+                    "label": f"Test conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
+                })
 
-            # Format conversations data
-            if teacher_conversations.exists():
-                conversations = []
-                for conv in teacher_conversations:
-                    conversations.append(
-                        {
-                            "id": conv.id,
-                            "created_at": conv.created_at,
-                            "updated_at": conv.updated_at,
-                            "message_count": conv.message_count,
-                            "is_teacher_test": True,
-                            "label": f"Test conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
-                        }
-                    )
+        if 'student' in user_roles:
+            # Students see their active conversation and submission
+            student_conversations = Conversation.objects.filter(
+                user=user, section=section, is_deleted=False
+            ).select_related("user").prefetch_related("messages")
 
-        elif student_profile:
-            is_student = True
+            for conv in student_conversations:
+                conversations.append({
+                    "id": conv.id,
+                    "created_at": conv.created_at,
+                    "updated_at": conv.updated_at,
+                    "message_count": conv.message_count,
+                    "is_test": False,
+                    "role": "student",
+                    "label": f"Conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
+                })
 
-            # Get conversations created by this student for this section
-            student_conversations = (
-                Conversation.objects.filter(
-                    user=user, section=section, is_deleted=False
-                )
-                .select_related("user")
-                .prefetch_related("messages")
-            )
-
-            # Format conversations data
-            if student_conversations.exists():
-                conversations = []
-                for conv in student_conversations:
-                    conversations.append(
-                        {
-                            "id": conv.id,
-                            "created_at": conv.created_at,
-                            "updated_at": conv.updated_at,
-                            "message_count": conv.message_count,
-                            "is_teacher_test": False,
-                            "label": f"Conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
-                        }
-                    )
-
-            # Get submission for this student and section if it exists
+            # Get submission if exists
             student_submission = (
                 Submission.objects.filter(
                     conversation__user=user, conversation__section=section
@@ -948,31 +925,22 @@ class SectionDetailView(View):
                     "submitted_at": student_submission.submitted_at,
                 }
 
-        elif teacher_assistant_profile:
-            is_teacher_assistant = True
+        if 'teacher_assistant' in user_roles:
+            # TAs see test conversations they created
+            ta_conversations = Conversation.objects.filter(
+                user=user, section=section, is_deleted=False
+            ).select_related("user").prefetch_related("messages")
 
-            # TAs can view test conversations (created by them)
-            ta_conversations = (
-                Conversation.objects.filter(
-                    user=user, section=section, is_deleted=False
-                )
-                .select_related("user")
-                .prefetch_related("messages")
-            )
-
-            if ta_conversations.exists():
-                conversations = []
-                for conv in ta_conversations:
-                    conversations.append(
-                        {
-                            "id": conv.id,
-                            "created_at": conv.created_at,
-                            "updated_at": conv.updated_at,
-                            "message_count": conv.message_count,
-                            "is_ta_test": True,
-                            "label": f"Test conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
-                        }
-                    )
+            for conv in ta_conversations:
+                conversations.append({
+                    "id": conv.id,
+                    "created_at": conv.created_at,
+                    "updated_at": conv.updated_at,
+                    "message_count": conv.message_count,
+                    "is_test": True,
+                    "role": "teacher_assistant",
+                    "label": f"Test conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
+                })
 
         # Create and return the view data
         return SectionDetailViewData(
@@ -984,11 +952,9 @@ class SectionDetailView(View):
             section_order=section.order,
             has_solution=section.solution is not None,
             solution_content=section.solution.content if section.solution else None,
-            conversations=conversations,
+            user_roles=user_roles,
+            conversations=conversations if conversations else None,
             submission=submission,
-            is_teacher=is_teacher,
-            is_student=is_student,
-            is_teacher_assistant=is_teacher_assistant,
         )
 
 

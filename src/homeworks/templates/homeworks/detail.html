@@ -12,7 +12,18 @@
     <!-- Homework Header -->
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
-            <h1>{{ data.title }}</h1>
+            <h1>
+                {{ data.title }}
+                {% if 'teacher' in data.user_roles %}
+                    <span class="badge bg-primary">Teaching</span>
+                {% endif %}
+                {% if 'student' in data.user_roles %}
+                    <span class="badge bg-success">Student</span>
+                {% endif %}
+                {% if 'teacher_assistant' in data.user_roles %}
+                    <span class="badge bg-warning text-dark">TA</span>
+                {% endif %}
+            </h1>
             <p class="text-muted">Created by: {{ data.created_by_name }} | {{ data.created_at|date:"F d, Y" }}</p>
         </div>
         <div class="text-end">
@@ -20,15 +31,19 @@
             <span class="badge bg-danger mb-2">Overdue</span><br>
             {% endif %}
             <span class="text-muted">Due: {{ data.due_date|date:"F d, Y" }}</span>
-            
-            {% if data.can_edit %}
+
+            {% if data.can_edit or 'teacher' in data.user_roles or 'teacher_assistant' in data.user_roles %}
             <div class="mt-2">
+                {% if data.can_edit %}
                 <a href="{% url 'homeworks:edit' data.id %}" class="btn btn-outline-primary">
                     <i class="bi bi-pencil"></i> Edit
                 </a>
-                <a href="{% url 'homeworks:submissions' data.id %}" class="btn btn-outline-info ms-2">
+                {% endif %}
+                {% if 'teacher' in data.user_roles or 'teacher_assistant' in data.user_roles %}
+                <a href="{% url 'homeworks:submissions' data.id %}" class="btn btn-outline-info {% if data.can_edit %}ms-2{% endif %}">
                     <i class="bi bi-people"></i> View Submissions
                 </a>
+                {% endif %}
             </div>
             {% endif %}
         </div>
@@ -74,7 +89,7 @@
                     </zero-md>
                     </div>
                     
-                    {% if data.user_type == 'student' %}
+                    {% if 'student' in data.user_roles %}
                     <div class="mb-3">
                         {% if section.status == 'submitted' %}
                         <div class="d-flex justify-content-between align-items-center">
@@ -116,7 +131,7 @@
                     </div>
                     {% endif %}
 
-                    {% if section.has_solution and data.user_type == 'teacher' %}
+                    {% if section.has_solution and 'teacher' in data.user_roles %}
                     <div class="alert alert-info mt-3">
                         <h6><i class="bi bi-lightbulb"></i> Solution</h6>
                         <div><zero-md src="data:text/markdown;charset=utf-8,{{ section.solution_content|urlencode }}">
@@ -137,8 +152,8 @@
         <a href="{% url 'homeworks:list' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back to List
         </a>
-        
-        {% if data.user_type == 'teacher' and data.can_edit %}
+
+        {% if 'teacher' in data.user_roles and data.can_edit %}
         <div>
             <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
                 <i class="bi bi-trash"></i> Delete
@@ -149,7 +164,7 @@
 </div>
 
 <!-- Delete Confirmation Modal -->
-{% if data.user_type == 'teacher' and data.can_edit %}
+{% if 'teacher' in data.user_roles and data.can_edit %}
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
