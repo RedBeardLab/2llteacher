@@ -63,6 +63,7 @@ class LLMConfigData:
     max_completion_tokens: int
     is_default: bool
     is_active: bool
+    course_id: Optional[UUID] = None
 
     @classmethod
     def from_model(cls, llm_config: "LLMConfig") -> "LLMConfigData":
@@ -92,6 +93,7 @@ class LLMConfigData:
             max_completion_tokens=llm_config.max_completion_tokens,
             is_default=llm_config.is_default,
             is_active=llm_config.is_active,
+            course_id=getattr(llm_config.course, "id", None),
         )
 
 
@@ -113,6 +115,7 @@ class LLMConfigCreateData:
     max_completion_tokens: int = 1000
     is_default: bool = False
     is_active: bool = True
+    course_id: Optional[UUID] = None
 
 
 @dataclass
@@ -1059,9 +1062,12 @@ class LLMService:
 
     @staticmethod
     @traced
-    def get_default_config() -> Optional[LLMConfigData]:
+    def get_default_config_for_course(course_id: UUID) -> Optional[LLMConfigData]:
         """
-        Get the default LLM configuration data.
+        Get the default LLM configuration data for a specific course.
+
+        Args:
+            course_id: UUID of the course
 
         Returns:
             LLMConfigData if default config found, None otherwise
@@ -1069,10 +1075,32 @@ class LLMService:
         from .models import LLMConfig
 
         try:
-            # Get default config
-            config = LLMConfig.objects.get(is_default=True, is_active=True)
+            config = LLMConfig.objects.get(
+                course_id=course_id, is_default=True, is_active=True
+            )
             return LLMConfigData.from_model(config)
         except LLMConfig.DoesNotExist:
+            return None
+        except Exception as e:
+            logger.error(f"Error getting default LLM config for course: {str(e)}")
+            record_exception(e)
+            return None
+
+    @staticmethod
+    @traced
+    def get_default_config() -> Optional[LLMConfigData]:
+        """
+        Get a default LLM configuration data (course-agnostic, for backwards compatibility).
+
+        Returns:
+            LLMConfigData if any default config found, None otherwise
+        """
+        from .models import LLMConfig
+
+        try:
+            config = LLMConfig.objects.filter(is_default=True, is_active=True).first()
+            if config:
+                return LLMConfigData.from_model(config)
             return None
         except Exception as e:
             logger.error(f"Error getting default LLM config: {str(e)}")
@@ -1105,9 +1133,12 @@ class LLMService:
 
     @staticmethod
     @traced
-    def get_all_configs() -> List[LLMConfigData]:
+    def get_configs_for_course(course_id: UUID) -> List[LLMConfigData]:
         """
-        Get all active LLM configurations.
+        Get all active LLM configurations for a specific course.
+
+        Args:
+            course_id: UUID of the course
 
         Returns:
             List of LLMConfigData objects
@@ -1115,7 +1146,30 @@ class LLMService:
         from .models import LLMConfig
 
         try:
-            configs = LLMConfig.objects.filter(is_active=True).order_by("name")
+            configs = LLMConfig.objects.filter(
+                course_id=course_id, is_active=True
+            ).order_by("name")
+            return [LLMConfigData.from_model(config) for config in configs]
+        except Exception as e:
+            logger.error(f"Error getting LLM configs for course: {str(e)}")
+            record_exception(e)
+            return []
+
+    @staticmethod
+    @traced
+    def get_all_configs() -> List[LLMConfigData]:
+        """
+        Get all active LLM configurations (course-scoped when course_id provided).
+
+        Returns:
+            List of LLMConfigData objects
+        """
+        from .models import LLMConfig
+
+        try:
+            configs = LLMConfig.objects.filter(is_active=True).order_by(
+                "course__name", "name"
+            )
             return [LLMConfigData.from_model(config) for config in configs]
         except Exception as e:
             logger.error(f"Error getting all LLM configs: {str(e)}")
@@ -1126,7 +1180,7 @@ class LLMService:
     @traced
     def create_config(data: LLMConfigCreateData) -> LLMConfigCreateResult:
         """
-        Create a new LLM configuration.
+        Create a new LLM configuration for a course.
 
         Args:
             data: LLMConfigCreateData with configuration parameters
@@ -1135,10 +1189,15 @@ class LLMService:
             LLMConfigCreateResult with success status and config ID
         """
         from .models import LLMConfig
+        from courses.models import Course
 
         try:
-            # Create config
+            course = None
+            if data.course_id:
+                course = Course.objects.get(id=data.course_id)
+
             config = LLMConfig.objects.create(
+                course=course,
                 name=data.name,
                 model_name=data.model_name,
                 api_key=data.api_key,
@@ -1150,8 +1209,56 @@ class LLMService:
             )
 
             return LLMConfigCreateResult(config_id=config.id, success=True)
+        except Course.DoesNotExist:
+            return LLMConfigCreateResult(success=False, error="Course not found")
         except Exception as e:
             logger.error(f"Error creating LLM config: {str(e)}")
+            record_exception(e)
+            return LLMConfigCreateResult(success=False, error=str(e))
+
+    @staticmethod
+    @traced
+    def clone_config_to_course(
+        config_id: UUID, target_course_id: UUID
+    ) -> LLMConfigCreateResult:
+        """
+        Clone an LLM configuration to another course.
+
+        Args:
+            config_id: UUID of the config to clone
+            target_course_id: UUID of the target course
+
+        Returns:
+            LLMConfigCreateResult with success status and new config ID
+        """
+        from .models import LLMConfig
+        from courses.models import Course
+
+        try:
+            source_config = LLMConfig.objects.get(id=config_id)
+            target_course = Course.objects.get(id=target_course_id)
+
+            new_config = LLMConfig.objects.create(
+                course=target_course,
+                name=source_config.name,
+                model_name=source_config.model_name,
+                api_key=source_config.api_key,
+                base_prompt=source_config.base_prompt,
+                temperature=source_config.temperature,
+                max_completion_tokens=source_config.max_completion_tokens,
+                is_default=False,
+                is_active=True,
+            )
+
+            return LLMConfigCreateResult(config_id=new_config.id, success=True)
+        except LLMConfig.DoesNotExist:
+            return LLMConfigCreateResult(
+                success=False, error="Source configuration not found"
+            )
+        except Course.DoesNotExist:
+            return LLMConfigCreateResult(success=False, error="Target course not found")
+        except Exception as e:
+            logger.error(f"Error cloning LLM config: {str(e)}")
             record_exception(e)
             return LLMConfigCreateResult(success=False, error=str(e))
 
@@ -1171,10 +1278,8 @@ class LLMService:
         from .models import LLMConfig
 
         try:
-            # Get config
             config = LLMConfig.objects.get(id=config_id)
 
-            # Update fields if provided
             if "name" in data:
                 config.name = data["name"]
             if "model_name" in data:
@@ -1192,7 +1297,6 @@ class LLMService:
             if "is_active" in data:
                 config.is_active = data["is_active"]
 
-            # Save changes
             config.save()
 
             return LLMConfigUpdateResult(success=True)
@@ -1220,13 +1324,11 @@ class LLMService:
         try:
             config = LLMConfig.objects.get(id=config_id)
 
-            # Don't allow deleting the default config
             if config.is_default:
                 return LLMConfigUpdateResult(
                     success=False, error="Cannot delete the default configuration"
                 )
 
-            # Soft delete by setting is_active to False
             config.is_active = False
             config.save()
 
@@ -1237,6 +1339,46 @@ class LLMService:
             logger.error(f"Error deleting LLM config: {str(e)}")
             record_exception(e)
             return LLMConfigUpdateResult(success=False, error=str(e))
+
+    @staticmethod
+    @traced
+    def get_or_create_default_for_course(course_id: UUID) -> Optional[LLMConfigData]:
+        """
+        Get or create a default config for a course based on global default.
+
+        If the course doesn't have a default config, create one by cloning
+        from the global default template.
+
+        Args:
+            course_id: UUID of the course
+
+        Returns:
+            LLMConfigData of the course's default config, or None if no global default exists
+        """
+        from .models import LLMConfig, GlobalLLMDefault
+        from courses.models import Course
+
+        try:
+            course = Course.objects.get(id=course_id)
+
+            existing = LLMConfig.objects.filter(
+                course_id=course_id, is_default=True, is_active=True
+            ).first()
+            if existing:
+                return LLMConfigData.from_model(existing)
+
+            global_default = GlobalLLMDefault.objects.filter(is_active=True).first()
+            if not global_default:
+                return None
+
+            new_config = global_default.create_course_config(course)
+            return LLMConfigData.from_model(new_config)
+        except Course.DoesNotExist:
+            return None
+        except Exception as e:
+            logger.error(f"Error getting/creating default config for course: {str(e)}")
+            record_exception(e)
+            return None
 
     @staticmethod
     @traced

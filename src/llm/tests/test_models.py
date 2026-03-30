@@ -48,7 +48,7 @@ class LLMConfigModelTest(TestCase):
     def test_llm_config_str_representation(self):
         """Test LLM config string representation."""
         config = LLMConfig.objects.create(**self.llm_config_data)
-        self.assertEqual(str(config), "Test GPT-4 Config (gpt-4)")
+        self.assertEqual(str(config), "Test GPT-4 Config (gpt-4) - No Course")
 
     def test_llm_config_table_name(self):
         """Test LLM config table name."""
@@ -68,12 +68,28 @@ class LLMConfigModelTest(TestCase):
         self.assertFalse(config.is_default)
         self.assertTrue(config.is_active)
 
-    def test_llm_config_name_uniqueness(self):
-        """Test that LLM config names must be unique."""
-        LLMConfig.objects.create(**self.llm_config_data)
+    def test_llm_config_name_uniqueness_per_course(self):
+        """Test that LLM config names must be unique per course."""
+        from courses.models import Course
+        from django.db import transaction
 
+        course1 = Course.objects.create(name="Course 1", code="C1")
+        course2 = Course.objects.create(name="Course 2", code="C2")
+
+        data1 = self.llm_config_data.copy()
+        data1["course"] = course1
+        LLMConfig.objects.create(**data1)
+
+        data2 = self.llm_config_data.copy()
+        data2["course"] = course1
         with self.assertRaises(Exception):
-            LLMConfig.objects.create(**self.llm_config_data)
+            with transaction.atomic():
+                LLMConfig.objects.create(**data2)
+
+        data3 = self.llm_config_data.copy()
+        data3["course"] = course2
+        config3 = LLMConfig.objects.create(**data3)
+        self.assertEqual(config3.name, self.llm_config_data["name"])
 
     def test_llm_config_model_name_required(self):
         """Test that model name is required."""

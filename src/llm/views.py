@@ -7,7 +7,7 @@ Views for LLM configuration management following testable-first approach.
 from dataclasses import dataclass
 from typing import List, Optional
 from uuid import UUID
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
@@ -32,7 +32,6 @@ from .services import (
 logger = logging.getLogger(__name__)
 
 
-# Data contracts for views
 @dataclass
 class LLMConfigListItem:
     id: UUID
@@ -40,8 +39,10 @@ class LLMConfigListItem:
     model_name: str
     is_default: bool
     is_active: bool
-    created_at: str
-    updated_at: str
+    course_id: Optional[UUID] = None
+    course_name: Optional[str] = None
+    created_at: str = ""
+    updated_at: str = ""
 
 
 @dataclass
@@ -49,6 +50,8 @@ class LLMConfigListData:
     configs: List[LLMConfigListItem]
     total_count: int
     can_create: bool
+    course_id: Optional[UUID] = None
+    course_name: Optional[str] = None
 
 
 @dataclass
@@ -57,6 +60,9 @@ class LLMConfigDetailData:
     can_edit: bool
     can_delete: bool
     can_test: bool
+    can_clone: bool
+    course_id: Optional[UUID] = None
+    course_name: Optional[str] = None
 
 
 @dataclass
@@ -64,29 +70,39 @@ class LLMConfigFormData:
     config: Optional[LLMConfigData] = None
     is_edit: bool = False
     form_title: str = "Create LLM Configuration"
+    course_id: Optional[UUID] = None
+    courses: List[dict] = None
+
+
+@dataclass
+class LLMConfigCloneData:
+    config_id: UUID
+    target_course_id: UUID
+    source_course_name: str
+    target_course_name: str
 
 
 @method_decorator(login_required, name="dispatch")
 class LLMConfigListView(View):
-    """List all LLM configurations using testable-first approach."""
+    """List LLM configurations for a course using testable-first approach."""
 
     @method_decorator(teacher_required)
-    def get(self, request: HttpRequest) -> HttpResponse:
-        # Get typed data
-        data = self._get_config_list_data(request.user)
-
-        # Render with typed data
+    def get(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
+        data = self._get_config_list_data(course_id)
         return render(request, "llm/config_list.html", {"data": data})
 
-    def _get_config_list_data(self, user) -> LLMConfigListData:
+    def _get_config_list_data(self, course_id: UUID) -> LLMConfigListData:
         """Get typed data for config list. Easy to test!"""
-        teacher, student = get_teacher_or_student(user)
-        can_create = teacher is not None
+        from courses.models import Course
 
-        # Get all configs
-        configs_data = LLMService.get_all_configs()
+        try:
+            course = Course.objects.get(id=course_id)
+            course_name = course.name
+        except Course.DoesNotExist:
+            return LLMConfigListData(configs=[], total_count=0, can_create=False)
 
-        # Convert to list items
+        configs_data = LLMService.get_configs_for_course(course_id)
+
         config_items = []
         for config in configs_data:
             config_items.append(
@@ -96,13 +112,17 @@ class LLMConfigListView(View):
                     model_name=config.model_name,
                     is_default=config.is_default,
                     is_active=config.is_active,
-                    created_at="",  # We'll format this in template
-                    updated_at="",  # We'll format this in template
+                    course_id=config.course_id,
+                    course_name=course_name,
                 )
             )
 
         return LLMConfigListData(
-            configs=config_items, total_count=len(config_items), can_create=can_create
+            configs=config_items,
+            total_count=len(config_items),
+            can_create=True,
+            course_id=course_id,
+            course_name=course_name,
         )
 
 
@@ -110,39 +130,48 @@ class LLMConfigListView(View):
 class LLMConfigDetailView(View):
     """View LLM configuration details using testable-first approach."""
 
-    def get(self, request: HttpRequest, config_id: UUID) -> HttpResponse:
-        # Get typed data
-        data = self._get_config_detail_data(request.user, config_id)
+    @method_decorator(teacher_required)
+    def get(
+        self, request: HttpRequest, course_id: UUID, config_id: UUID
+    ) -> HttpResponse:
+        data = self._get_config_detail_data(course_id, config_id)
 
         if not data:
             messages.error(request, "Configuration not found.")
-            return redirect("llm:config-list")
+            return redirect("llm:config-list", course_id=course_id)
 
-        # Render with typed data
         return render(request, "llm/config_detail.html", {"data": data})
 
     def _get_config_detail_data(
-        self, user, config_id: UUID
+        self, course_id: UUID, config_id: UUID
     ) -> Optional[LLMConfigDetailData]:
         """Get typed data for config detail. Easy to test!"""
-        try:
-            teacher, student = get_teacher_or_student(user)
+        from courses.models import Course
 
-            # Get config data (config_id is already a UUID from URL pattern)
+        try:
             config_data = LLMService.get_config_by_id(config_id)
             if not config_data:
                 return None
 
-            # Determine permissions
-            can_edit = teacher is not None
-            can_delete = teacher is not None and not config_data.is_default
-            can_test = teacher is not None
+            try:
+                course = Course.objects.get(id=course_id)
+                course_name = course.name
+            except Course.DoesNotExist:
+                course_name = None
+
+            can_edit = True
+            can_delete = True and not config_data.is_default
+            can_test = True
+            can_clone = True
 
             return LLMConfigDetailData(
                 config=config_data,
                 can_edit=can_edit,
                 can_delete=can_delete,
                 can_test=can_test,
+                can_clone=can_clone,
+                course_id=course_id,
+                course_name=course_name,
             )
         except (ValueError, ValidationError):
             return None
@@ -153,33 +182,26 @@ class LLMConfigCreateView(View):
     """Create LLM configuration using testable-first approach."""
 
     @method_decorator(teacher_required)
-    def get(self, request: HttpRequest) -> HttpResponse:
-        # Get form data
-        data = LLMConfigFormData(is_edit=False, form_title="Create LLM Configuration")
-
+    def get(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
+        data = self._get_form_data(course_id)
         return render(request, "llm/config_form.html", {"data": data})
 
     @method_decorator(teacher_required)
-    def post(self, request: HttpRequest) -> HttpResponse:
-        # Parse form data
-        form_data = self._parse_create_form_data(request)
+    def post(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
+        form_data = self._parse_create_form_data(request, course_id)
 
-        # Validate and create
         result = self._create_config(form_data)
 
-        # Handle result
         if result.success:
             messages.success(
                 request, f"Configuration '{form_data.name}' created successfully!"
             )
-            return redirect("llm:config-detail", config_id=result.config_id)
+            return redirect(
+                "llm:config-detail", course_id=course_id, config_id=result.config_id
+            )
         else:
             messages.error(request, result.error or "Failed to create configuration.")
-
-            # Return form with data
-            data = LLMConfigFormData(
-                is_edit=False, form_title="Create LLM Configuration"
-            )
+            data = self._get_form_data(course_id)
             return render(
                 request,
                 "llm/config_form.html",
@@ -190,7 +212,25 @@ class LLMConfigCreateView(View):
                 },
             )
 
-    def _parse_create_form_data(self, request: HttpRequest) -> LLMConfigCreateData:
+    def _get_form_data(self, course_id: UUID) -> LLMConfigFormData:
+        from courses.models import Course
+
+        try:
+            course = Course.objects.get(id=course_id)
+            courses = [{"id": str(course.id), "name": course.name}]
+        except Course.DoesNotExist:
+            courses = []
+
+        return LLMConfigFormData(
+            is_edit=False,
+            form_title="Create LLM Configuration",
+            course_id=course_id,
+            courses=courses,
+        )
+
+    def _parse_create_form_data(
+        self, request: HttpRequest, course_id: UUID
+    ) -> LLMConfigCreateData:
         """Parse form data into typed object. Easy to test!"""
         return LLMConfigCreateData(
             name=request.POST.get("name", "").strip(),
@@ -201,11 +241,11 @@ class LLMConfigCreateView(View):
             max_completion_tokens=int(request.POST.get("max_completion_tokens", 1000)),
             is_default=request.POST.get("is_default") == "on",
             is_active=True,
+            course_id=course_id,
         )
 
     def _create_config(self, data: LLMConfigCreateData) -> LLMConfigCreateResult:
         """Create config with validation. Easy to test!"""
-        # Basic validation
         if not data.name:
             return LLMConfigCreateResult(success=False, error="Name is required.")
         if not data.model_name:
@@ -217,7 +257,6 @@ class LLMConfigCreateView(View):
                 success=False, error="Base prompt is required."
             )
 
-        # Create using service
         return LLMService.create_config(data)
 
 
@@ -226,51 +265,52 @@ class LLMConfigEditView(View):
     """Edit LLM configuration using testable-first approach."""
 
     @method_decorator(teacher_required)
-    def get(self, request: HttpRequest, config_id: UUID) -> HttpResponse:
-        # Get config data (config_id is already a UUID from URL pattern)
+    def get(
+        self, request: HttpRequest, course_id: UUID, config_id: UUID
+    ) -> HttpResponse:
         config_data = LLMService.get_config_by_id(config_id)
         if not config_data:
             messages.error(request, "Configuration not found.")
-            return redirect("llm:config-list")
+            return redirect("llm:config-list", course_id=course_id)
 
-        # Get form data
         data = LLMConfigFormData(
             config=config_data,
             is_edit=True,
             form_title=f"Edit Configuration: {config_data.name}",
+            course_id=course_id,
         )
 
         return render(request, "llm/config_form.html", {"data": data})
 
     @method_decorator(teacher_required)
-    def post(self, request: HttpRequest, config_id: UUID) -> HttpResponse:
-        # Get existing config (config_id is already a UUID from URL pattern)
+    def post(
+        self, request: HttpRequest, course_id: UUID, config_id: UUID
+    ) -> HttpResponse:
         config_data = LLMService.get_config_by_id(config_id)
         if not config_data:
             messages.error(request, "Configuration not found.")
-            return redirect("llm:config-list")
+            return redirect("llm:config-list", course_id=course_id)
 
-        # Parse form data
         update_data = self._parse_update_form_data(request)
 
-        # Update config
         result = LLMService.update_config(config_id, update_data)
 
-        # Handle result
         if result.success:
             messages.success(
                 request,
                 f"Configuration '{update_data.get('name', config_data.name)}' updated successfully!",
             )
-            return redirect("llm:config-detail", config_id=config_id)
+            return redirect(
+                "llm:config-detail", course_id=course_id, config_id=config_id
+            )
         else:
             messages.error(request, result.error or "Failed to update configuration.")
 
-            # Return form with data
             data = LLMConfigFormData(
                 config=config_data,
                 is_edit=True,
                 form_title=f"Edit Configuration: {config_data.name}",
+                course_id=course_id,
             )
             return render(
                 request,
@@ -321,22 +361,21 @@ class LLMConfigDeleteView(View):
     """Delete LLM configuration using testable-first approach."""
 
     @method_decorator(teacher_required)
-    def post(self, request: HttpRequest, config_id: UUID) -> HttpResponse:
-        # Delete config
+    def post(
+        self, request: HttpRequest, course_id: UUID, config_id: UUID
+    ) -> HttpResponse:
         result = self._delete_config(config_id)
 
-        # Handle result
         if result.success:
             messages.success(request, "Configuration deleted successfully!")
         else:
             messages.error(request, result.error or "Failed to delete configuration.")
 
-        return redirect("llm:config-list")
+        return redirect("llm:config-list", course_id=course_id)
 
     def _delete_config(self, config_id: UUID) -> LLMConfigUpdateResult:
         """Delete config with validation. Easy to test!"""
         try:
-            # config_id is already a UUID from URL pattern
             return LLMService.delete_config(config_id)
         except ValueError:
             return LLMConfigUpdateResult(
@@ -349,16 +388,15 @@ class LLMConfigTestView(View):
     """Test LLM configuration using testable-first approach."""
 
     @method_decorator(teacher_required)
-    def post(self, request: HttpRequest, config_id: UUID) -> JsonResponse:
-        # Parse test data
+    def post(
+        self, request: HttpRequest, course_id: UUID, config_id: UUID
+    ) -> JsonResponse:
         test_message = request.POST.get(
             "test_message", "Hello, this is a test message."
         )
 
-        # Test config
         result = self._test_config(config_id, test_message)
 
-        # Return JSON response
         return JsonResponse(
             {
                 "success": result.success,
@@ -371,7 +409,6 @@ class LLMConfigTestView(View):
     def _test_config(self, config_id: UUID, test_message: str) -> LLMResponseResult:
         """Test config with validation. Easy to test!"""
         try:
-            # config_id is already a UUID from URL pattern
             return LLMService.test_config(config_id, test_message)
         except ValueError:
             return LLMResponseResult(
@@ -379,6 +416,62 @@ class LLMConfigTestView(View):
                 tokens_used=0,
                 success=False,
                 error="Invalid configuration ID.",
+            )
+
+
+@method_decorator(login_required, name="dispatch")
+class LLMConfigCloneView(View):
+    """Clone an LLM configuration to another course."""
+
+    @method_decorator(teacher_required)
+    def get(
+        self, request: HttpRequest, course_id: UUID, config_id: UUID
+    ) -> HttpResponse:
+        config_data = LLMService.get_config_by_id(config_id)
+        if not config_data:
+            messages.error(request, "Configuration not found.")
+            return redirect("llm:config-list", course_id=course_id)
+
+        from courses.models import Course
+
+        courses = Course.objects.filter(is_active=True).exclude(id=course_id)
+
+        return render(
+            request,
+            "llm/config_clone.html",
+            {
+                "config": config_data,
+                "source_course_id": course_id,
+                "courses": courses,
+            },
+        )
+
+    @method_decorator(teacher_required)
+    def post(
+        self, request: HttpRequest, course_id: UUID, config_id: UUID
+    ) -> HttpResponse:
+        target_course_id = request.POST.get("target_course_id")
+        if not target_course_id:
+            messages.error(request, "Please select a target course.")
+            return redirect(
+                "llm:config-clone", course_id=course_id, config_id=config_id
+            )
+
+        try:
+            target_uuid = UUID(target_course_id)
+        except ValueError:
+            messages.error(request, "Invalid target course.")
+            return redirect("llm:config-list", course_id=course_id)
+
+        result = LLMService.clone_config_to_course(config_id, target_uuid)
+
+        if result.success:
+            messages.success(request, "Configuration cloned successfully!")
+            return redirect("llm:config-list", course_id=target_uuid)
+        else:
+            messages.error(request, result.error or "Failed to clone configuration.")
+            return redirect(
+                "llm:config-clone", course_id=course_id, config_id=config_id
             )
 
 
