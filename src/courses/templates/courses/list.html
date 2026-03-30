@@ -16,6 +16,8 @@
             <p class="text-muted">Browse and enroll in available courses</p>
             {% elif data.user_type == 'teacher' %}
             <p class="text-muted">Your teaching courses</p>
+            {% elif data.user_type == 'teacher_assistant' %}
+            <p class="text-muted">Courses you are assisting as TA</p>
             {% endif %}
         </div>
         {% if data.user_type == 'teacher' %}
@@ -81,6 +83,10 @@
                     {% elif data.user_type == 'teacher' %}
                         <span class="text-muted">
                             <i class="bi bi-person-badge"></i> Teaching this course
+                        </span>
+                    {% elif data.user_type == 'teacher_assistant' %}
+                        <span class="text-muted">
+                            <i class="bi bi-person-badge"></i> TA for this course
                         </span>
                     {% endif %}
                 </div>

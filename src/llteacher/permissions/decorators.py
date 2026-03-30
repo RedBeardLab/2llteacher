@@ -353,6 +353,7 @@ def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
     Allows access if:
     1. User is a teacher who owns the homework
     2. User is a student enrolled in the course that has the homework
+    3. User is a teacher assistant assigned to the course that has the homework
 
     Args:
         view_func: View function to decorate
@@ -368,7 +369,7 @@ def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
         from homeworks.models import Homework
 
         homework = get_object_or_404(Homework, id=homework_id)
-        teacher, student = get_teacher_or_student(request.user)
+        teacher, student, teacher_assistant = get_teacher_or_student_or_ta(request.user)
 
         # Teachers who own the homework have access
         if teacher and homework.created_by == teacher:
@@ -376,9 +377,16 @@ def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
 
         # For students, check if they're enrolled in the course that has this homework
         if student:
-            is_enrolled = homework.course.is_student_enrolled(student)
-            if is_enrolled:
-                return view_func(request, homework_id, *args, **kwargs)
+            if homework.course:
+                is_enrolled = homework.course.is_student_enrolled(student)
+                if is_enrolled:
+                    return view_func(request, homework_id, *args, **kwargs)
+
+        # For teacher assistants, check if they're assigned to the course
+        if teacher_assistant:
+            if homework.course:
+                if homework.course.is_teacher_assistant(teacher_assistant):
+                    return view_func(request, homework_id, *args, **kwargs)
 
         return HttpResponseForbidden(
             "Access denied. You are not enrolled in the course that has this homework."
