@@ -298,9 +298,9 @@ class ConversationDetailView(View):
 
         # Create combined timeline for instructor (teacher/TA) view
         is_instructor_viewing = (
-            (hasattr(request.user, "teacher_profile") or hasattr(request.user, "teacher_assistant_profile"))
-            and request.user.id != conversation_data.user_id
-        )
+            hasattr(request.user, "teacher_profile")
+            or hasattr(request.user, "teacher_assistant_profile")
+        ) and request.user.id != conversation_data.user_id
         timeline = self._create_timeline(conversation_data, is_instructor_viewing)
 
         # Render the conversation detail template
@@ -340,13 +340,15 @@ class ConversationDetailView(View):
             # Get the conversation to check course assignment
             try:
                 conversation = Conversation.objects.select_related(
-                    'section__homework__course'
+                    "section__homework__course"
                 ).get(id=conversation_data.id)
 
                 # Check if TA is assigned to this course
                 if conversation.section.homework.course:
-                    is_ta_for_course = conversation.section.homework.course.is_teacher_assistant(
-                        user.teacher_assistant_profile
+                    is_ta_for_course = (
+                        conversation.section.homework.course.is_teacher_assistant(
+                            user.teacher_assistant_profile
+                        )
                     )
                     if is_ta_for_course:
                         return True

@@ -9,7 +9,12 @@ from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
-from courses.models import Course, CourseEnrollment, CourseTeacher, CourseTeacherAssistant
+from courses.models import (
+    Course,
+    CourseEnrollment,
+    CourseTeacher,
+    CourseTeacherAssistant,
+)
 from courses.views import CourseListView, CourseListData
 from accounts.models import Teacher, Student, TeacherAssistant
 
@@ -222,8 +227,8 @@ class CourseListViewTests(TestCase):
         data = view._get_view_data(multi_user)
 
         # Should have both student and TA in user_types
-        self.assertIn('student', data.user_types)
-        self.assertIn('teacher_assistant', data.user_types)
+        self.assertIn("student", data.user_types)
+        self.assertIn("teacher_assistant", data.user_types)
         self.assertEqual(len(data.user_types), 2)
 
         # Should see courses from both roles plus course3 (active, available for enrollment)
@@ -235,10 +240,10 @@ class CourseListViewTests(TestCase):
         course3_item = next(c for c in data.courses if c.id == course3.id)
 
         # Verify roles
-        self.assertIn('student', course1_item.roles)
+        self.assertIn("student", course1_item.roles)
         self.assertTrue(course1_item.is_enrolled)
 
-        self.assertIn('teacher_assistant', course2_item.roles)
+        self.assertIn("teacher_assistant", course2_item.roles)
         self.assertFalse(course2_item.is_enrolled)
 
         # course3 should have no roles (not enrolled, not TA)
