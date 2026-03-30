@@ -402,7 +402,8 @@ class HomeworkDetailViewTATests(TestCase):
         # Check that the View Submissions button is present in the HTML
         self.assertContains(response, "View Submissions")
         self.assertContains(
-            response, reverse("homeworks:submissions", kwargs={"homework_id": self.homework.id})
+            response,
+            reverse("homeworks:submissions", kwargs={"homework_id": self.homework.id}),
         )
 
     def test_ta_cannot_edit_homework(self):
