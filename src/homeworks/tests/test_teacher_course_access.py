@@ -231,13 +231,14 @@ class TestTeacherHomeworkDetailViewPermissions(TeacherCourseAccessTestCase):
         self.assertTrue(response.context["data"].can_edit)
 
     def test_teacher_cannot_edit_homework_from_other_course(self):
-        """Test that teacher1 cannot edit homework2 (from course2 they don't teach)."""
+        """Test that teacher1 cannot access homework2 (from course2 they don't teach)."""
         self.client.login(username="teacher1", password="password123")
         url = reverse("homeworks:detail", kwargs={"homework_id": self.homework2.id})
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["data"].can_edit)
+        # Should be redirected since they don't have access
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("homeworks:list"))
 
     def test_teacher_can_edit_own_homework_in_other_course(self):
         """Test that teacher1 can edit homework4 (created by them, assigned to course2)."""
