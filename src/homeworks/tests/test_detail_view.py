@@ -103,7 +103,7 @@ class HomeworkDetailViewTests(TestCase):
         self.assertIsInstance(data, HomeworkDetailData)
 
         # Check if the user type is correctly identified
-        self.assertEqual(data.user_type, "teacher")
+        self.assertIn("teacher", data.user_roles)
 
         # Check if edit permission is correctly set
         self.assertTrue(data.can_edit)
@@ -132,14 +132,8 @@ class HomeworkDetailViewTests(TestCase):
         view = HomeworkDetailView()
         data = view._get_view_data(self.other_teacher_user, self.homework.id)
 
-        # Check if data is of the correct type
-        self.assertIsInstance(data, HomeworkDetailData)
-
-        # Check if the user type is correctly identified
-        self.assertEqual(data.user_type, "teacher")
-
-        # Check if edit permission is correctly set (should be False)
-        self.assertFalse(data.can_edit)
+        # Teacher not teaching the course should not have access
+        self.assertIsNone(data)
 
     def test_get_view_data_for_student(self):
         """Test the _get_view_data method for a student user."""
@@ -150,7 +144,7 @@ class HomeworkDetailViewTests(TestCase):
         self.assertIsInstance(data, HomeworkDetailData)
 
         # Check if the user type is correctly identified
-        self.assertEqual(data.user_type, "student")
+        self.assertIn("student", data.user_roles)
 
         # Check if edit permission is correctly set (should be False)
         self.assertFalse(data.can_edit)
@@ -183,7 +177,7 @@ class HomeworkDetailViewTests(TestCase):
         # Check context data
         self.assertIn("data", response.context)
         data = response.context["data"]
-        self.assertEqual(data.user_type, "teacher")
+        self.assertIn("teacher", data.user_roles)
         self.assertTrue(data.can_edit)
 
     def test_get_request_nonexistent_homework(self):

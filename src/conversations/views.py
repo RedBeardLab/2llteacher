@@ -296,12 +296,12 @@ class ConversationDetailView(View):
         # Process message styling for display
         conversation_data = self._process_message_styling(conversation_data)
 
-        # Create combined timeline for teacher view
-        is_teacher_viewing = (
-            hasattr(request.user, "teacher_profile")
+        # Create combined timeline for instructor (teacher/TA) view
+        is_instructor_viewing = (
+            (hasattr(request.user, "teacher_profile") or hasattr(request.user, "teacher_assistant_profile"))
             and request.user.id != conversation_data.user_id
         )
-        timeline = self._create_timeline(conversation_data, is_teacher_viewing)
+        timeline = self._create_timeline(conversation_data, is_instructor_viewing)
 
         # Render the conversation detail template
         return render(
@@ -310,7 +310,7 @@ class ConversationDetailView(View):
             {
                 "conversation_data": conversation_data,
                 "timeline": timeline,
-                "is_teacher_viewing": is_teacher_viewing,
+                "is_instructor_viewing": is_instructor_viewing,
             },
         )
 
@@ -333,6 +333,25 @@ class ConversationDetailView(View):
         has_teacher_profile = hasattr(user, "teacher_profile")
         if has_teacher_profile and not conversation_data.is_teacher_test:
             return True
+
+        # TA can view student conversations in courses they're assigned to
+        has_ta_profile = hasattr(user, "teacher_assistant_profile")
+        if has_ta_profile and not conversation_data.is_teacher_test:
+            # Get the conversation to check course assignment
+            try:
+                conversation = Conversation.objects.select_related(
+                    'section__homework__course'
+                ).get(id=conversation_data.id)
+
+                # Check if TA is assigned to this course
+                if conversation.section.homework.course:
+                    is_ta_for_course = conversation.section.homework.course.is_teacher_assistant(
+                        user.teacher_assistant_profile
+                    )
+                    if is_ta_for_course:
+                        return True
+            except Conversation.DoesNotExist:
+                pass
 
         return False
 
@@ -360,13 +379,13 @@ class ConversationDetailView(View):
 
         return conversation_data
 
-    def _create_timeline(self, conversation_data, is_teacher_viewing):
+    def _create_timeline(self, conversation_data, is_instructor_viewing):
         """
         Create a combined timeline of messages, paste events, and rapid text growth events.
 
         Args:
             conversation_data: ConversationData object
-            is_teacher_viewing: Boolean indicating if teacher is viewing
+            is_instructor_viewing: Boolean indicating if instructor (teacher or TA) is viewing
 
         Returns:
             List of timeline items (messages, paste events, and rapid text growth events) sorted by timestamp
@@ -380,8 +399,8 @@ class ConversationDetailView(View):
                     {"type": "message", "data": message, "timestamp": message.timestamp}
                 )
 
-        # Add paste events if teacher is viewing
-        if is_teacher_viewing and conversation_data.paste_events:
+        # Add paste events if instructor is viewing
+        if is_instructor_viewing and conversation_data.paste_events:
             for paste_event in conversation_data.paste_events:
                 timeline.append(
                     {
@@ -391,8 +410,8 @@ class ConversationDetailView(View):
                     }
                 )
 
-        # Add rapid text growth events if teacher is viewing
-        if is_teacher_viewing and conversation_data.rapid_text_growth_events:
+        # Add rapid text growth events if instructor is viewing
+        if is_instructor_viewing and conversation_data.rapid_text_growth_events:
             for rapid_text_growth_event in conversation_data.rapid_text_growth_events:
                 timeline.append(
                     {

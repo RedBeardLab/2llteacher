@@ -25,8 +25,9 @@ from llteacher.permissions.decorators import (
     TeacherRequest,
 )
 
-from .models import Course, CourseEnrollment, CourseTeacher
+from .models import Course, CourseEnrollment, CourseTeacher, CourseTeacherAssistant
 from .forms import CourseForm
+from accounts.models import User, TeacherAssistant
 
 
 @dataclass
@@ -37,7 +38,8 @@ class CourseItem:
     name: str
     code: str
     description: str
-    is_enrolled: bool
+    roles: list[str]  # ['teacher', 'student', 'teacher_assistant']
+    is_enrolled: bool  # For backwards compatibility with student enrollment
 
 
 @dataclass
@@ -45,7 +47,7 @@ class CourseListData:
     """Data structure for the course list view."""
 
     courses: list[CourseItem]
-    user_type: str  # 'student', 'teacher', or 'unknown'
+    user_types: list[str]  # All roles this user has: ['teacher', 'student', 'teacher_assistant']
 
 
 class CourseListView(View):
@@ -74,53 +76,78 @@ class CourseListView(View):
         Prepare data for the course list view.
 
         Args:
-            user: The current user (student or teacher)
+            user: The current user (student, teacher, or teacher assistant)
 
         Returns:
             CourseListData with courses and enrollment/teaching status
         """
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
+        teacher_assistant_profile = getattr(user, "teacher_assistant_profile", None)
 
-        courses = []
-        user_type = "unknown"
-
+        # Track which user types this user has
+        user_types = []
         if teacher_profile:
-            # For teachers, show only courses they are teaching
-            user_type = "teacher"
-            teacher_courses = teacher_profile.courses.all().order_by("name")
+            user_types.append("teacher")
+        if student_profile:
+            user_types.append("student")
+        if teacher_assistant_profile:
+            user_types.append("teacher_assistant")
 
-            for course in teacher_courses:
-                courses.append(
-                    CourseItem(
-                        id=course.id,
-                        name=course.name,
-                        code=course.code,
-                        description=course.description,
-                        is_enrolled=False,  # Teachers don't enroll
-                    )
+        # Aggregate courses from all roles
+        course_dict = {}  # Use dict to deduplicate by course.id
+
+        # Add teacher courses
+        if teacher_profile:
+            for course in teacher_profile.courses.all():
+                if course.id not in course_dict:
+                    course_dict[course.id] = {
+                        'course': course,
+                        'roles': [],
+                        'is_enrolled': False
+                    }
+                course_dict[course.id]['roles'].append('teacher')
+
+        # Add student courses
+        if student_profile:
+            for course in Course.objects.filter(is_active=True):
+                if course.id not in course_dict:
+                    course_dict[course.id] = {
+                        'course': course,
+                        'roles': [],
+                        'is_enrolled': False
+                    }
+                if course.is_student_enrolled(student_profile):
+                    course_dict[course.id]['roles'].append('student')
+                    course_dict[course.id]['is_enrolled'] = True
+
+        # Add TA courses
+        if teacher_assistant_profile:
+            for course in teacher_assistant_profile.courses.all():
+                if course.id not in course_dict:
+                    course_dict[course.id] = {
+                        'course': course,
+                        'roles': [],
+                        'is_enrolled': False
+                    }
+                course_dict[course.id]['roles'].append('teacher_assistant')
+
+        # Convert to CourseItem list
+        courses = []
+        for course_data in sorted(course_dict.values(), key=lambda x: x['course'].name):
+            course = course_data['course']
+            courses.append(
+                CourseItem(
+                    id=course.id,
+                    name=course.name,
+                    code=course.code,
+                    description=course.description,
+                    roles=course_data['roles'],
+                    is_enrolled=course_data['is_enrolled']
                 )
+            )
 
-        elif student_profile:
-            # For students, show all active courses
-            user_type = "student"
-            active_courses = Course.objects.filter(is_active=True).order_by("name")
-
-            for course in active_courses:
-                # Check if student is enrolled
-                is_enrolled = course.is_student_enrolled(student_profile)
-
-                courses.append(
-                    CourseItem(
-                        id=course.id,
-                        name=course.name,
-                        code=course.code,
-                        description=course.description,
-                        is_enrolled=is_enrolled,
-                    )
-                )
-
-        return CourseListData(courses=courses, user_type=user_type)
+        return CourseListData(courses=courses, user_types=user_types)
 
 
 class CourseEnrollView(View):
@@ -242,6 +269,16 @@ class EnrolledStudentItem:
 
 
 @dataclass
+class TAItem:
+    """Data structure for a teacher assistant in the course detail view."""
+
+    id: UUID
+    username: str
+    email: str
+    assigned_at: str  # Formatted assignment date
+
+
+@dataclass
 class CourseDetailData:
     """Data structure for the course detail view."""
 
@@ -250,8 +287,9 @@ class CourseDetailData:
     course_code: str
     course_description: str
     homeworks: list[HomeworkItem]
-    enrolled_students: list[EnrolledStudentItem] | None  # None for students
-    user_type: str  # 'student' or 'teacher'
+    enrolled_students: list[EnrolledStudentItem] | None
+    teacher_assistants: list[TAItem] | None
+    user_roles: list[str]  # All roles this user has: ['teacher', 'student', 'teacher_assistant']
 
 
 class CourseDetailView(View):
@@ -275,45 +313,57 @@ class CourseDetailView(View):
         # Check permissions and get data
         teacher_profile = getattr(request.user, "teacher_profile", None)
         student_profile = getattr(request.user, "student_profile", None)
+        teacher_assistant_profile = getattr(
+            request.user, "teacher_assistant_profile", None
+        )
 
-        # Check if user has access to this course
-        has_access = False
-        user_type = None
+        # Check access through any role
+        user_roles = []
 
-        if teacher_profile:
-            # Check if teacher teaches this course
-            has_access = CourseTeacher.objects.filter(
-                course=course, teacher=teacher_profile
-            ).exists()
-            user_type = "teacher"
-        elif student_profile:
-            # Check if student is enrolled
-            has_access = course.is_student_enrolled(student_profile)
-            user_type = "student"
+        if teacher_profile and CourseTeacher.objects.filter(course=course, teacher=teacher_profile).exists():
+            user_roles.append('teacher')
 
-        if not has_access:
+        if student_profile and course.is_student_enrolled(student_profile):
+            user_roles.append('student')
+
+        if teacher_assistant_profile and course.is_teacher_assistant(teacher_assistant_profile):
+            user_roles.append('teacher_assistant')
+
+        if not user_roles:
             return HttpResponseForbidden("You do not have access to this course.")
 
-        # Get the appropriate data based on user type
-        data = self._get_view_data(course, user_type, teacher_profile, student_profile)
+        # Get the appropriate data based on user roles
+        data = self._get_view_data(
+            course,
+            user_roles,
+            teacher_profile,
+            student_profile,
+            teacher_assistant_profile,
+        )
 
         # Render the template with the data
         return render(request, "courses/detail.html", {"data": data})
 
     def _get_view_data(
-        self, course: Course, user_type: str, teacher_profile=None, student_profile=None
+        self,
+        course: Course,
+        user_roles: list[str],
+        teacher_profile=None,
+        student_profile=None,
+        teacher_assistant_profile=None,
     ) -> CourseDetailData:
         """
         Prepare data for the course detail view.
 
         Args:
             course: The course to display
-            user_type: 'teacher' or 'student'
+            user_roles: List of roles this user has for this course
             teacher_profile: Teacher profile if user is a teacher
             student_profile: Student profile if user is a student
+            teacher_assistant_profile: Teacher assistant profile if user is a TA
 
         Returns:
-            CourseDetailData with course info, homeworks, and optionally students
+            CourseDetailData with course info, homeworks, and optionally students/TAs
         """
         # Get homeworks for this course (direct FK relationship)
         from homeworks.models import Homework
@@ -331,9 +381,9 @@ class CourseDetailView(View):
                 )
             )
 
-        # Get enrolled students if user is a teacher
+        # Get enrolled students if user is a teacher or TA (TAs need to see students for grading)
         enrolled_students = None
-        if user_type == "teacher":
+        if 'teacher' in user_roles or 'teacher_assistant' in user_roles:
             enrollments = (
                 CourseEnrollment.objects.filter(course=course, is_active=True)
                 .select_related("student__user")
@@ -352,6 +402,26 @@ class CourseDetailView(View):
                     )
                 )
 
+        # Get teacher assistants if user is a teacher or TA
+        teacher_assistants = None
+        if 'teacher' in user_roles or 'teacher_assistant' in user_roles:
+            tas = (
+                CourseTeacherAssistant.objects.filter(course=course)
+                .select_related("teacher_assistant__user")
+                .order_by("-assigned_at")
+            )
+
+            teacher_assistants = []
+            for ta in tas:
+                teacher_assistants.append(
+                    TAItem(
+                        id=ta.teacher_assistant.id,
+                        username=ta.teacher_assistant.user.username,
+                        email=ta.teacher_assistant.user.email,
+                        assigned_at=ta.assigned_at.strftime("%B %d, %Y"),
+                    )
+                )
+
         return CourseDetailData(
             course_id=course.id,
             course_name=course.name,
@@ -359,7 +429,8 @@ class CourseDetailView(View):
             course_description=course.description,
             homeworks=homeworks,
             enrolled_students=enrolled_students,
-            user_type=user_type,
+            teacher_assistants=teacher_assistants,
+            user_roles=user_roles,
         )
 
 
@@ -533,3 +604,113 @@ class CourseHomeworkCreateView(View):
             action="create",
             is_submitted=False,
         )
+
+
+class CourseTAAssignView(View):
+    """
+    View for assigning a teacher assistant to a course.
+
+    Teacher-only view that allows assigning existing TeacherAssistant
+    profiles to the course.
+    """
+
+    @method_decorator(login_required, name="dispatch")
+    @method_decorator(teacher_required, name="dispatch")
+    def dispatch(self, *args, **kwargs):
+        """Ensure user is a logged-in teacher."""
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request: TeacherRequest, course_id: UUID) -> HttpResponse:
+        """Handle POST requests to assign a TA to a course."""
+        course = get_object_or_404(Course, id=course_id)
+
+        # Check if teacher teaches this course
+        if not self._is_course_teacher(request.user.teacher_profile, course):
+            return HttpResponseForbidden(
+                "You can only assign TAs to courses you teach."
+            )
+
+        # Get email from form
+        ta_email = request.POST.get("ta_email")
+        if not ta_email:
+            messages.error(request, "TA email is required.")
+            return redirect("courses:detail", course_id=course.id)
+
+        # Find or create TeacherAssistant profile
+        try:
+            ta_user = User.objects.get(email=ta_email)
+        except User.DoesNotExist:
+            messages.error(request, f"No user found with email {ta_email}.")
+            return redirect("courses:detail", course_id=course.id)
+
+        # Get or create TeacherAssistant profile
+        teacher_assistant, created = TeacherAssistant.objects.get_or_create(
+            user=ta_user
+        )
+
+        # Check if already assigned
+        if CourseTeacherAssistant.objects.filter(
+            course=course, teacher_assistant=teacher_assistant
+        ).exists():
+            messages.info(request, f"{ta_email} is already a TA in this course.")
+            return redirect("courses:detail", course_id=course.id)
+
+        # Assign TA to course
+        CourseTeacherAssistant.objects.create(
+            course=course,
+            teacher_assistant=teacher_assistant,
+        )
+
+        messages.success(request, f"{ta_email} has been assigned as TA!")
+        return redirect("courses:detail", course_id=course.id)
+
+    def _is_course_teacher(self, teacher_profile, course: Course) -> bool:
+        """Check if teacher is associated with this course."""
+        return CourseTeacher.objects.filter(
+            course=course, teacher=teacher_profile
+        ).exists()
+
+
+class CourseTARemoveView(View):
+    """
+    View for removing a teacher assistant from a course.
+
+    Teacher-only view that allows removing TAs from the course.
+    """
+
+    @method_decorator(login_required, name="dispatch")
+    @method_decorator(teacher_required, name="dispatch")
+    def dispatch(self, *args, **kwargs):
+        """Ensure user is a logged-in teacher."""
+        return super().dispatch(*args, **kwargs)
+
+    def post(
+        self, request: TeacherRequest, course_id: UUID, ta_id: UUID
+    ) -> HttpResponse:
+        """Handle POST requests to remove a TA from a course."""
+        course = get_object_or_404(Course, id=course_id)
+
+        # Check if teacher teaches this course
+        if not self._is_course_teacher(request.user.teacher_profile, course):
+            return HttpResponseForbidden(
+                "You can only remove TAs from courses you teach."
+            )
+
+        # Find and delete the assignment
+        try:
+            ta_assignment = CourseTeacherAssistant.objects.get(
+                course=course,
+                teacher_assistant_id=ta_id,
+            )
+            ta_assignment.delete()
+            messages.success(request, "TA has been removed from the course.")
+        except CourseTeacherAssistant.DoesNotExist:
+            messages.error(request, "TA assignment not found.")
+
+        return redirect("courses:detail", course_id=course.id)
+
+    def _is_course_teacher(self, teacher_profile, course: Course) -> bool:
+        """Check if teacher is associated with this course."""
+        return CourseTeacher.objects.filter(
+            course=course, teacher=teacher_profile
+        ).exists()

@@ -122,8 +122,8 @@ class SectionDetailViewTestCase(TestCase):
         self.assertEqual(
             response.context["data"].section_id, self.section_without_solution.id
         )
-        self.assertEqual(response.context["data"].is_teacher, True)
-        self.assertEqual(response.context["data"].is_student, False)
+        self.assertIn("teacher", response.context["data"].user_roles)
+        self.assertNotIn("student", response.context["data"].user_roles)
         self.assertEqual(response.context["data"].has_solution, False)
 
         # Access section with solution
@@ -164,8 +164,8 @@ class SectionDetailViewTestCase(TestCase):
         self.assertTemplateUsed(response, "homeworks/section_detail.html")
 
         # Check context data
-        self.assertEqual(response.context["data"].is_teacher, False)
-        self.assertEqual(response.context["data"].is_student, True)
+        self.assertNotIn("teacher", response.context["data"].user_roles)
+        self.assertIn("student", response.context["data"].user_roles)
         self.assertIsNotNone(response.context["data"].conversations)
         self.assertIsNotNone(response.context["data"].submission)
         self.assertEqual(

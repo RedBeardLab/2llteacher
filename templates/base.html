@@ -38,7 +38,7 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                    {% if request.user.student_profile or request.user.teacher_profile %}
+                    {% if request.user.student_profile or request.user.teacher_profile or request.user.teacher_assistant_profile %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == '/courses/' %}active{% endif %}" href="{% url 'courses:list' %}">
                             <i class="bi bi-book"></i> Courses

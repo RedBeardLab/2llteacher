@@ -9,6 +9,13 @@
 
 {% block content %}
 <div class="container mt-4">
+    {% if 'teacher_assistant' in data.user_roles and 'teacher' not in data.user_roles and 'student' not in data.user_roles %}
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle"></i> You are viewing this section as a Teacher Assistant.
+        You can test the assignment using the conversation below.
+    </div>
+    {% endif %}
+
     <!-- Breadcrumb Navigation -->
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
@@ -21,7 +28,18 @@
     <!-- Section Header -->
     <div class="card mb-4">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <h3 class="mb-0">Section {{ data.section_order }}: {{ data.section_title }}</h3>
+            <h3 class="mb-0">
+                Section {{ data.section_order }}: {{ data.section_title }}
+                {% if 'teacher' in data.user_roles %}
+                    <span class="badge bg-primary">Teaching</span>
+                {% endif %}
+                {% if 'student' in data.user_roles %}
+                    <span class="badge bg-success">Student</span>
+                {% endif %}
+                {% if 'teacher_assistant' in data.user_roles %}
+                    <span class="badge bg-warning text-dark">TA</span>
+                {% endif %}
+            </h3>
         </div>
         <div class="card-body">
             <div class="content-area mb-4">
@@ -32,7 +50,7 @@
                 </zero-md>
             </div>
 
-            {% if data.is_teacher and data.has_solution %}
+            {% if 'teacher' in data.user_roles and data.has_solution %}
             <div class="alert alert-info">
                 <h5><i class="bi bi-lightbulb"></i> Solution</h5>
                 <div class="solution-content">
@@ -51,7 +69,7 @@
     <div class="card mb-4">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
             <h4 class="mb-0">Conversations</h4>
-            {% if data.is_student or data.is_teacher %}
+            {% if data.user_roles %}
             <a href="{% url 'conversations:start' section_id=data.section_id %}" class="btn btn-primary btn-sm">
                 <i class="bi bi-plus-circle"></i> New Conversation
             </a>
@@ -63,7 +81,16 @@
                 {% for conversation in data.conversations %}
                 <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="mb-1">{{ conversation.label }}</h5>
+                        <h5 class="mb-1">
+                            {{ conversation.label }}
+                            {% if conversation.role == 'teacher' %}
+                                <span class="badge bg-primary">Teaching</span>
+                            {% elif conversation.role == 'student' %}
+                                <span class="badge bg-success">Student</span>
+                            {% elif conversation.role == 'teacher_assistant' %}
+                                <span class="badge bg-warning text-dark">TA</span>
+                            {% endif %}
+                        </h5>
                         <small class="text-muted">Last updated: {{ conversation.updated_at|date:"F d, Y H:i" }}</small>
                     </div>
                     <span class="badge bg-primary rounded-pill">{{ conversation.message_count }} messages</span>
@@ -74,7 +101,7 @@
             <div class="text-center py-4">
                 <i class="bi bi-chat-dots fs-1 text-muted"></i>
                 <p class="mt-2">No conversations started yet.</p>
-                {% if data.is_student or data.is_teacher %}
+                {% if data.user_roles %}
                 <a href="{% url 'conversations:start' section_id=data.section_id %}" class="btn btn-outline-primary">
                     Start a New Conversation
                 </a>
@@ -85,7 +112,7 @@
     </div>
 
     <!-- Submission Section (for students) -->
-    {% if data.is_student %}
+    {% if 'student' in data.user_roles %}
     <div class="card mb-4">
         <div class="card-header bg-light">
             <h4 class="mb-0">Submission Status</h4>

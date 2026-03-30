@@ -295,6 +295,7 @@ class SectionAccessRequiredTests(TestCase):
         request.user = Mock()
         request.user.teacher_profile = teacher_profile
         request.user.student_profile = None
+        request.user.teacher_assistant_profile = None
 
         # Set the teacher as the homework creator
         homework.created_by = teacher_profile
@@ -323,6 +324,7 @@ class SectionAccessRequiredTests(TestCase):
         request.user = Mock()
         request.user.teacher_profile = None
         request.user.student_profile = Mock()
+        request.user.teacher_assistant_profile = None
 
         # Call the decorated view
         section_id = uuid4()
@@ -351,6 +353,7 @@ class SectionAccessRequiredTests(TestCase):
         request.user = Mock()
         request.user.teacher_profile = teacher_profile
         request.user.student_profile = None
+        request.user.teacher_assistant_profile = None
 
         # Set a different teacher as the homework creator
         homework.created_by = other_teacher_profile
@@ -364,8 +367,8 @@ class SectionAccessRequiredTests(TestCase):
         self.assertIsInstance(response, HttpResponseForbidden)
 
     @patch("llteacher.permissions.decorators.get_object_or_404")
-    def test_non_teacher_non_student_access_denied(self, mock_get_object):
-        """Test that user who is neither teacher nor student cannot access the section."""
+    def test_non_teacher_non_student_non_ta_access_denied(self, mock_get_object):
+        """Test that user who is neither teacher nor student nor TA cannot access the section."""
         # Create mock section
         section = Mock()
         section.homework = Mock()
@@ -373,11 +376,12 @@ class SectionAccessRequiredTests(TestCase):
         # Set up mock to return the section
         mock_get_object.return_value = section
 
-        # Create request with user who is neither teacher nor student
+        # Create request with user who is neither teacher nor student nor TA
         request = self.factory.get("/")
         request.user = Mock()
         request.user.teacher_profile = None
         request.user.student_profile = None
+        request.user.teacher_assistant_profile = None
 
         # Call the decorated view
         section_id = uuid4()

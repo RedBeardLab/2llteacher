@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from accounts.models import Teacher, Student
+from accounts.models import Teacher, Student, TeacherAssistant
 import uuid
 
 
@@ -144,6 +144,58 @@ class StudentModelTest(TestCase):
         student_id = student.id
         self.user.delete()
         self.assertFalse(Student.objects.filter(id=student_id).exists())
+
+
+class TeacherAssistantModelTest(TestCase):
+    """Test cases for the TeacherAssistant model."""
+
+    def setUp(self):
+        self.User = get_user_model()
+        self.user = self.User.objects.create_user(
+            username="testta", password="testpass123"
+        )
+
+    def test_teacher_assistant_creation(self):
+        """Test basic teacher assistant creation."""
+        ta = TeacherAssistant.objects.create(user=self.user)
+        self.assertEqual(ta.user, self.user)
+        self.assertIsInstance(ta.id, uuid.UUID)
+
+    def test_teacher_assistant_uuid_primary_key(self):
+        """Test that teacher assistant has UUID primary key."""
+        ta = TeacherAssistant.objects.create(user=self.user)
+        self.assertIsInstance(ta.id, uuid.UUID)
+
+    def test_teacher_assistant_timestamps(self):
+        """Test teacher assistant timestamp fields."""
+        ta = TeacherAssistant.objects.create(user=self.user)
+        self.assertIsNotNone(ta.created_at)
+        self.assertIsNotNone(ta.updated_at)
+        self.assertIsInstance(ta.created_at, timezone.datetime)
+        self.assertIsInstance(ta.updated_at, timezone.datetime)
+
+    def test_teacher_assistant_str_representation(self):
+        """Test teacher assistant string representation."""
+        ta = TeacherAssistant.objects.create(user=self.user)
+        self.assertEqual(str(ta), f"TeacherAssistant: {self.user.username}")
+
+    def test_teacher_assistant_table_name(self):
+        """Test teacher assistant table name."""
+        ta = TeacherAssistant.objects.create(user=self.user)
+        self.assertEqual(ta._meta.db_table, "accounts_teacher_assistant")
+
+    def test_teacher_assistant_user_relationship(self):
+        """Test teacher assistant-user one-to-one relationship."""
+        ta = TeacherAssistant.objects.create(user=self.user)
+        self.assertEqual(ta.user, self.user)
+        self.assertEqual(self.user.teacher_assistant_profile, ta)
+
+    def test_teacher_assistant_cascade_delete(self):
+        """Test that teacher assistant is deleted when user is deleted."""
+        ta = TeacherAssistant.objects.create(user=self.user)
+        ta_id = ta.id
+        self.user.delete()
+        self.assertFalse(TeacherAssistant.objects.filter(id=ta_id).exists())
 
 
 class TeacherStudentRelationshipTest(TestCase):

@@ -13,7 +13,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
-from accounts.models import Teacher, Student
+from accounts.models import Teacher, Student, TeacherAssistant
 
 # Type alias for request.user which can be either authenticated or anonymous
 RequestUser = AbstractBaseUser | AnonymousUser
@@ -38,6 +38,12 @@ class UserWithStudent(Protocol):
     student_profile: Student
 
 
+class UserWithTeacherAssistant(Protocol):
+    """Protocol for User with teacher_assistant_profile attribute."""
+
+    teacher_assistant_profile: TeacherAssistant
+
+
 class TeacherRequest(HttpRequest):
     """Request type where user is guaranteed to have teacher_profile.
 
@@ -60,6 +66,17 @@ class StudentRequest(HttpRequest):
     user: UserWithStudent  # type: ignore[assignment]
 
 
+class TeacherAssistantRequest(HttpRequest):
+    """Request type where user is guaranteed to have teacher_assistant_profile.
+
+    Note: The user attribute override is intentional - the decorator guarantees
+    this type narrowing at runtime. The type: ignore is necessary because mypy
+    doesn't allow narrowing an attribute type in a subclass.
+    """
+
+    user: UserWithTeacherAssistant  # type: ignore[assignment]
+
+
 def get_teacher_or_student(user: RequestUser) -> tuple[Teacher | None, Student | None]:
     """
     Get teacher and student profiles from a user object.
@@ -73,6 +90,24 @@ def get_teacher_or_student(user: RequestUser) -> tuple[Teacher | None, Student |
     teacher = getattr(user, "teacher_profile", None)
     student = getattr(user, "student_profile", None)
     return teacher, student
+
+
+def get_teacher_or_student_or_ta(
+    user: RequestUser,
+) -> tuple[Teacher | None, Student | None, TeacherAssistant | None]:
+    """
+    Get teacher, student, and teacher assistant profiles from a user object.
+
+    Args:
+        user: User object
+
+    Returns:
+        Tuple of (teacher, student, teacher_assistant) - each may be None if not applicable
+    """
+    teacher = getattr(user, "teacher_profile", None)
+    student = getattr(user, "student_profile", None)
+    teacher_assistant = getattr(user, "teacher_assistant_profile", None)
+    return teacher, student, teacher_assistant
 
 
 def teacher_required(
@@ -127,6 +162,31 @@ def student_required(
     return wrapper
 
 
+def teacher_assistant_required(
+    view_func: Callable[Concatenate[TeacherAssistantRequest, P], R],
+) -> Callable[Concatenate[HttpRequest, P], R]:
+    """
+    Decorator to ensure user is a teacher assistant and transform request type.
+
+    The decorated view function receives TeacherAssistantRequest with guaranteed teacher_assistant_profile access.
+
+    Args:
+        view_func: View function that expects TeacherAssistantRequest
+
+    Returns:
+        Decorated function that accepts HttpRequest and checks teacher assistant access
+    """
+
+    @wraps(view_func)
+    def wrapper(request: HttpRequest, *args: P.args, **kwargs: P.kwargs) -> R:
+        _, _, teacher_assistant = get_teacher_or_student_or_ta(request.user)
+        if not teacher_assistant:
+            return cast(R, HttpResponseForbidden("Teacher Assistant access required."))
+        return view_func(cast(TeacherAssistantRequest, request), *args, **kwargs)
+
+    return wrapper
+
+
 def homework_owner_required(view_func: ViewFunc) -> ViewFunc:
     """
     Decorator to ensure teacher owns the homework.
@@ -163,6 +223,7 @@ def section_access_required(view_func: ViewFunc) -> ViewFunc:
     Allows access if:
     1. User is a teacher who owns the homework containing the section
     2. User is a student (with any further access checking done in the view)
+    3. User is a teacher assistant assigned to the course that has the homework
 
     Args:
         view_func: View function to decorate
@@ -178,7 +239,7 @@ def section_access_required(view_func: ViewFunc) -> ViewFunc:
         from homeworks.models import Section
 
         section = get_object_or_404(Section, id=section_id)
-        teacher, student = get_teacher_or_student(request.user)
+        teacher, student, teacher_assistant = get_teacher_or_student_or_ta(request.user)
 
         if teacher and section.homework.created_by == teacher:
             # Teacher owns the homework
@@ -186,8 +247,12 @@ def section_access_required(view_func: ViewFunc) -> ViewFunc:
         elif student:
             # Student access (additional checks may be done in view)
             return view_func(request, section, *args, **kwargs)
-        else:
-            return HttpResponseForbidden("Access denied.")
+        elif teacher_assistant:
+            # Check if TA is assigned to the course that has this homework
+            if section.homework.course:
+                if section.homework.course.is_teacher_assistant(teacher_assistant):
+                    return view_func(request, section, *args, **kwargs)
+        return HttpResponseForbidden("Access denied.")
 
     return cast(ViewFunc, wrapper)
 
@@ -199,6 +264,7 @@ def conversation_access_required(view_func: ViewFunc) -> ViewFunc:
     Allows access if:
     1. User owns the conversation
     2. User is a teacher who owns the homework containing the section
+    3. User is a teacher assistant assigned to the course
 
     Args:
         view_func: View function to decorate
@@ -214,7 +280,7 @@ def conversation_access_required(view_func: ViewFunc) -> ViewFunc:
         from conversations.models import Conversation
 
         conversation = get_object_or_404(Conversation, id=conversation_id)
-        teacher, _ = get_teacher_or_student(request.user)
+        teacher, _, teacher_assistant = get_teacher_or_student_or_ta(request.user)
 
         # User owns the conversation
         if conversation.user == request.user:
@@ -223,6 +289,13 @@ def conversation_access_required(view_func: ViewFunc) -> ViewFunc:
         # Teacher owns the homework containing the section
         if teacher and conversation.section.homework.created_by == teacher:
             return view_func(request, conversation, *args, **kwargs)
+
+        # TA access - check if assigned to the course
+        if teacher_assistant and conversation.section.homework.course:
+            if conversation.section.homework.course.is_teacher_assistant(
+                teacher_assistant
+            ):
+                return view_func(request, conversation, *args, **kwargs)
 
         return HttpResponseForbidden("Access denied.")
 
@@ -236,6 +309,7 @@ def submission_access_required(view_func: ViewFunc) -> ViewFunc:
     Allows access if:
     1. User is the student who submitted
     2. User is a teacher who owns the homework containing the section
+    3. User is a teacher assistant assigned to the course
 
     Args:
         view_func: View function to decorate
@@ -251,7 +325,7 @@ def submission_access_required(view_func: ViewFunc) -> ViewFunc:
         from conversations.models import Submission
 
         submission = get_object_or_404(Submission, id=submission_id)
-        teacher, student = get_teacher_or_student(request.user)
+        teacher, student, teacher_assistant = get_teacher_or_student_or_ta(request.user)
 
         # Student who submitted
         if student and submission.conversation.user == request.user:
@@ -261,6 +335,11 @@ def submission_access_required(view_func: ViewFunc) -> ViewFunc:
         homework = submission.conversation.section.homework
         if teacher and homework.created_by == teacher:
             return view_func(request, submission, *args, **kwargs)
+
+        # TA access - check if assigned to the course
+        if teacher_assistant and homework.course:
+            if homework.course.is_teacher_assistant(teacher_assistant):
+                return view_func(request, submission, *args, **kwargs)
 
         return HttpResponseForbidden("Access denied.")
 
@@ -274,6 +353,7 @@ def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
     Allows access if:
     1. User is a teacher who owns the homework
     2. User is a student enrolled in the course that has the homework
+    3. User is a teacher assistant assigned to the course that has the homework
 
     Args:
         view_func: View function to decorate
@@ -289,7 +369,7 @@ def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
         from homeworks.models import Homework
 
         homework = get_object_or_404(Homework, id=homework_id)
-        teacher, student = get_teacher_or_student(request.user)
+        teacher, student, teacher_assistant = get_teacher_or_student_or_ta(request.user)
 
         # Teachers who own the homework have access
         if teacher and homework.created_by == teacher:
@@ -297,9 +377,16 @@ def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
 
         # For students, check if they're enrolled in the course that has this homework
         if student:
-            is_enrolled = homework.course.is_student_enrolled(student)
-            if is_enrolled:
-                return view_func(request, homework_id, *args, **kwargs)
+            if homework.course:
+                is_enrolled = homework.course.is_student_enrolled(student)
+                if is_enrolled:
+                    return view_func(request, homework_id, *args, **kwargs)
+
+        # For teacher assistants, check if they're assigned to the course
+        if teacher_assistant:
+            if homework.course:
+                if homework.course.is_teacher_assistant(teacher_assistant):
+                    return view_func(request, homework_id, *args, **kwargs)
 
         return HttpResponseForbidden(
             "Access denied. You are not enrolled in the course that has this homework."

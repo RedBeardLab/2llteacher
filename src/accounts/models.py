@@ -49,6 +49,23 @@ class Student(models.Model):
         return f"Student: {self.user.username}"
 
 
+class TeacherAssistant(models.Model):
+    """Teacher Assistant profile with one-to-one relationship to User."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="teacher_assistant_profile"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "accounts_teacher_assistant"
+
+    def __str__(self):
+        return f"TeacherAssistant: {self.user.username}"
+
+
 class EmailVerification(models.Model):
     """Email verification tokens for user registration."""
 

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
-from .models import User, Teacher, Student, EmailVerification
+from .models import User, Teacher, Student, TeacherAssistant, EmailVerification
 
 
 @admin.register(EmailVerification)
@@ -70,3 +70,4 @@ class EmailVerificationAdmin(admin.ModelAdmin):
 admin.site.register(User, UserAdmin)
 admin.site.register(Teacher)
 admin.site.register(Student)
+admin.site.register(TeacherAssistant)
