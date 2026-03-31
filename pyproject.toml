@@ -31,7 +31,20 @@ build-backend = "uv_build"
 module-name = ["llteacher", "accounts", "conversations", "homeworks", "llm"]
 
 [tool.uv]
-dev-dependencies = ["pytest", "pytest-django", "ruff", "mypy"]
+dev-dependencies = ["pytest", "pytest-django", "ruff", "mypy", "coverage"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/test_*.py",
+    "src/llteacher/test_settings.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main"]
