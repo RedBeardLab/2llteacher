@@ -434,6 +434,7 @@ class LLMConfigCloneView(View):
 
         from courses.models import Course
 
+        source_course = get_object_or_404(Course, id=course_id)
         courses = Course.objects.filter(is_active=True).exclude(id=course_id)
 
         return render(
@@ -442,6 +443,7 @@ class LLMConfigCloneView(View):
             {
                 "config": config_data,
                 "source_course_id": course_id,
+                "source_course_name": source_course.name,
                 "courses": courses,
             },
         )
