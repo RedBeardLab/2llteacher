@@ -7,13 +7,18 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1>{{ data.config.name }}</h1>
+                <div>
+                    <h1>{{ data.config.name }}</h1>
+                    {% if data.course_name %}
+                        <p class="text-muted mb-0">Course: {{ data.course_name }}</p>
+                    {% endif %}
+                </div>
                 <div class="btn-group" role="group">
-                    <a href="{% url 'llm:config-list' %}" class="btn btn-outline-secondary">
+                    <a href="{% url 'llm:config-list' data.course_id %}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left"></i> Back to List
                     </a>
                     {% if data.can_edit %}
-                        <a href="{% url 'llm:config-edit' data.config.id %}" class="btn btn-primary">
+                        <a href="{% url 'llm:config-edit' data.course_id data.config.id %}" class="btn btn-primary">
                             <i class="fas fa-edit"></i> Edit
                         </a>
                     {% endif %}
@@ -21,6 +26,11 @@
                         <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#testModal">
                             <i class="fas fa-flask"></i> Test
                         </button>
+                    {% endif %}
+                    {% if data.can_clone %}
+                        <a href="{% url 'llm:config-clone' data.course_id data.config.id %}" class="btn btn-info">
+                            <i class="fas fa-copy"></i> Clone
+                        </a>
                     {% endif %}
                     {% if data.can_delete %}
                         <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
@@ -48,7 +58,7 @@
                                 <dd class="col-sm-9">{{ data.config.temperature }}</dd>
 
                                 <dt class="col-sm-3">Max Tokens:</dt>
-                                <dd class="col-sm-9">{{ data.config.max_tokens }}</dd>
+                                <dd class="col-sm-9">{{ data.config.max_completion_tokens }}</dd>
 
                                 <dt class="col-sm-3">Status:</dt>
                                 <dd class="col-sm-9">
@@ -87,7 +97,6 @@
     </div>
 </div>
 
-<!-- Test Modal -->
 {% if data.can_test %}
 <div class="modal fade" id="testModal" tabindex="-1" aria-labelledby="testModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -124,7 +133,6 @@
 </div>
 {% endif %}
 
-<!-- Delete Modal -->
 {% if data.can_delete %}
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -139,7 +147,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form method="post" action="{% url 'llm:config-delete' data.config.id %}" class="d-inline">
+                <form method="post" action="{% url 'llm:config-delete' data.course_id data.config.id %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger">Delete</button>
                 </form>
@@ -163,14 +171,12 @@ document.getElementById('testForm').addEventListener('submit', function(e) {
     const tokensSpan = document.getElementById('testTokens');
     const message = document.getElementById('testMessage').value;
     
-    // Show loading state
     button.disabled = true;
     spinner.classList.remove('d-none');
     resultDiv.classList.add('d-none');
     errorDiv.classList.add('d-none');
     
-    // Make request
-    fetch('{% url "llm:config-test" data.config.id %}', {
+    fetch('{% url "llm:config-test" data.course_id data.config.id %}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',

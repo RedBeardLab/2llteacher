@@ -48,13 +48,6 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == '/homeworks/' %}active{% endif %}" href="{% url 'homeworks:list' %}">Homeworks</a>
                     </li>
-                    {% if request.user.teacher_profile %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.app_name == 'llm' %}active{% endif %}" href="{% url 'llm:config-list' %}">
-                            <i class="bi bi-robot"></i> LLM Config
-                        </a>
-                    </li>
-                    {% endif %}
                 </ul>
                 <ul class="navbar-nav ms-auto">
                     {% if request.user.is_authenticated %}

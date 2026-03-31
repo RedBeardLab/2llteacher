@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Clone LLM Configuration{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Clone LLM Configuration</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <p class="mb-0">You are cloning <strong>{{ config.name }}</strong> to another course.</p>
+                        <p class="mb-0">The cloned configuration will have the same settings but will be independent from the original.</p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="source_course" class="form-label">Source Course</label>
+                            <input type="text" class="form-control" id="source_course" value="{{ source_course_name }}" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="target_course_id" class="form-label">Target Course *</label>
+                            <select class="form-select" id="target_course_id" name="target_course_id" required>
+                                <option value="">Select a course...</option>
+                                {% for course in courses %}
+                                    <option value="{{ course.id }}">{{ course.name }} ({{ course.code }})</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Select the course to clone this configuration to</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'llm:config-detail' source_course_id config.id %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-copy"></i> Clone Configuration
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

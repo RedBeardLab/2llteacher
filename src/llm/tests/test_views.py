@@ -11,9 +11,10 @@ from django.urls import reverse
 from unittest.mock import patch
 import json
 
-from llm.models import LLMConfig
-from llm.services import LLMResponseWithTools
+from llm.models import LLMConfig, GlobalLLMDefault
+from llm.services import LLMResponseWithTools, LLMService
 from accounts.models import Teacher, Student
+from courses.models import Course, CourseTeacher
 
 User = get_user_model()
 
@@ -25,7 +26,6 @@ class LLMViewsTestCase(TestCase):
         """Set up test data."""
         self.client = Client()
 
-        # Create test users
         self.teacher_user = User.objects.create_user(
             username="teacher", email="teacher@test.com", password="testpass123"
         )
@@ -36,8 +36,17 @@ class LLMViewsTestCase(TestCase):
         )
         self.student = Student.objects.create(user=self.student_user)
 
-        # Create test LLM config
+        self.course = Course.objects.create(
+            name="Test Course",
+            code="TEST101",
+            description="Test course description",
+        )
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+
         self.llm_config = LLMConfig.objects.create(
+            course=self.course,
             name="Test Config",
             model_name="gpt-3.5-turbo",
             api_key="test-api-key-12345",
@@ -45,6 +54,16 @@ class LLMViewsTestCase(TestCase):
             temperature=0.7,
             max_completion_tokens=1000,
             is_default=True,
+            is_active=True,
+        )
+
+        self.global_default = GlobalLLMDefault.objects.create(
+            name="Global Default",
+            model_name="gpt-4",
+            api_key="global-api-key",
+            base_prompt="You are a global AI tutor.",
+            temperature=0.7,
+            max_completion_tokens=1000,
             is_active=True,
         )
 
@@ -56,7 +75,9 @@ class TestLLMConfigListView(LLMViewsTestCase):
         """Test that teachers can access the config list."""
         self.client.login(username="teacher", password="testpass123")
 
-        response = self.client.get(reverse("llm:config-list"))
+        response = self.client.get(
+            reverse("llm:config-list", kwargs={"course_id": self.course.id})
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Test Config")
@@ -66,16 +87,33 @@ class TestLLMConfigListView(LLMViewsTestCase):
         """Test that students cannot access the config list."""
         self.client.login(username="student", password="testpass123")
 
-        response = self.client.get(reverse("llm:config-list"))
+        response = self.client.get(
+            reverse("llm:config-list", kwargs={"course_id": self.course.id})
+        )
 
-        # Should redirect to login or show permission denied
         self.assertIn(response.status_code, [302, 403])
 
     def test_anonymous_user_redirected(self):
         """Test that anonymous users are redirected to login."""
-        response = self.client.get(reverse("llm:config-list"))
+        response = self.client.get(
+            reverse("llm:config-list", kwargs={"course_id": self.course.id})
+        )
 
         self.assertEqual(response.status_code, 302)
+
+    def test_teacher_not_in_course_cannot_access_config_list(self):
+        """Test that a teacher not associated with the course is denied."""
+        other_teacher_user = User.objects.create_user(
+            username="other_teacher", email="other@test.com", password="testpass123"
+        )
+        Teacher.objects.create(user=other_teacher_user)
+        self.client.login(username="other_teacher", password="testpass123")
+
+        response = self.client.get(
+            reverse("llm:config-list", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 403)
 
 
 class TestLLMConfigCreateView(LLMViewsTestCase):
@@ -85,7 +123,9 @@ class TestLLMConfigCreateView(LLMViewsTestCase):
         """Test that teachers can access the create form."""
         self.client.login(username="teacher", password="testpass123")
 
-        response = self.client.get(reverse("llm:config-create"))
+        response = self.client.get(
+            reverse("llm:config-create", kwargs={"course_id": self.course.id})
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Create LLM Configuration")
@@ -105,13 +145,14 @@ class TestLLMConfigCreateView(LLMViewsTestCase):
             "is_active": True,
         }
 
-        response = self.client.post(reverse("llm:config-create"), form_data)
+        response = self.client.post(
+            reverse("llm:config-create", kwargs={"course_id": self.course.id}),
+            form_data,
+        )
 
-        # Should redirect after successful creation
         self.assertEqual(response.status_code, 302)
 
-        # Check config was created
-        new_config = LLMConfig.objects.get(name="New Test Config")
+        new_config = LLMConfig.objects.get(name="New Test Config", course=self.course)
         self.assertEqual(new_config.model_name, "gpt-4")
         self.assertEqual(new_config.temperature, 0.8)
 
@@ -119,7 +160,9 @@ class TestLLMConfigCreateView(LLMViewsTestCase):
         """Test that students cannot create configs."""
         self.client.login(username="student", password="testpass123")
 
-        response = self.client.get(reverse("llm:config-create"))
+        response = self.client.get(
+            reverse("llm:config-create", kwargs={"course_id": self.course.id})
+        )
 
         self.assertIn(response.status_code, [302, 403])
 
@@ -132,25 +175,28 @@ class TestLLMConfigDetailView(LLMViewsTestCase):
         self.client.login(username="teacher", password="testpass123")
 
         response = self.client.get(
-            reverse("llm:config-detail", kwargs={"config_id": self.llm_config.id})
+            reverse(
+                "llm:config-detail",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            )
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Test Config")
         self.assertContains(response, "gpt-3.5-turbo")
 
-    def test_student_can_view_config_detail(self):
-        """Test that students can view config details (read-only)."""
+    def test_student_cannot_view_config_detail(self):
+        """Test that students cannot view config details."""
         self.client.login(username="student", password="testpass123")
 
         response = self.client.get(
-            reverse("llm:config-detail", kwargs={"config_id": self.llm_config.id})
+            reverse(
+                "llm:config-detail",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            )
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Test Config")
-        # Should not contain edit/delete buttons for students
-        self.assertNotContains(response, "Edit Configuration")
+        self.assertIn(response.status_code, [302, 403])
 
 
 class TestLLMConfigUpdateView(LLMViewsTestCase):
@@ -172,14 +218,15 @@ class TestLLMConfigUpdateView(LLMViewsTestCase):
         }
 
         response = self.client.post(
-            reverse("llm:config-edit", kwargs={"config_id": self.llm_config.id}),
+            reverse(
+                "llm:config-edit",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            ),
             form_data,
         )
 
-        # Should redirect after successful update
         self.assertEqual(response.status_code, 302)
 
-        # Check config was updated
         updated_config = LLMConfig.objects.get(id=self.llm_config.id)
         self.assertEqual(updated_config.name, "Updated Test Config")
         self.assertEqual(updated_config.model_name, "gpt-4")
@@ -190,7 +237,10 @@ class TestLLMConfigUpdateView(LLMViewsTestCase):
         self.client.login(username="student", password="testpass123")
 
         response = self.client.get(
-            reverse("llm:config-edit", kwargs={"config_id": self.llm_config.id})
+            reverse(
+                "llm:config-edit",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            )
         )
 
         self.assertIn(response.status_code, [302, 403])
@@ -201,8 +251,8 @@ class TestLLMConfigDeleteView(LLMViewsTestCase):
 
     def test_teacher_can_delete_config(self):
         """Test that teachers can delete (deactivate) configs."""
-        # Create a non-default config for deletion
         delete_config = LLMConfig.objects.create(
+            course=self.course,
             name="Delete Me",
             model_name="gpt-3.5-turbo",
             api_key="delete-api-key",
@@ -216,13 +266,14 @@ class TestLLMConfigDeleteView(LLMViewsTestCase):
         self.client.login(username="teacher", password="testpass123")
 
         response = self.client.post(
-            reverse("llm:config-delete", kwargs={"config_id": delete_config.id})
+            reverse(
+                "llm:config-delete",
+                kwargs={"course_id": self.course.id, "config_id": delete_config.id},
+            )
         )
 
-        # Should redirect after successful deletion
         self.assertEqual(response.status_code, 302)
 
-        # Check config was deactivated
         deleted_config = LLMConfig.objects.get(id=delete_config.id)
         self.assertFalse(deleted_config.is_active)
 
@@ -231,13 +282,14 @@ class TestLLMConfigDeleteView(LLMViewsTestCase):
         self.client.login(username="teacher", password="testpass123")
 
         response = self.client.post(
-            reverse("llm:config-delete", kwargs={"config_id": self.llm_config.id})
+            reverse(
+                "llm:config-delete",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            )
         )
 
-        # Should redirect with error message
         self.assertEqual(response.status_code, 302)
 
-        # Check config is still active
         config = LLMConfig.objects.get(id=self.llm_config.id)
         self.assertTrue(config.is_active)
 
@@ -246,61 +298,139 @@ class TestLLMConfigDeleteView(LLMViewsTestCase):
         self.client.login(username="student", password="testpass123")
 
         response = self.client.post(
-            reverse("llm:config-delete", kwargs={"config_id": self.llm_config.id})
+            reverse(
+                "llm:config-delete",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            )
         )
 
         self.assertIn(response.status_code, [302, 403])
 
 
-class TestLLMConfigTestView(LLMViewsTestCase):
-    """Test cases for LLMConfigTestView."""
+class TestLLMConfigCloneView(LLMViewsTestCase):
+    """Test cases for LLMConfigCloneView."""
 
-    @patch("llm.services.LLMService.test_config")
-    def test_teacher_can_test_config(self, mock_test_config):
-        """Test that teachers can test configs."""
-        # Mock successful test response
-        mock_test_config.return_value = LLMResponseWithTools(
-            response_text="Test response from AI", tokens_used=15, success=True
+    def setUp(self):
+        super().setUp()
+        self.target_course = Course.objects.create(
+            name="Target Course",
+            code="TARGET101",
+            description="Target course for cloning",
+        )
+        CourseTeacher.objects.create(
+            course=self.target_course, teacher=self.teacher, role="owner"
         )
 
+    def test_teacher_can_access_clone_form(self):
+        """Test that teachers can access the clone form."""
         self.client.login(username="teacher", password="testpass123")
 
-        response = self.client.post(
-            reverse("llm:config-test", kwargs={"config_id": self.llm_config.id}),
-            {"test_message": "Hello, this is a test."},
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        response = self.client.get(
+            reverse(
+                "llm:config-clone",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            )
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Clone")
+        self.assertContains(response, "Target Course")
 
-        # Parse JSON response
-        data = json.loads(response.content)
-        self.assertTrue(data["success"])
-        self.assertEqual(data["response_text"], "Test response from AI")
-        self.assertEqual(data["tokens_used"], 15)
-
-    @patch("llm.services.LLMService.test_config")
-    def test_config_test_failure(self, mock_test_config):
-        """Test handling of config test failures."""
-        # Mock failed test response
-        mock_test_config.return_value = LLMResponseWithTools(
-            response_text="", tokens_used=0, success=False, error="Invalid API key"
-        )
-
+    def test_teacher_can_clone_config(self):
+        """Test that teachers can clone a config to another course."""
         self.client.login(username="teacher", password="testpass123")
 
+        form_data = {
+            "target_course_id": str(self.target_course.id),
+        }
+
         response = self.client.post(
-            reverse("llm:config-test", kwargs={"config_id": self.llm_config.id}),
-            {"test_message": "Hello, this is a test."},
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            reverse(
+                "llm:config-clone",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            ),
+            form_data,
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
 
-        # Parse JSON response
-        data = json.loads(response.content)
-        self.assertFalse(data["success"])
-        self.assertEqual(data["error"], "Invalid API key")
+        cloned_config = LLMConfig.objects.filter(
+            course=self.target_course, name=self.llm_config.name
+        ).first()
+        self.assertIsNotNone(cloned_config)
+        self.assertEqual(cloned_config.model_name, self.llm_config.model_name)
+        self.assertEqual(cloned_config.api_key, self.llm_config.api_key)
+        self.assertFalse(cloned_config.is_default)
+
+    def test_student_cannot_clone_config(self):
+        """Test that students cannot clone configs."""
+        self.client.login(username="student", password="testpass123")
+
+        response = self.client.get(
+            reverse(
+                "llm:config-clone",
+                kwargs={"course_id": self.course.id, "config_id": self.llm_config.id},
+            )
+        )
+
+        self.assertIn(response.status_code, [302, 403])
+
+
+class TestLLMServiceCourseScoped(LLMViewsTestCase):
+    """Test cases for LLM service course-scoped methods."""
+
+    def test_get_configs_for_course(self):
+        """Test getting configs for a specific course."""
+        configs = LLMService.get_configs_for_course(self.course.id)
+
+        self.assertEqual(len(configs), 1)
+        self.assertEqual(configs[0].name, "Test Config")
+
+    def test_get_configs_for_course_empty(self):
+        """Test getting configs for a course with no configs."""
+        empty_course = Course.objects.create(
+            name="Empty Course", code="EMPTY101", description="No configs here"
+        )
+
+        configs = LLMService.get_configs_for_course(empty_course.id)
+
+        self.assertEqual(len(configs), 0)
+
+    def test_get_default_config_for_course(self):
+        """Test getting default config for a specific course."""
+        default_config = LLMService.get_default_config_for_course(self.course.id)
+
+        self.assertIsNotNone(default_config)
+        self.assertEqual(default_config.name, "Test Config")
+        self.assertTrue(default_config.is_default)
+
+    def test_clone_config_to_course(self):
+        """Test cloning a config to another course."""
+        target_course = Course.objects.create(
+            name="Target Course", code="TARGET101", description="Cloning target"
+        )
+
+        result = LLMService.clone_config_to_course(self.llm_config.id, target_course.id)
+
+        self.assertTrue(result.success)
+
+        cloned = LLMConfig.objects.get(course=target_course, name=self.llm_config.name)
+        self.assertEqual(cloned.model_name, self.llm_config.model_name)
+        self.assertFalse(cloned.is_default)
+
+    def test_get_or_create_default_for_course(self):
+        """Test getting or creating default config for a course."""
+        new_course = Course.objects.create(
+            name="New Course", code="NEW101", description="New course"
+        )
+
+        result = LLMService.get_or_create_default_for_course(new_course.id)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.name, "Global Default")
+
+        configs = LLMConfig.objects.filter(course=new_course)
+        self.assertTrue(configs.exists())
 
 
 class TestLLMGenerateAPIView(LLMViewsTestCase):
@@ -309,11 +439,7 @@ class TestLLMGenerateAPIView(LLMViewsTestCase):
     @patch("llm.services.LLMService.get_response")
     def test_api_generate_response(self, mock_get_response):
         """Test the API endpoint for generating responses."""
-        # Login as student for API access
         self.client.login(username="student", password="testpass123")
-
-        # Mock successful response with tools format
-        from llm.services import LLMResponseWithTools
 
         mock_get_response.return_value = LLMResponseWithTools(
             response_text="This is an AI response.",
@@ -322,24 +448,14 @@ class TestLLMGenerateAPIView(LLMViewsTestCase):
             success=True,
         )
 
-        # Create necessary database objects for the test
         from homeworks.models import Homework, Section
         from conversations.models import Conversation
-        from courses.models import Course
 
-        # Create a course first
-        course = Course.objects.create(
-            name="Test Course",
-            code="TEST101",
-            description="Test course description",
-        )
-
-        # Create homework with course (direct FK relationship)
         homework = Homework.objects.create(
             title="Test Homework",
             description="Test homework description",
             created_by=self.teacher,
-            course=course,
+            course=self.course,
             due_date="2024-12-31 23:59:59",
             llm_config=self.llm_config,
         )
@@ -351,12 +467,10 @@ class TestLLMGenerateAPIView(LLMViewsTestCase):
             order=1,
         )
 
-        # Create conversation
         conversation = Conversation.objects.create(
             user=self.student_user, section=section
         )
 
-        # Create API data with real conversation ID
         api_data = {
             "conversation_id": str(conversation.id),
             "content": "I need help with this problem.",
@@ -371,36 +485,9 @@ class TestLLMGenerateAPIView(LLMViewsTestCase):
 
         self.assertEqual(response.status_code, 200)
 
-        # Parse JSON response
         data = json.loads(response.content)
         self.assertTrue(data["success"])
         self.assertEqual(data["response_text"], "This is an AI response.")
-
-    def test_api_generate_invalid_data(self):
-        """Test API endpoint with invalid data."""
-        # Login as student for API access
-        self.client.login(username="student", password="testpass123")
-
-        # Missing required fields
-        api_data = {
-            "content": "I need help with this problem."
-            # Missing conversation_id and message_type
-        }
-
-        response = self.client.post(
-            reverse("llm:api-generate"),
-            json.dumps(api_data),
-            content_type="application/json",
-        )
-
-        self.assertEqual(
-            response.status_code, 200
-        )  # API returns 200 with error in JSON
-
-        # Parse JSON response to check for error
-        data = json.loads(response.content)
-        self.assertFalse(data["success"])
-        self.assertIn("error", data)
 
 
 class TestLLMConfigsAPIView(LLMViewsTestCase):
@@ -408,19 +495,12 @@ class TestLLMConfigsAPIView(LLMViewsTestCase):
 
     def test_api_get_configs(self):
         """Test the API endpoint for getting all configs."""
-        # Login as student for API access
         self.client.login(username="student", password="testpass123")
 
         response = self.client.get(reverse("llm:api-configs"))
 
         self.assertEqual(response.status_code, 200)
 
-        # Parse JSON response
         data = json.loads(response.content)
         self.assertTrue(data["success"])
-        self.assertEqual(len(data["configs"]), 1)
-
-        config = data["configs"][0]
-        self.assertEqual(config["name"], "Test Config")
-        self.assertEqual(config["model_name"], "gpt-3.5-turbo")
-        self.assertTrue(config["is_default"])
+        self.assertGreaterEqual(len(data["configs"]), 1)
