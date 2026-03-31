@@ -346,6 +346,41 @@ def submission_access_required(view_func: ViewFunc) -> ViewFunc:
     return cast(ViewFunc, wrapper)
 
 
+def course_teacher_required(view_func: ViewFunc) -> ViewFunc:
+    """
+    Decorator to ensure the requesting teacher is associated with the course in the URL.
+
+    Expects a `course_id` kwarg in the URL. Returns 403 if the teacher is not
+    a member of that course.
+
+    Args:
+        view_func: View function to decorate
+
+    Returns:
+        Decorated function that checks course membership
+    """
+
+    @wraps(view_func)
+    def wrapper(
+        request: HttpRequest, course_id: UUID, *args: Any, **kwargs: Any
+    ) -> HttpResponse:
+        from courses.models import Course, CourseTeacher
+
+        teacher, _ = get_teacher_or_student(request.user)
+        if not teacher:
+            return HttpResponseForbidden("Teacher access required.")
+
+        course = get_object_or_404(Course, id=course_id)
+        if not CourseTeacher.objects.filter(course=course, teacher=teacher).exists():
+            return HttpResponseForbidden(
+                "You are not a teacher of this course."
+            )
+
+        return view_func(request, course_id, *args, **kwargs)
+
+    return cast(ViewFunc, wrapper)
+
+
 def course_homework_access_required(view_func: ViewFunc) -> ViewFunc:
     """
     Decorator to ensure user has access to homework based on course enrollment.

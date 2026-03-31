@@ -101,6 +101,20 @@ class TestLLMConfigListView(LLMViewsTestCase):
 
         self.assertEqual(response.status_code, 302)
 
+    def test_teacher_not_in_course_cannot_access_config_list(self):
+        """Test that a teacher not associated with the course is denied."""
+        other_teacher_user = User.objects.create_user(
+            username="other_teacher", email="other@test.com", password="testpass123"
+        )
+        Teacher.objects.create(user=other_teacher_user)
+        self.client.login(username="other_teacher", password="testpass123")
+
+        response = self.client.get(
+            reverse("llm:config-list", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 403)
+
 
 class TestLLMConfigCreateView(LLMViewsTestCase):
     """Test cases for LLMConfigCreateView."""

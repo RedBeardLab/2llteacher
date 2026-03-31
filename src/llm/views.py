@@ -17,7 +17,7 @@ from django.core.exceptions import ValidationError
 
 import logging
 
-from llteacher.permissions.decorators import teacher_required, get_teacher_or_student
+from llteacher.permissions.decorators import course_teacher_required, get_teacher_or_student
 from llteacher.tracing import record_exception
 
 from .services import (
@@ -86,7 +86,7 @@ class LLMConfigCloneData:
 class LLMConfigListView(View):
     """List LLM configurations for a course using testable-first approach."""
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def get(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
         data = self._get_config_list_data(course_id)
         return render(request, "llm/config_list.html", {"data": data})
@@ -130,7 +130,7 @@ class LLMConfigListView(View):
 class LLMConfigDetailView(View):
     """View LLM configuration details using testable-first approach."""
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def get(
         self, request: HttpRequest, course_id: UUID, config_id: UUID
     ) -> HttpResponse:
@@ -181,12 +181,12 @@ class LLMConfigDetailView(View):
 class LLMConfigCreateView(View):
     """Create LLM configuration using testable-first approach."""
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def get(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
         data = self._get_form_data(course_id)
         return render(request, "llm/config_form.html", {"data": data})
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def post(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
         form_data = self._parse_create_form_data(request, course_id)
 
@@ -264,7 +264,7 @@ class LLMConfigCreateView(View):
 class LLMConfigEditView(View):
     """Edit LLM configuration using testable-first approach."""
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def get(
         self, request: HttpRequest, course_id: UUID, config_id: UUID
     ) -> HttpResponse:
@@ -282,7 +282,7 @@ class LLMConfigEditView(View):
 
         return render(request, "llm/config_form.html", {"data": data})
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def post(
         self, request: HttpRequest, course_id: UUID, config_id: UUID
     ) -> HttpResponse:
@@ -360,7 +360,7 @@ class LLMConfigEditView(View):
 class LLMConfigDeleteView(View):
     """Delete LLM configuration using testable-first approach."""
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def post(
         self, request: HttpRequest, course_id: UUID, config_id: UUID
     ) -> HttpResponse:
@@ -387,7 +387,7 @@ class LLMConfigDeleteView(View):
 class LLMConfigTestView(View):
     """Test LLM configuration using testable-first approach."""
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def post(
         self, request: HttpRequest, course_id: UUID, config_id: UUID
     ) -> JsonResponse:
@@ -423,7 +423,7 @@ class LLMConfigTestView(View):
 class LLMConfigCloneView(View):
     """Clone an LLM configuration to another course."""
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def get(
         self, request: HttpRequest, course_id: UUID, config_id: UUID
     ) -> HttpResponse:
@@ -446,7 +446,7 @@ class LLMConfigCloneView(View):
             },
         )
 
-    @method_decorator(teacher_required)
+    @method_decorator(course_teacher_required)
     def post(
         self, request: HttpRequest, course_id: UUID, config_id: UUID
     ) -> HttpResponse:
