@@ -152,6 +152,11 @@
               </div>
               {% endif %}
             </div>
+
+            <div class="mb-3">
+              <label for="{{ form.section_type.id_for_label }}" class="form-label">Section Type</label>
+              {{ form.section_type }}
+            </div>
           </div>
           {% endfor %}
         </div>
@@ -216,6 +221,14 @@ function addSection() {
       <div class="mb-3">
         <label for="id_sections-${newIndex}-solution" class="form-label">Solution (Optional)</label>
         <textarea name="sections-${newIndex}-solution" class="form-control" rows="3" id="id_sections-${newIndex}-solution" placeholder="Optional solution..."></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label for="id_sections-${newIndex}-section_type" class="form-label">Section Type</label>
+        <select name="sections-${newIndex}-section_type" class="form-select" id="id_sections-${newIndex}-section_type">
+          <option value="conversation" selected>Conversation (Interactive)</option>
+          <option value="non_interactive">Non-Interactive Question</option>
+        </select>
       </div>
     </div>
   `;

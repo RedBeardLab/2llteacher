@@ -91,42 +91,73 @@
                     
                     {% if 'student' in data.user_roles %}
                     <div class="mb-3">
-                        {% if section.status == 'submitted' %}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="badge bg-success fs-6">
-                                <i class="bi bi-check-circle"></i> Submitted
-                            </span>
-                            <a href="{% url 'conversations:detail' section.conversation_id %}" class="btn btn-outline-primary btn-sm">
-                                <i class="bi bi-eye"></i> View Submission
-                            </a>
-                        </div>
-                        {% elif section.status == 'in_progress' or section.status == 'in_progress_overdue' %}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="badge bg-warning fs-6">
-                                <i class="bi bi-clock"></i> In Progress{% if section.status == 'in_progress_overdue' %} (Overdue){% endif %}
-                            </span>
-                            <a href="{% url 'conversations:detail' section.conversation_id %}" class="btn btn-primary btn-sm">
-                                <i class="bi bi-arrow-right-circle"></i> Continue Working
-                            </a>
-                        </div>
-                        {% elif section.status == 'overdue' %}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="badge bg-danger fs-6">
-                                <i class="bi bi-exclamation-triangle"></i> Overdue
-                            </span>
-                            <a href="{% url 'conversations:start' section_id=section.id %}" class="btn btn-outline-danger btn-sm">
-                                <i class="bi bi-play-circle"></i> Start Now
-                            </a>
-                        </div>
+                        {% if section.section_type == 'non_interactive' %}
+                            {% if section.status == 'submitted' %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-success fs-6">
+                                    <i class="bi bi-check-circle"></i> Answered
+                                </span>
+                                <a href="{% url 'homeworks:section_answer' homework_id=data.id section_id=section.id %}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-pencil"></i> Answer Again
+                                </a>
+                            </div>
+                            {% elif section.status == 'overdue' %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-danger fs-6">
+                                    <i class="bi bi-exclamation-triangle"></i> Overdue — Not Answered
+                                </span>
+                                <a href="{% url 'homeworks:section_answer' homework_id=data.id section_id=section.id %}" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-pencil"></i> Answer Now
+                                </a>
+                            </div>
+                            {% else %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-secondary fs-6">
+                                    <i class="bi bi-circle"></i> Not Answered
+                                </span>
+                                <a href="{% url 'homeworks:section_answer' homework_id=data.id section_id=section.id %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-pencil"></i> Answer
+                                </a>
+                            </div>
+                            {% endif %}
                         {% else %}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="badge bg-secondary fs-6">
-                                <i class="bi bi-circle"></i> Not Started
-                            </span>
-                            <a href="{% url 'conversations:start' section_id=section.id %}" class="btn btn-primary btn-sm">
-                                <i class="bi bi-play-circle"></i> Start Working
-                            </a>
-                        </div>
+                            {% if section.status == 'submitted' %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-success fs-6">
+                                    <i class="bi bi-check-circle"></i> Submitted
+                                </span>
+                                <a href="{% url 'conversations:detail' section.conversation_id %}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-eye"></i> View Submission
+                                </a>
+                            </div>
+                            {% elif section.status == 'in_progress' or section.status == 'in_progress_overdue' %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-warning fs-6">
+                                    <i class="bi bi-clock"></i> In Progress{% if section.status == 'in_progress_overdue' %} (Overdue){% endif %}
+                                </span>
+                                <a href="{% url 'conversations:detail' section.conversation_id %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-arrow-right-circle"></i> Continue Working
+                                </a>
+                            </div>
+                            {% elif section.status == 'overdue' %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-danger fs-6">
+                                    <i class="bi bi-exclamation-triangle"></i> Overdue
+                                </span>
+                                <a href="{% url 'conversations:start' section_id=section.id %}" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-play-circle"></i> Start Now
+                                </a>
+                            </div>
+                            {% else %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-secondary fs-6">
+                                    <i class="bi bi-circle"></i> Not Started
+                                </span>
+                                <a href="{% url 'conversations:start' section_id=section.id %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-play-circle"></i> Start Working
+                                </a>
+                            </div>
+                            {% endif %}
                         {% endif %}
                     </div>
                     {% endif %}

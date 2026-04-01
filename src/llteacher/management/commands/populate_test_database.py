@@ -5,6 +5,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from accounts.models import Teacher, Student
+from courses.models import Course, CourseTeacher, CourseEnrollment
 from llm.models import LLMConfig
 from homeworks.models import Homework, Section, SectionSolution
 from conversations.models import Conversation, Message, Submission
@@ -33,11 +34,14 @@ class Command(BaseCommand):
             # Create users and profiles
             users = self.create_users()
 
-            # Create LLM configuration
-            llm_config = self.create_llm_config()
+            # Create courses and enroll everyone
+            courses = self.create_courses(users["teachers"], users["students"])
+
+            # Create LLM configuration (scoped to courses)
+            llm_configs = self.create_llm_configs(courses)
 
             # Create homeworks with sections
-            homeworks = self.create_homeworks(users["teachers"], llm_config)
+            homeworks = self.create_homeworks(users["teachers"], courses, llm_configs)
 
             # Create conversations and messages
             self.create_conversations_and_messages(users["students"], homeworks)
@@ -54,6 +58,9 @@ class Command(BaseCommand):
         Section.objects.all().delete()
         Homework.objects.all().delete()
         LLMConfig.objects.all().delete()
+        CourseEnrollment.objects.all().delete()
+        CourseTeacher.objects.all().delete()
+        Course.objects.all().delete()
         Teacher.objects.all().delete()
         Student.objects.all().delete()
         User.objects.filter(
@@ -119,15 +126,36 @@ class Command(BaseCommand):
             "students": [student1, student2, student3],
         }
 
-    def create_llm_config(self):
-        """Create LLM configuration for testing."""
-        self.stdout.write("Creating LLM configuration...")
+    def create_courses(self, teachers, students):
+        """Create courses, assign teachers, and enroll students."""
+        self.stdout.write("Creating courses...")
 
-        llm_config = LLMConfig.objects.create(
-            name="Test GPT-4 Config",
-            model_name="gpt-5",
-            api_key="test-api-key-placeholder",
-            base_prompt="""You are an AI tutor helping students learn programming.
+        course1 = Course.objects.create(
+            name="Introduction to Python",
+            code="CS101",
+            description="A beginner course covering Python fundamentals.",
+        )
+        CourseTeacher.objects.create(course=course1, teacher=teachers[0], role="owner")
+        for student in students:
+            CourseEnrollment.objects.create(course=course1, student=student)
+
+        course2 = Course.objects.create(
+            name="Data Analysis with Python",
+            code="CS201",
+            description="Intermediate course on data analysis using Python.",
+        )
+        CourseTeacher.objects.create(course=course2, teacher=teachers[1], role="owner")
+        for student in students[:2]:  # Only first 2 students enrolled
+            CourseEnrollment.objects.create(course=course2, student=student)
+
+        self.stdout.write("  ✓ Created 2 courses with teacher assignments and enrollments")
+        return [course1, course2]
+
+    def create_llm_configs(self, courses):
+        """Create LLM configurations scoped to each course."""
+        self.stdout.write("Creating LLM configurations...")
+
+        base_prompt = """You are an AI tutor helping students learn programming.
 
 Be encouraging, ask guiding questions, and help students discover solutions rather than giving direct answers.
 
@@ -151,29 +179,40 @@ But with something generic of lists. Like
 list_name = [1, 2, 3]
 ```
 
-And explain the syntaz and how to add values.""",
-            temperature=0.7,
-            max_completion_tokens=1000,
-            is_default=True,
-            is_active=True,
-        )
+And explain the syntaz and how to add values."""
 
-        self.stdout.write("  ✓ Created LLM configuration")
-        return llm_config
+        configs = []
+        for course in courses:
+            config = LLMConfig.objects.create(
+                course=course,
+                name=f"Tutor Config for {course.name}",
+                model_name="gpt-5",
+                api_key="test-api-key-placeholder",
+                base_prompt=base_prompt,
+                temperature=0.7,
+                max_completion_tokens=1000,
+                is_default=True,
+                is_active=True,
+            )
+            configs.append(config)
 
-    def create_homeworks(self, teachers, llm_config):
+        self.stdout.write(f"  ✓ Created {len(configs)} LLM configurations")
+        return configs
+
+    def create_homeworks(self, teachers, courses, llm_configs):
         """Create sample homeworks with sections."""
         self.stdout.write("Creating homeworks and sections...")
 
         homeworks = []
 
-        # Homework 1 by Teacher 1
+        # Homework 1 by Teacher 1 — belongs to course 1
         hw1 = Homework.objects.create(
             title="Python Basics",
             description="Introduction to Python programming fundamentals including variables, data types, and control structures.",
             created_by=teachers[0],
+            course=courses[0],
             due_date=timezone.now() + timedelta(days=7),
-            llm_config=llm_config,
+            llm_config=llm_configs[0],
         )
 
         # Sections for Homework 1
@@ -312,13 +351,14 @@ else:
 
         homeworks.append(hw1)
 
-        # Homework 2 by Teacher 2
+        # Homework 2 by Teacher 2 — belongs to course 2
         hw2 = Homework.objects.create(
             title="Data Analysis with Python",
             description="Learn to analyze data using Python lists and dictionaries. Practice with real-world data scenarios.",
             created_by=teachers[1],
+            course=courses[1],
             due_date=timezone.now() + timedelta(days=10),
-            llm_config=llm_config,
+            llm_config=llm_configs[1],
         )
 
         # Sections for Homework 2
@@ -551,6 +591,7 @@ for category in categories:
         self.stdout.write(f"Users: {User.objects.count()}")
         self.stdout.write(f"Teachers: {Teacher.objects.count()}")
         self.stdout.write(f"Students: {Student.objects.count()}")
+        self.stdout.write(f"Courses: {Course.objects.count()}")
         self.stdout.write(f"LLM Configs: {LLMConfig.objects.count()}")
         self.stdout.write(f"Homeworks: {Homework.objects.count()}")
         self.stdout.write(f"Sections: {Section.objects.count()}")

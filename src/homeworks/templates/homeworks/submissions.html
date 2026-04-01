@@ -143,6 +143,10 @@
                                         <span class="badge bg-danger ms-2">
                                             <i class="bi bi-exclamation-triangle"></i> Missing
                                         </span>
+                                    {% elif section_status.section_type == 'non_interactive' %}
+                                        <span class="badge bg-success ms-2">
+                                            <i class="bi bi-pencil-square"></i> {{ section_status.answer_count }} Answer{{ section_status.answer_count|pluralize }}
+                                        </span>
                                     {% elif section_status.submission_count > 0 %}
                                         <span class="badge bg-success ms-2">
                                             <i class="bi bi-check-circle"></i> {{ section_status.submission_count }} Submitted
@@ -157,19 +161,42 @@
                                 <small class="text-muted">
                                     Latest: {{ section_status.latest_conversation_date|date:"M d, Y H:i" }}
                                 </small>
+                                {% elif section_status.latest_answer_date %}
+                                <small class="text-muted">
+                                    Latest: {{ section_status.latest_answer_date|date:"M d, Y H:i" }}
+                                </small>
                                 {% endif %}
                             </div>
-                            
+
                             {% if section_status.is_missing %}
                             <div class="text-center text-muted py-2">
                                 <i class="bi bi-exclamation-circle"></i>
+                                {% if section_status.section_type == 'non_interactive' %}
+                                <em>Student has not answered this section</em>
+                                {% else %}
                                 <em>Student has not started this section</em>
+                                {% endif %}
+                            </div>
+                            {% elif section_status.section_type == 'non_interactive' %}
+                            <div class="answers-in-section">
+                                <div class="d-flex justify-content-between align-items-start mt-2 p-2 bg-white border rounded">
+                                    <div class="flex-grow-1">
+                                        <div class="small text-muted mb-1">Latest answer:</div>
+                                        <p class="mb-0" style="white-space: pre-wrap;">{{ section_status.latest_answer }}</p>
+                                    </div>
+                                    <div class="flex-shrink-0 ms-3">
+                                        <a href="{% url 'conversations:section_answers' section_status.section_id student.student_id %}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i> View All ({{ section_status.answer_count }})
+                                        </a>
+                                    </div>
+                                </div>
                             </div>
                             {% else %}
                             <div class="conversations-in-section">
                                 <small class="text-muted">Conversations ({{ section_status.conversations|length }}):</small>
                                 {% for conversation in section_status.conversations %}
-                                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-white border rounded 
+                                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-white border rounded
                                             {% if conversation.is_deleted %}bg-light{% endif %}">
                                     <div class="flex-grow-1">
                                         <div class="d-flex align-items-center gap-2">
@@ -198,7 +225,7 @@
                                         </div>
                                     </div>
                                     <div class="flex-shrink-0">
-                                        <a href="{% url 'conversations:detail' conversation.conversation_id %}" 
+                                        <a href="{% url 'conversations:detail' conversation.conversation_id %}"
                                            class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye"></i> View
                                         </a>

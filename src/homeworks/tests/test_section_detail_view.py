@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from accounts.models import User, Teacher, Student
 from homeworks.models import Homework, Section, SectionSolution
-from conversations.models import Conversation, Submission
+from conversations.models import Conversation, Submission, SectionAnswer
 from courses.models import Course, CourseEnrollment, CourseTeacher
 
 
@@ -231,3 +231,97 @@ class SectionDetailViewTestCase(TestCase):
         # Check for conversation and submission data in context
         self.assertIsNotNone(response.context["data"].conversations)
         self.assertIsNotNone(response.context["data"].submission)
+
+
+class SectionDetailViewNonInteractiveTestCase(TestCase):
+    """Test SectionDetailView behaviour for non-interactive sections."""
+
+    def setUp(self):
+        import datetime
+
+        self.client = Client()
+
+        self.teacher_user = User.objects.create_user(
+            username="teacher", email="teacher@example.com", password="password"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        self.student_user = User.objects.create_user(
+            username="student", email="student@example.com", password="password"
+        )
+        self.student = Student.objects.create(user=self.student_user)
+
+        self.course = Course.objects.create(
+            name="Course", code="C101", description="", is_active=True
+        )
+        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
+        CourseEnrollment.objects.create(course=self.course, student=self.student, is_active=True)
+
+        self.homework = Homework.objects.create(
+            title="HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=datetime.datetime(2030, 1, 1),
+        )
+
+        self.ni_section = Section.objects.create(
+            homework=self.homework,
+            title="Q1",
+            content="What is 2+2?",
+            order=1,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+        self.url = reverse(
+            "homeworks:section_detail",
+            kwargs={"homework_id": self.homework.id, "section_id": self.ni_section.id},
+        )
+
+    def test_student_sees_non_interactive_section_type(self):
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["data"].section_type, "non_interactive")
+
+    def test_student_has_no_conversations_for_non_interactive(self):
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        self.assertIsNone(response.context["data"].conversations)
+
+    def test_student_has_no_submission_for_non_interactive(self):
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        self.assertIsNone(response.context["data"].submission)
+
+    def test_student_existing_answers_empty_when_none_submitted(self):
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.context["data"].existing_answers, [])
+
+    def test_student_existing_answers_populated_after_submission(self):
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="Four"
+        )
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="4"
+        )
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        answers = response.context["data"].existing_answers
+        self.assertEqual(len(answers), 2)
+        self.assertIn("answer", answers[0])
+        self.assertIn("submitted_at", answers[0])
+
+    def test_teacher_sees_non_interactive_badge_in_response(self):
+        self.client.login(username="teacher", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["data"].section_type, "non_interactive")
+        self.assertContains(response, "Non-Interactive")
+
+    def test_teacher_still_has_conversations_card(self):
+        """Teachers can still test non-interactive sections via conversations."""
+        self.client.login(username="teacher", password="password")
+        response = self.client.get(self.url)
+        self.assertContains(response, "Conversations")

@@ -15,6 +15,16 @@ urlpatterns = [
         name="start",
     ),
     path(
+        "section/<uuid:section_id>/answer/",
+        views.SectionAnswerSubmitView.as_view(),
+        name="answer_section",
+    ),
+    path(
+        "section/<uuid:section_id>/answers/<uuid:student_id>/",
+        views.SectionAnswerDetailView.as_view(),
+        name="section_answers",
+    ),
+    path(
         "<uuid:conversation_id>/", views.ConversationDetailView.as_view(), name="detail"
     ),
     path(

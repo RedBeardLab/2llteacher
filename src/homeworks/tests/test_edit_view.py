@@ -243,11 +243,13 @@ class HomeworkEditViewTestCase(TestCase):
             "sections-0-content": "Updated content",
             "sections-0-order": "1",
             "sections-0-solution": "New solution",
+            "sections-0-section_type": "conversation",
             "sections-1-id": self.section_with_solution.id,
             "sections-1-title": self.section_with_solution.title,
             "sections-1-content": self.section_with_solution.content,
             "sections-1-order": "2",
             "sections-1-solution": self.section_with_solution.solution.content,
+            "sections-1-section_type": "conversation",
         }
 
         # Submit the form
@@ -292,11 +294,13 @@ class HomeworkEditViewTestCase(TestCase):
             "sections-0-content": "Updated content",
             "sections-0-order": "1",
             "sections-0-solution": "New solution",
+            "sections-0-section_type": "conversation",
             "sections-1-id": self.section_with_solution.id,
             "sections-1-title": self.section_with_solution.title,
             "sections-1-content": self.section_with_solution.content,
             "sections-1-order": "2",
             "sections-1-solution": self.section_with_solution.solution.content,
+            "sections-1-section_type": "conversation",
         }
 
         # Submit the form
@@ -329,11 +333,13 @@ class HomeworkEditViewTestCase(TestCase):
             "sections-0-content": "Updated content",
             "sections-0-order": "1",
             "sections-0-solution": "New solution",
+            "sections-0-section_type": "conversation",
             "sections-1-id": self.section_with_solution.id,
             "sections-1-title": self.section_with_solution.title,
             "sections-1-content": self.section_with_solution.content,
             "sections-1-order": "1",  # Duplicate order should fail validation
             "sections-1-solution": self.section_with_solution.solution.content,
+            "sections-1-section_type": "conversation",
         }
 
         # Submit the form
@@ -345,3 +351,102 @@ class HomeworkEditViewTestCase(TestCase):
         self.assertTemplateUsed(response, "homeworks/form.html")
         self.assertEqual(response.context["data"].is_submitted, False)
         self.assertIsNotNone(response.context["data"].errors)
+
+
+class HomeworkEditSectionTypeTests(TestCase):
+    """Test that section_type is preserved and updated correctly via the edit view."""
+
+    def setUp(self):
+        from courses.models import Course, CourseTeacher
+
+        self.client = Client()
+
+        self.teacher_user = User.objects.create_user(
+            username="teacher", email="teacher@example.com", password="password"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        self.course = Course.objects.create(name="Course", code="C101", description="")
+        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
+
+        self.homework = Homework.objects.create(
+            title="HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=datetime.datetime(2030, 1, 1),
+        )
+
+        self.conv_section = Section.objects.create(
+            homework=self.homework,
+            title="Chat",
+            content="Talk.",
+            order=1,
+            section_type=Section.SECTION_TYPE_CONVERSATION,
+        )
+
+        self.ni_section = Section.objects.create(
+            homework=self.homework,
+            title="Q1",
+            content="What?",
+            order=2,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+        self.url = reverse("homeworks:edit", kwargs={"homework_id": self.homework.id})
+
+    def _base_post_data(self):
+        return {
+            "title": "HW",
+            "description": "desc",
+            "due_date": "2030-02-01T00:00:00",
+            "llm_config": "",
+            "sections-TOTAL_FORMS": "2",
+            "sections-INITIAL_FORMS": "2",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-id": str(self.conv_section.id),
+            "sections-0-title": self.conv_section.title,
+            "sections-0-content": self.conv_section.content,
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
+            "sections-1-id": str(self.ni_section.id),
+            "sections-1-title": self.ni_section.title,
+            "sections-1-content": self.ni_section.content,
+            "sections-1-order": "2",
+            "sections-1-solution": "",
+            "sections-1-section_type": "non_interactive",
+        }
+
+    def test_edit_get_prepopulates_section_type(self):
+        """section_type initial value is set from the existing section."""
+        self.client.login(username="teacher", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        forms = response.context["data"].section_forms.forms
+        self.assertEqual(forms[0].initial.get("section_type"), "conversation")
+        self.assertEqual(forms[1].initial.get("section_type"), "non_interactive")
+
+    def test_edit_post_updates_section_type(self):
+        """Changing section_type via POST updates the section."""
+        self.client.login(username="teacher", password="password")
+        data = self._base_post_data()
+        data["sections-0-section_type"] = "non_interactive"  # flip conversation → non_interactive
+
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, 302)
+
+        self.conv_section.refresh_from_db()
+        self.assertEqual(self.conv_section.section_type, "non_interactive")
+
+    def test_edit_post_preserves_section_type(self):
+        """Existing section_type is preserved when not changed."""
+        self.client.login(username="teacher", password="password")
+        response = self.client.post(self.url, self._base_post_data())
+        self.assertEqual(response.status_code, 302)
+
+        self.conv_section.refresh_from_db()
+        self.ni_section.refresh_from_db()
+        self.assertEqual(self.conv_section.section_type, "conversation")
+        self.assertEqual(self.ni_section.section_type, "non_interactive")

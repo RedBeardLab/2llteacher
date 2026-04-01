@@ -170,6 +170,27 @@ class PasteEvent(models.Model):
         return None
 
 
+class SectionAnswer(models.Model):
+    """Student's answer to a non-interactive question section."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="section_answers"
+    )
+    section = models.ForeignKey(
+        "homeworks.Section", on_delete=models.CASCADE, related_name="answers"
+    )
+    answer = models.TextField(validators=[MinLengthValidator(1)])
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "conversations_section_answer"
+        ordering = ["-submitted_at"]
+
+    def __str__(self):
+        return f"Answer by {self.user.username} for {self.section}"
+
+
 class RapidTextGrowthEvent(models.Model):
     """Record of rapid text growth detection events for review."""
 

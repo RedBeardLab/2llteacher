@@ -570,6 +570,7 @@ class CourseHomeworkCreateView(View):
                             content=section_form.cleaned_data["content"],
                             order=section_form.cleaned_data["order"],
                             solution=section_form.cleaned_data["solution"],
+                            section_type=section_form.cleaned_data.get("section_type", "conversation"),
                         )
                     )
 
