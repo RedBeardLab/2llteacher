@@ -42,6 +42,13 @@ class Homework(models.Model):
 class Section(models.Model):
     """Individual section within a homework assignment."""
 
+    SECTION_TYPE_CONVERSATION = "conversation"
+    SECTION_TYPE_NON_INTERACTIVE = "non_interactive"
+    SECTION_TYPE_CHOICES = [
+        (SECTION_TYPE_CONVERSATION, "Conversation (Interactive)"),
+        (SECTION_TYPE_NON_INTERACTIVE, "Non-Interactive Question"),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     homework = models.ForeignKey(
         Homework, on_delete=models.CASCADE, related_name="sections"
@@ -57,6 +64,11 @@ class Section(models.Model):
         null=True,
         blank=True,
         related_name="section",
+    )
+    section_type = models.CharField(
+        max_length=50,
+        choices=SECTION_TYPE_CHOICES,
+        default=SECTION_TYPE_CONVERSATION,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

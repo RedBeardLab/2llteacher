@@ -220,6 +220,11 @@ class ConversationStartView(View):
             Section.objects.select_related("homework"), id=section_id
         )
 
+        if section.section_type == Section.SECTION_TYPE_NON_INTERACTIVE:
+            return HttpResponseForbidden(
+                "Conversations are not available for non-interactive sections."
+            )
+
         # Create view data
         view_data = self._get_view_data(section)
 
@@ -232,6 +237,11 @@ class ConversationStartView(View):
         section = get_object_or_404(
             Section.objects.select_related("homework"), id=section_id
         )
+
+        if section.section_type == Section.SECTION_TYPE_NON_INTERACTIVE:
+            return HttpResponseForbidden(
+                "Conversations are not available for non-interactive sections."
+            )
 
         # Start conversation using service
         result = ConversationService.start_conversation(request.user, section)
@@ -765,3 +775,101 @@ class RapidTextGrowthLogView(View):
                 {"error": f"Failed to log rapid text growth event: {str(e)}"},
                 status=500,
             )
+
+
+class SectionAnswerSubmitView(View):
+    """Submit an answer to a non-interactive section. Multiple submissions allowed."""
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request: HttpRequest, section_id: UUID) -> HttpResponse:
+        from homeworks.models import Section
+        from conversations.models import SectionAnswer
+
+        section = get_object_or_404(
+            Section.objects.select_related("homework__course"),
+            id=section_id,
+        )
+
+        if section.section_type != Section.SECTION_TYPE_NON_INTERACTIVE:
+            return HttpResponseForbidden("Not a non-interactive section.")
+
+        student_profile = getattr(request.user, "student_profile", None)
+        if not student_profile:
+            return HttpResponseForbidden("Only students can submit answers.")
+        if not section.homework.course.is_student_enrolled(student_profile):
+            return HttpResponseForbidden("Access denied.")
+
+        answer_text = request.POST.get("answer", "").strip()
+        if not answer_text:
+            return redirect(
+                "homeworks:section_answer",
+                homework_id=section.homework.id,
+                section_id=section.id,
+            )
+
+        SectionAnswer.objects.create(
+            user=request.user, section=section, answer=answer_text
+        )
+
+        next_section = Section.objects.filter(
+            homework=section.homework,
+            order__gt=section.order,
+        ).order_by("order").first()
+
+        if next_section is None:
+            return redirect("homeworks:detail", homework_id=section.homework.id)
+        elif next_section.section_type == Section.SECTION_TYPE_NON_INTERACTIVE:
+            return redirect(
+                "homeworks:section_answer",
+                homework_id=section.homework.id,
+                section_id=next_section.id,
+            )
+        else:
+            return redirect(
+                "homeworks:section_detail",
+                homework_id=section.homework.id,
+                section_id=next_section.id,
+            )
+
+
+class SectionAnswerDetailView(View):
+    """Teacher/TA view: all answers from one student for one non-interactive section."""
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request: HttpRequest, section_id: UUID, student_id: UUID) -> HttpResponse:
+        from homeworks.models import Section
+        from accounts.models import Student
+        from conversations.models import SectionAnswer
+
+        section = get_object_or_404(
+            Section.objects.select_related("homework__course"),
+            id=section_id,
+        )
+        student = get_object_or_404(Student.objects.select_related("user"), id=student_id)
+
+        teacher_profile = getattr(request.user, "teacher_profile", None)
+        ta_profile = getattr(request.user, "teacher_assistant_profile", None)
+        if teacher_profile:
+            if not teacher_profile.courses.filter(id=section.homework.course.id).exists():
+                return HttpResponseForbidden("Access denied.")
+        elif ta_profile:
+            if not section.homework.course.is_teacher_assistant(ta_profile):
+                return HttpResponseForbidden("Access denied.")
+        else:
+            return HttpResponseForbidden("Access denied.")
+
+        answers = SectionAnswer.objects.filter(
+            section=section, user=student.user
+        ).order_by("-submitted_at")
+
+        return render(request, "conversations/section_answers.html", {
+            "section": section,
+            "student": student,
+            "answers": answers,
+        })

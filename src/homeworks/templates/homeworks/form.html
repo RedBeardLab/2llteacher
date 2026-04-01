@@ -174,6 +174,16 @@
           </div>
           {% endif %}
         </div>
+
+        <div class="mb-3">
+          <label for="{{ section_form.section_type.id_for_label }}" class="form-label">Section Type</label>
+          {{ section_form.section_type }}
+          {% if section_form.section_type.errors %}
+          <div class="invalid-feedback d-block">
+            {{ section_form.section_type.errors|join:", " }}
+          </div>
+          {% endif %}
+        </div>
         
         {% if not forloop.first %}
         <div class="mb-3">

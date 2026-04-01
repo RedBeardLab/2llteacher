@@ -591,3 +591,147 @@ class HomeworkSubmissionsServiceTest(TestCase):
         # Verify only enrolled students are shown
         self.assertIn("student1", student_usernames)
         self.assertIn("student2", student_usernames)
+
+
+class HomeworkSubmissionsNonInteractiveServiceTest(TestCase):
+    """Tests for get_homework_submissions with non-interactive sections."""
+
+    def setUp(self):
+        self.teacher_user = User.objects.create_user(
+            username="teacher", email="teacher@example.com", password="pass"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        self.student_user = User.objects.create_user(
+            username="student", email="student@example.com", password="pass"
+        )
+        self.student = Student.objects.create(user=self.student_user)
+
+        self.course = Course.objects.create(name="Course", code="C101", description="")
+        CourseEnrollment.objects.create(course=self.course, student=self.student)
+
+        self.homework = Homework.objects.create(
+            title="HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+
+        self.ni_section = Section.objects.create(
+            homework=self.homework,
+            title="Q1",
+            content="What is 2+2?",
+            order=1,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+    def test_non_interactive_section_with_answers(self):
+        from conversations.models import SectionAnswer
+
+        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="First answer")
+        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="Second answer")
+
+        result = HomeworkService.get_homework_submissions(self.homework.id)
+
+        self.assertIsNotNone(result)
+        student_summary = result.students[0]
+        section_status = student_summary.section_statuses[0]
+
+        self.assertEqual(section_status.section_type, "non_interactive")
+        self.assertEqual(section_status.answer_count, 2)
+        self.assertIsNotNone(section_status.latest_answer)
+        self.assertFalse(section_status.is_missing)
+        self.assertEqual(len(section_status.conversations), 0)
+
+    def test_non_interactive_section_no_answers(self):
+        result = HomeworkService.get_homework_submissions(self.homework.id)
+
+        self.assertIsNotNone(result)
+        student_summary = result.students[0]
+        section_status = student_summary.section_statuses[0]
+
+        self.assertEqual(section_status.section_type, "non_interactive")
+        self.assertEqual(section_status.answer_count, 0)
+        self.assertIsNone(section_status.latest_answer)
+        self.assertTrue(section_status.is_missing)
+
+    def test_non_interactive_section_counts_toward_participation(self):
+        from conversations.models import SectionAnswer
+
+        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="My answer")
+
+        result = HomeworkService.get_homework_submissions(self.homework.id)
+
+        self.assertIsNotNone(result)
+        student_summary = result.students[0]
+        self.assertTrue(student_summary.has_interactions)
+        self.assertEqual(student_summary.participation_status, ParticipationStatus.ACTIVE)
+
+
+class HomeworkSubmissionsNonInteractiveViewTest(TestCase):
+    """Tests for the submissions view rendering non-interactive sections."""
+
+    def setUp(self):
+        self.client = Client()
+
+        self.teacher_user = User.objects.create_user(
+            username="teacher", email="teacher@example.com", password="pass"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        self.student_user = User.objects.create_user(
+            username="student", email="student@example.com", password="pass"
+        )
+        self.student = Student.objects.create(user=self.student_user)
+
+        self.course = Course.objects.create(name="Course", code="C101", description="")
+        CourseEnrollment.objects.create(course=self.course, student=self.student)
+
+        from courses.models import CourseTeacher
+        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
+
+        self.homework = Homework.objects.create(
+            title="HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+
+        self.ni_section = Section.objects.create(
+            homework=self.homework,
+            title="Q1",
+            content="What is 2+2?",
+            order=1,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+    def test_submissions_view_shows_non_interactive_answer_count(self):
+        from conversations.models import SectionAnswer
+
+        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="Four")
+        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="4")
+
+        self.client.login(username="teacher", password="pass")
+        url = reverse("homeworks:submissions", kwargs={"homework_id": self.homework.id})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2 Answers")
+
+    def test_submissions_view_shows_view_all_answers_link(self):
+        from conversations.models import SectionAnswer
+
+        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="Four")
+
+        self.client.login(username="teacher", password="pass")
+        url = reverse("homeworks:submissions", kwargs={"homework_id": self.homework.id})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        expected_url = reverse(
+            "conversations:section_answers",
+            kwargs={"section_id": self.ni_section.id, "student_id": self.student.id},
+        )
+        self.assertContains(response, expected_url)

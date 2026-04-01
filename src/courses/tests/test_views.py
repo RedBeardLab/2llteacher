@@ -804,6 +804,7 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-content": "Section content",
             "sections-0-order": "1",
             "sections-0-solution": "Section solution",
+            "sections-0-section_type": "conversation",
         }
 
         response = self.client.post(
@@ -921,6 +922,7 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-content": "Content",
             "sections-0-order": "1",
             "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
         }
 
         response = self.client.post(
@@ -958,6 +960,7 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-content": "Content",
             "sections-0-order": "1",
             "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
         }
 
         response = self.client.post(
@@ -971,3 +974,71 @@ class CourseHomeworkCreateViewTests(TestCase):
             response.url,
             reverse("courses:detail", kwargs={"course_id": self.course.id}),
         )
+
+
+class CourseHomeworkCreateSectionTypeTests(TestCase):
+    """Test that section_type is saved correctly when creating homeworks."""
+
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self.teacher_user = User.objects.create_user(
+            username="teacher_st", email="teacher_st@example.com", password="password"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        self.course = Course.objects.create(name="Course", code="C101ST", description="")
+        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
+
+        from llm.models import LLMConfig
+        self.llm_config = LLMConfig.objects.create(
+            name="Test LLM",
+            model_name="gpt-4",
+            api_key="key",
+            base_prompt="prompt",
+            course=self.course,
+        )
+
+        self.due_date = (timezone.now() + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M")
+        self.url = reverse("courses:homework-create", kwargs={"course_id": self.course.id})
+
+    def _base_post_data(self):
+        return {
+            "title": "HW",
+            "description": "desc",
+            "due_date": self.due_date,
+            "llm_config": self.llm_config.id,
+            "sections-TOTAL_FORMS": "1",
+            "sections-INITIAL_FORMS": "0",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-title": "Q1",
+            "sections-0-content": "Content",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+        }
+
+    def test_create_non_interactive_section(self):
+        self.client.login(username="teacher_st", password="password")
+        data = self._base_post_data()
+        data["sections-0-section_type"] = "non_interactive"
+
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, 302)
+
+        from homeworks.models import Homework
+        hw = Homework.objects.get(title="HW", course=self.course)
+        self.assertEqual(hw.sections.first().section_type, "non_interactive")
+
+    def test_create_conversation_section(self):
+        self.client.login(username="teacher_st", password="password")
+        data = self._base_post_data()
+        data["sections-0-section_type"] = "conversation"
+
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, 302)
+
+        from homeworks.models import Homework
+        hw = Homework.objects.get(title="HW", course=self.course)
+        self.assertEqual(hw.sections.first().section_type, "conversation")

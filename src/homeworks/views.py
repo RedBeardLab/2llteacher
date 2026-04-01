@@ -392,6 +392,7 @@ class HomeworkEditView(View):
                 "content": section.content,
                 "order": section.order,
                 "solution": section.solution.content if section.solution else "",
+                "section_type": section.section_type,
             }
             initial_section_data.append(section_data)
 
@@ -452,6 +453,7 @@ class HomeworkEditView(View):
                         "content": section_form.cleaned_data["content"],
                         "order": section_form.cleaned_data["order"],
                         "solution": section_form.cleaned_data["solution"],
+                        "section_type": section_form.cleaned_data.get("section_type", "conversation"),
                     }
 
                     if section_form.cleaned_data.get("id"):
@@ -466,6 +468,7 @@ class HomeworkEditView(View):
                                 content=section_data["content"],
                                 order=section_data["order"],
                                 solution=section_data["solution"],
+                                section_type=section_data["section_type"],
                             )
                         )
 
@@ -682,8 +685,10 @@ class HomeworkDetailView(View):
                         solution_content=section_data.solution_content,
                         created_at=section_data.created_at,
                         updated_at=section_data.updated_at,
+                        section_type=section_data.section_type,
                         status=progress.status if progress else None,
                         conversation_id=progress.conversation_id if progress else None,
+                        answer_count=progress.answer_count if progress else 0,
                     )
                 )
 
@@ -729,8 +734,10 @@ class SectionDetailViewData:
     has_solution: bool
     solution_content: str | None
     user_roles: list[str]  # All roles this user has for this section: ['teacher', 'student', 'teacher_assistant']
+    section_type: str = "conversation"
     conversations: list[Dict[str, Any]] | None = None
     submission: Dict[str, Any] | None = None
+    existing_answers: list[Dict[str, Any]] | None = None  # student's prior answers, newest first
 
 
 class SectionDetailView(View):
@@ -892,38 +899,48 @@ class SectionDetailView(View):
                     "label": f"Test conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
                 })
 
+        existing_answers = None
+
         if 'student' in user_roles:
-            # Students see their active conversation and submission
-            student_conversations = Conversation.objects.filter(
-                user=user, section=section, is_deleted=False
-            ).select_related("user").prefetch_related("messages")
+            if section.section_type == Section.SECTION_TYPE_NON_INTERACTIVE:
+                from conversations.models import SectionAnswer
+                answers = SectionAnswer.objects.filter(user=user, section=section)
+                existing_answers = [
+                    {"answer": a.answer, "submitted_at": a.submitted_at}
+                    for a in answers
+                ]
+            else:
+                # Students see their active conversation and submission
+                student_conversations = Conversation.objects.filter(
+                    user=user, section=section, is_deleted=False
+                ).select_related("user").prefetch_related("messages")
 
-            for conv in student_conversations:
-                conversations.append({
-                    "id": conv.id,
-                    "created_at": conv.created_at,
-                    "updated_at": conv.updated_at,
-                    "message_count": conv.message_count,
-                    "is_test": False,
-                    "role": "student",
-                    "label": f"Conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
-                })
+                for conv in student_conversations:
+                    conversations.append({
+                        "id": conv.id,
+                        "created_at": conv.created_at,
+                        "updated_at": conv.updated_at,
+                        "message_count": conv.message_count,
+                        "is_test": False,
+                        "role": "student",
+                        "label": f"Conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
+                    })
 
-            # Get submission if exists
-            student_submission = (
-                Submission.objects.filter(
-                    conversation__user=user, conversation__section=section
+                # Get submission if exists
+                student_submission = (
+                    Submission.objects.filter(
+                        conversation__user=user, conversation__section=section
+                    )
+                    .select_related("conversation")
+                    .first()
                 )
-                .select_related("conversation")
-                .first()
-            )
 
-            if student_submission:
-                submission = {
-                    "id": student_submission.id,
-                    "conversation_id": student_submission.conversation.id,
-                    "submitted_at": student_submission.submitted_at,
-                }
+                if student_submission:
+                    submission = {
+                        "id": student_submission.id,
+                        "conversation_id": student_submission.conversation.id,
+                        "submitted_at": student_submission.submitted_at,
+                    }
 
         if 'teacher_assistant' in user_roles:
             # TAs see test conversations they created
@@ -953,8 +970,10 @@ class SectionDetailView(View):
             has_solution=section.solution is not None,
             solution_content=section.solution.content if section.solution else None,
             user_roles=user_roles,
+            section_type=section.section_type,
             conversations=conversations if conversations else None,
             submission=submission,
+            existing_answers=existing_answers,
         )
 
 
@@ -1123,3 +1142,70 @@ class HomeworkMatrixExportView(View):
             writer.writerow(row)
 
         return response
+
+
+@dataclass
+class NonInteractiveSectionData:
+    """Data for the non-interactive section answer page."""
+
+    homework_id: UUID
+    homework_title: str
+    section_id: UUID
+    section_title: str
+    section_content: str
+    section_order: int
+    existing_answers: list[Dict[str, Any]]
+
+
+class NonInteractiveSectionAnswerView(View):
+    """
+    Dedicated answer page for non-interactive sections.
+
+    Students see the question and can submit written answers.
+    No LLM or conversation involved.
+    """
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request: HttpRequest, homework_id: UUID, section_id: UUID) -> HttpResponse:
+        data = self._get_data(request, homework_id, section_id)
+        if isinstance(data, HttpResponse):
+            return data
+        return render(request, "homeworks/non_interactive_answer.html", {"data": data})
+
+    def _get_data(self, request: HttpRequest, homework_id: UUID, section_id: UUID):
+        from conversations.models import SectionAnswer
+
+        student_profile = getattr(request.user, "student_profile", None)
+        if not student_profile:
+            return HttpResponseForbidden("Only students can answer sections.")
+
+        try:
+            homework = Homework.objects.get(id=homework_id)
+            section = Section.objects.get(id=section_id, homework=homework)
+        except (Homework.DoesNotExist, Section.DoesNotExist):
+            return redirect("homeworks:detail", homework_id=homework_id)
+
+        if section.section_type != Section.SECTION_TYPE_NON_INTERACTIVE:
+            return redirect("homeworks:section_detail", homework_id=homework_id, section_id=section_id)
+
+        if not homework.course or not homework.course.is_student_enrolled(student_profile):
+            return HttpResponseForbidden("You are not enrolled in this course.")
+
+        answers = list(
+            SectionAnswer.objects.filter(section=section, user=request.user)
+            .order_by("-submitted_at")
+            .values("answer", "submitted_at")
+        )
+
+        return NonInteractiveSectionData(
+            homework_id=homework.id,
+            homework_title=homework.title,
+            section_id=section.id,
+            section_title=section.title,
+            section_content=section.content,
+            section_order=section.order,
+            existing_answers=answers,
+        )

@@ -195,3 +195,31 @@ class ConversationStartViewTests(TestCase):
 
         # Check response is a 404
         self.assertEqual(response.status_code, 404)
+
+    def test_get_non_interactive_section_returns_403(self):
+        """GET on a non-interactive section is forbidden — no LLM in the loop."""
+        ni_section = Section.objects.create(
+            homework=self.homework,
+            title="Written Q",
+            content="Explain X.",
+            order=2,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+        self.client.login(username="studentuser", password="password123")
+        url = reverse("conversations:start", kwargs={"section_id": ni_section.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_non_interactive_section_returns_403(self):
+        """POST on a non-interactive section is forbidden — no conversation created."""
+        ni_section = Section.objects.create(
+            homework=self.homework,
+            title="Written Q",
+            content="Explain X.",
+            order=2,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+        self.client.login(username="studentuser", password="password123")
+        url = reverse("conversations:start", kwargs={"section_id": ni_section.id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 403)

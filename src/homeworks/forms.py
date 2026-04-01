@@ -47,6 +47,14 @@ class SectionForm(forms.Form):
             }
         ),
     )
+    section_type = forms.ChoiceField(
+        choices=[
+            ("conversation", "Conversation (Interactive)"),
+            ("non_interactive", "Non-Interactive Question"),
+        ],
+        initial="conversation",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
 
 
 class HomeworkCreateForm(forms.ModelForm):

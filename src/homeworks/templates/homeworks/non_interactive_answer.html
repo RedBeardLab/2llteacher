@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Section {{ data.section_order }}: {{ data.section_title }}{% endblock %}
+
+{% block extra_js %}
+<script type="module" src="https://cdn.jsdelivr.net/npm/zero-md@3?register"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 800px;">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'homeworks:list' %}">Homeworks</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'homeworks:detail' data.homework_id %}">{{ data.homework_title }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Section {{ data.section_order }}: {{ data.section_title }}</li>
+        </ol>
+    </nav>
+
+    <!-- Question -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h3 class="mb-0">
+                Section {{ data.section_order }}: {{ data.section_title }}
+                <span class="badge bg-secondary ms-2">Written Answer</span>
+            </h3>
+        </div>
+        <div class="card-body">
+            <zero-md src="data:text/markdown;charset=utf-8,{{ data.section_content|urlencode }}">
+                <template data-append>
+                    <style>.markdown-body { background-color: transparent !important; }</style>
+                </template>
+            </zero-md>
+        </div>
+    </div>
+
+    <!-- Answer form -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h4 class="mb-0">
+                {% if data.existing_answers %}
+                    Submit Another Answer
+                {% else %}
+                    Your Answer
+                {% endif %}
+            </h4>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'conversations:answer_section' section_id=data.section_id %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <textarea name="answer" class="form-control" rows="8"
+                              placeholder="Write your answer here..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send"></i> Submit Answer
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Previous answers -->
+    {% if data.existing_answers %}
+    <div class="card mb-4">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Previous Answers</h4>
+            <span class="badge bg-secondary">{{ data.existing_answers|length }}</span>
+        </div>
+        <div class="card-body p-0">
+            {% for ans in data.existing_answers %}
+            <div class="p-3 {% if not forloop.last %}border-bottom{% endif %}">
+                <small class="text-muted">
+                    <i class="bi bi-clock"></i>
+                    Submitted {{ ans.submitted_at|date:"F d, Y H:i" }}
+                </small>
+                <p class="mt-2 mb-0" style="white-space: pre-wrap;">{{ ans.answer }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Back button -->
+    <div>
+        <a href="{% url 'homeworks:detail' data.homework_id %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Homework
+        </a>
+    </div>
+
+</div>
+{% endblock %}

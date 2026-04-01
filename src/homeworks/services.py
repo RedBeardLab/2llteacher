@@ -49,6 +49,7 @@ class SectionCreateData:
     content: str
     order: int
     solution: str | None = None
+    section_type: str = "conversation"
 
 
 @dataclass
@@ -80,9 +81,11 @@ class SectionData:
     solution_content: str | None
     created_at: datetime
     updated_at: datetime
+    section_type: str = "conversation"
     # Progress tracking fields (available when progress is calculated)
     status: SectionStatus | None = None
     conversation_id: UUID | None = None
+    answer_count: int = 0
 
     @property
     def has_solution(self) -> bool:
@@ -168,6 +171,10 @@ class StudentSectionStatus:
     is_missing: bool  # True if student has no conversations for this section
     latest_conversation_date: datetime | None
     submission_count: int  # Number of submitted conversations for this section
+    section_type: str = "conversation"
+    answer_count: int = 0  # For non-interactive sections
+    latest_answer: str | None = None  # Most recent answer text
+    latest_answer_date: datetime | None = None  # Date of most recent answer
 
 
 @dataclass
@@ -313,6 +320,7 @@ class HomeworkService:
                         title=section_data.title,
                         content=section_data.content,
                         order=section_data.order,
+                        section_type=section_data.section_type,
                     )
 
                     # Create solution if provided
@@ -329,6 +337,7 @@ class HomeworkService:
                     homework_id=homework.id, section_ids=section_ids
                 )
         except Exception as e:
+            logger.exception("Failed to create homework with sections")
             record_exception(e)
             return HomeworkCreateResult(
                 homework_id=None,  # type: ignore
@@ -353,52 +362,62 @@ class HomeworkService:
             HomeworkProgressData with progress information
         """
         # Import here to avoid circular imports
-        from conversations.models import Submission, Conversation
+        from conversations.models import Submission, Conversation, SectionAnswer
+        from .models import Section as SectionModel
 
         sections = homework.sections.select_related("solution").order_by("order")
         progress_items: list[SectionData] = []
 
         for section in sections:
             try:
-                # Check if student has submitted this section
-                submission = Submission.objects.filter(
-                    conversation__user=student.user,
-                    conversation__section=section,
-                    conversation__is_deleted=False,
-                ).first()
-
-                if submission:
-                    status: SectionStatus = SectionStatus.SUBMITTED
-                    conversation_id: UUID | None = submission.conversation.id
+                if section.section_type == SectionModel.SECTION_TYPE_NON_INTERACTIVE:
+                    # Non-interactive: status is based on submitted answers
+                    answer_count = SectionAnswer.objects.filter(
+                        section=section, user=student.user
+                    ).count()
+                    if answer_count > 0:
+                        status: SectionStatus = SectionStatus.SUBMITTED
+                    elif homework.is_overdue:
+                        status = SectionStatus.OVERDUE
+                    else:
+                        status = SectionStatus.NOT_STARTED
+                    conversation_id: UUID | None = None
                 else:
-                    # Check if student has started working (has conversations)
-                    conversation = Conversation.objects.filter(
-                        user=student.user, section=section, is_deleted=False
+                    answer_count = 0
+                    # Check if student has submitted this section
+                    submission = Submission.objects.filter(
+                        conversation__user=student.user,
+                        conversation__section=section,
+                        conversation__is_deleted=False,
                     ).first()
 
-                    if conversation:
-                        # Student has started working
-                        if homework.is_overdue:
-                            status = (
-                                SectionStatus.IN_PROGRESS_OVERDUE
-                            )  # Started but overdue
-                        else:
-                            status = SectionStatus.IN_PROGRESS  # Started and on time
-                        conversation_id = conversation.id
+                    if submission:
+                        status = SectionStatus.SUBMITTED
+                        conversation_id = submission.conversation.id
                     else:
-                        # Student hasn't started
-                        if homework.is_overdue:
-                            status = SectionStatus.OVERDUE  # Never started and overdue
+                        # Check if student has started working (has conversations)
+                        conversation = Conversation.objects.filter(
+                            user=student.user, section=section, is_deleted=False
+                        ).first()
+
+                        if conversation:
+                            if homework.is_overdue:
+                                status = SectionStatus.IN_PROGRESS_OVERDUE
+                            else:
+                                status = SectionStatus.IN_PROGRESS
+                            conversation_id = conversation.id
                         else:
-                            status = (
-                                SectionStatus.NOT_STARTED
-                            )  # Never started, still time
-                        conversation_id = None
+                            if homework.is_overdue:
+                                status = SectionStatus.OVERDUE
+                            else:
+                                status = SectionStatus.NOT_STARTED
+                            conversation_id = None
             except Exception as e:
                 logger.exception("Error determining section status")
                 record_exception(e)
                 status = SectionStatus.NOT_STARTED
                 conversation_id = None
+                answer_count = 0
 
             # Create progress data for this section with complete section information
             progress_items.append(
@@ -412,8 +431,10 @@ class HomeworkService:
                     else None,
                     created_at=section.created_at,
                     updated_at=section.updated_at,
+                    section_type=section.section_type,
                     status=status,
                     conversation_id=conversation_id,
+                    answer_count=answer_count,
                 )
             )
 
@@ -457,6 +478,7 @@ class HomeworkService:
                     else None,
                     created_at=section.created_at,
                     updated_at=section.updated_at,
+                    section_type=section.section_type,
                 )
                 sections.append(section_data)
 
@@ -735,6 +757,7 @@ class HomeworkService:
                             title=section_data.title,
                             content=section_data.content,
                             order=section_data.order,
+                            section_type=section_data.section_type,
                         )
 
                         # Create solution if provided
@@ -762,6 +785,8 @@ class HomeworkService:
                                 section.content = section_update["content"]
                             if "order" in section_update:
                                 section.order = section_update["order"]
+                            if "section_type" in section_update:
+                                section.section_type = section_update["section_type"]
 
                             # Update solution if provided
                             if "solution" in section_update:
@@ -800,6 +825,7 @@ class HomeworkService:
                 success=False, error=f"Homework with id {homework_id} not found"
             )
         except Exception as e:
+            logger.exception("Failed to update homework %s", homework_id)
             record_exception(e)
             return HomeworkUpdateResult(success=False, error=str(e))
 
@@ -841,9 +867,9 @@ class HomeworkService:
         Returns:
             HomeworkSubmissionsData with all students and their section-by-section interactions, or None if homework not found
         """
-        from .models import Homework
+        from .models import Homework, Section as SectionModel
         from accounts.models import Student
-        from conversations.models import Conversation, Submission, PasteEvent
+        from conversations.models import Conversation, Submission, PasteEvent, SectionAnswer
 
         try:
             # Get the homework with sections ordered by section order
@@ -896,6 +922,20 @@ class HomeworkService:
                     conv_id = paste_event.last_message_before_paste.conversation.id
                     paste_event_count_map[conv_id] += 1
 
+            # Fetch all non-interactive answers for this homework
+            section_answers = (
+                SectionAnswer.objects.filter(section__homework=homework)
+                .select_related("user__student_profile", "section")
+                .order_by("-submitted_at")
+            )
+            # Map: student_profile.id → section_id → [SectionAnswer] (newest-first)
+            student_answers_map: dict[UUID, dict[UUID, list]] = {}
+            for ans in section_answers:
+                sp = getattr(ans.user, "student_profile", None)
+                if sp is None:
+                    continue
+                student_answers_map.setdefault(sp.id, {}).setdefault(ans.section.id, []).append(ans)
+
             # Group conversations by student and section
             student_section_conversations_map: dict[
                 UUID, dict[UUID, list[Conversation]]
@@ -933,86 +973,121 @@ class HomeworkService:
                 # Create section statuses for all sections
                 section_statuses = []
                 total_conversations = 0
+                total_answers = 0
                 submitted_count = 0
                 sections_started = 0
                 missing_sections = 0
                 last_activity = None
 
                 for section in homework_sections:
-                    section_conversations = student_conversations.get(section.id, [])
-                    has_conversation = len(section_conversations) > 0
+                    if section.section_type == SectionModel.SECTION_TYPE_NON_INTERACTIVE:
+                        # Non-interactive section: use SectionAnswer instead of conversations
+                        section_ans = student_answers_map.get(student.id, {}).get(section.id, [])
+                        answer_count = len(section_ans)
+                        has_answer = answer_count > 0
+                        latest_answer = section_ans[0].answer if has_answer else None
+                        latest_answer_date = section_ans[0].submitted_at if has_answer else None
 
-                    if not has_conversation:
-                        missing_sections += 1
+                        if has_answer:
+                            sections_started += 1
+                            total_answers += 1
+                            if last_activity is None or latest_answer_date > last_activity:
+                                last_activity = latest_answer_date
+                        else:
+                            missing_sections += 1
+
+                        section_statuses.append(
+                            StudentSectionStatus(
+                                section_id=section.id,
+                                section_title=section.title,
+                                section_order=section.order,
+                                has_conversation=False,
+                                conversations=[],
+                                is_missing=not has_answer,
+                                latest_conversation_date=None,
+                                submission_count=0,
+                                section_type=section.section_type,
+                                answer_count=answer_count,
+                                latest_answer=latest_answer,
+                                latest_answer_date=latest_answer_date,
+                            )
+                        )
                     else:
-                        sections_started += 1
+                        section_conversations = student_conversations.get(section.id, [])
+                        has_conversation = len(section_conversations) > 0
 
-                    # Process conversations for this section
-                    conversation_data = []
-                    section_submissions = 0
-                    latest_conversation_date = None
+                        if not has_conversation:
+                            missing_sections += 1
+                        else:
+                            sections_started += 1
 
-                    for conv in section_conversations:
-                        total_conversations += 1
+                        # Process conversations for this section
+                        conversation_data = []
+                        section_submissions = 0
+                        latest_conversation_date = None
 
-                        # Check if this conversation has a submission
-                        submission = submission_map.get(conv.id)
-                        is_submitted = submission is not None
-                        if is_submitted:
-                            section_submissions += 1
-                            submitted_count += 1
-                            total_submissions += 1
+                        for conv in section_conversations:
+                            total_conversations += 1
 
-                        # Track latest conversation date for this section
-                        if (
-                            latest_conversation_date is None
-                            or conv.updated_at > latest_conversation_date
-                        ):
-                            latest_conversation_date = conv.updated_at
+                            # Check if this conversation has a submission
+                            submission = submission_map.get(conv.id)
+                            is_submitted = submission is not None
+                            if is_submitted:
+                                section_submissions += 1
+                                submitted_count += 1
+                                total_submissions += 1
 
-                        # Track overall last activity
-                        if last_activity is None or conv.updated_at > last_activity:
-                            last_activity = conv.updated_at
+                            # Track latest conversation date for this section
+                            if (
+                                latest_conversation_date is None
+                                or conv.updated_at > latest_conversation_date
+                            ):
+                                latest_conversation_date = conv.updated_at
 
-                        conversation_data.append(
-                            StudentConversationData(
-                                conversation_id=conv.id,
-                                section_title=conv.section.title,
-                                section_order=conv.section.order,
-                                created_at=conv.created_at,
-                                updated_at=conv.updated_at,
-                                message_count=conv.message_count,
-                                is_submitted=is_submitted,
-                                is_deleted=conv.is_deleted,
-                                submission_date=submission.submitted_at
-                                if submission
-                                else None,
-                                paste_event_count=paste_event_count_map.get(conv.id, 0),
+                            # Track overall last activity
+                            if last_activity is None or conv.updated_at > last_activity:
+                                last_activity = conv.updated_at
+
+                            conversation_data.append(
+                                StudentConversationData(
+                                    conversation_id=conv.id,
+                                    section_title=conv.section.title,
+                                    section_order=conv.section.order,
+                                    created_at=conv.created_at,
+                                    updated_at=conv.updated_at,
+                                    message_count=conv.message_count,
+                                    is_submitted=is_submitted,
+                                    is_deleted=conv.is_deleted,
+                                    submission_date=submission.submitted_at
+                                    if submission
+                                    else None,
+                                    paste_event_count=paste_event_count_map.get(conv.id, 0),
+                                )
+                            )
+
+                        # Sort conversations within this section chronologically (newest first)
+                        conversation_data.sort(key=lambda x: x.created_at, reverse=True)
+
+                        # Create section status
+                        section_statuses.append(
+                            StudentSectionStatus(
+                                section_id=section.id,
+                                section_title=section.title,
+                                section_order=section.order,
+                                has_conversation=has_conversation,
+                                conversations=conversation_data,
+                                is_missing=not has_conversation,
+                                latest_conversation_date=latest_conversation_date,
+                                submission_count=section_submissions,
+                                section_type=section.section_type,
                             )
                         )
 
-                    # Sort conversations within this section chronologically (newest first)
-                    conversation_data.sort(key=lambda x: x.created_at, reverse=True)
-
-                    # Create section status
-                    section_statuses.append(
-                        StudentSectionStatus(
-                            section_id=section.id,
-                            section_title=section.title,
-                            section_order=section.order,
-                            has_conversation=has_conversation,
-                            conversations=conversation_data,
-                            is_missing=not has_conversation,
-                            latest_conversation_date=latest_conversation_date,
-                            submission_count=section_submissions,
-                        )
-                    )
-
                 # Determine participation status
-                has_interactions = total_conversations > 0
+                has_interactions = total_conversations > 0 or total_answers > 0
                 if not has_interactions:
                     participation_status = ParticipationStatus.NO_INTERACTION
-                elif submitted_count > 0:
+                elif submitted_count > 0 or total_answers > 0:
                     participation_status = ParticipationStatus.ACTIVE
                     active_students += 1
                 else:
