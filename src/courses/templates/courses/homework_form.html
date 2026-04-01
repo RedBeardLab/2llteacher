@@ -21,6 +21,23 @@
     cursor: pointer;
     color: #dc3545;
   }
+  .cursor-pointer {
+    cursor: pointer;
+  }
+  .llm-config-card {
+    transition: all 0.2s ease-in-out;
+  }
+  .llm-config-card:hover {
+    background-color: #f8f9fa;
+    border-color: #86b7fe;
+  }
+  .llm-config-card.selected {
+    background-color: #e7f1ff;
+    border-color: #0d6efd;
+  }
+  .config-check {
+    font-size: 1.25rem;
+  }
 </style>
 {% endblock %}
 
@@ -80,13 +97,50 @@
         </div>
 
         <div class="mb-3">
-          <label for="{{ data.form.llm_config.id_for_label }}" class="form-label">LLM Configuration (Optional)</label>
-          {{ data.form.llm_config }}
+          <label class="form-label">LLM Configuration (Optional)</label>
+          <div class="form-text mb-2">Select a configuration for the LLM assistant. If none selected, the course default will be used.</div>
+          
           {% if data.form.llm_config.errors %}
           <div class="invalid-feedback d-block">
             {{ data.form.llm_config.errors|join:", " }}
           </div>
           {% endif %}
+          
+          <input type="hidden" name="llm_config" id="{{ data.form.llm_config.id_for_label }}" value="">
+          
+          <div class="row g-2">
+            {% for config in data.available_llm_configs %}
+            <div class="col-md-6 col-lg-4">
+              <div class="llm-config-card border rounded p-3 cursor-pointer {% if data.form.llm_config.value == config.id %}border-primary{% endif %}" 
+                   data-config-id="{{ config.id }}"
+                   onclick="selectLLMConfig(this, '{{ config.id }}')">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h6 class="mb-1">{{ config.name }}</h6>
+                    <p class="mb-1 text-muted small">{{ config.model_name }}</p>
+                    {% if config.is_default %}
+                    <span class="badge bg-success mb-1">Default</span>
+                    {% endif %}
+                    {% if config.course_id %}
+                    <span class="badge bg-secondary mb-1">Course-specific</span>
+                    {% else %}
+                    <span class="badge bg-info mb-1">Global</span>
+                    {% endif %}
+                  </div>
+                  <div class="config-check {% if data.form.llm_config.value == config.id %}d-block{% else %}d-none{% endif %}">
+                    <i class="bi bi-check-circle-fill text-primary"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+              <div class="alert alert-info mb-0">
+                No LLM configurations available. <a href="#">Create one first</a>.
+              </div>
+            </div>
+            {% endfor %}
+          </div>
         </div>
       </div>
     </div>
@@ -259,6 +313,23 @@ function updateSectionNumbers() {
     const header = section.querySelector('.section-header h6');
     header.textContent = `Section ${index + 1}`;
   });
+}
+
+function selectLLMConfig(card, configId) {
+  // Remove selection from all cards
+  document.querySelectorAll('.llm-config-card').forEach(c => {
+    c.classList.remove('selected', 'border-primary');
+    c.querySelector('.config-check').classList.add('d-none');
+    c.querySelector('.config-check').classList.remove('d-block');
+  });
+  
+  // Add selection to clicked card
+  card.classList.add('selected', 'border-primary');
+  card.querySelector('.config-check').classList.remove('d-none');
+  card.querySelector('.config-check').classList.add('d-block');
+  
+  // Set the hidden input value
+  document.getElementById('id_llm_config').value = configId;
 }
 </script>
 {% endblock %}

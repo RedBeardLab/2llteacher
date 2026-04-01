@@ -9,7 +9,12 @@ from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
-from courses.models import Course, CourseEnrollment, CourseTeacher, CourseTeacherAssistant
+from courses.models import (
+    Course,
+    CourseEnrollment,
+    CourseTeacher,
+    CourseTeacherAssistant,
+)
 from courses.views import CourseListView, CourseListData
 from accounts.models import Teacher, Student, TeacherAssistant
 
@@ -222,8 +227,8 @@ class CourseListViewTests(TestCase):
         data = view._get_view_data(multi_user)
 
         # Should have both student and TA in user_types
-        self.assertIn('student', data.user_types)
-        self.assertIn('teacher_assistant', data.user_types)
+        self.assertIn("student", data.user_types)
+        self.assertIn("teacher_assistant", data.user_types)
         self.assertEqual(len(data.user_types), 2)
 
         # Should see courses from both roles plus course3 (active, available for enrollment)
@@ -235,10 +240,10 @@ class CourseListViewTests(TestCase):
         course3_item = next(c for c in data.courses if c.id == course3.id)
 
         # Verify roles
-        self.assertIn('student', course1_item.roles)
+        self.assertIn("student", course1_item.roles)
         self.assertTrue(course1_item.is_enrolled)
 
-        self.assertIn('teacher_assistant', course2_item.roles)
+        self.assertIn("teacher_assistant", course2_item.roles)
         self.assertFalse(course2_item.is_enrolled)
 
         # course3 should have no roles (not enrolled, not TA)
@@ -781,6 +786,26 @@ class CourseHomeworkCreateViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "courses/homework_form.html")
 
+    def test_get_homework_create_form_includes_available_llm_configs(self):
+        """Test that the homework create form includes available LLM configs in context."""
+        self.client.login(username="testteacher", password="password123")
+
+        response = self.client.get(
+            reverse("courses:homework-create", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("data", response.context)
+
+        form_data = response.context["data"]
+        self.assertTrue(hasattr(form_data, "available_llm_configs"))
+
+        available_configs = form_data.available_llm_configs
+        self.assertIsInstance(available_configs, list)
+
+        config_ids = [c["id"] for c in available_configs]
+        self.assertIn(str(self.llm_config.id), config_ids)
+
     def test_create_homework_for_course_success(self):
         """Test that teachers can create homeworks for their courses."""
         self.client.login(username="testteacher", password="password123")
@@ -988,10 +1013,15 @@ class CourseHomeworkCreateSectionTypeTests(TestCase):
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
-        self.course = Course.objects.create(name="Course", code="C101ST", description="")
-        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
+        self.course = Course.objects.create(
+            name="Course", code="C101ST", description=""
+        )
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
 
         from llm.models import LLMConfig
+
         self.llm_config = LLMConfig.objects.create(
             name="Test LLM",
             model_name="gpt-4",
@@ -1001,7 +1031,9 @@ class CourseHomeworkCreateSectionTypeTests(TestCase):
         )
 
         self.due_date = (timezone.now() + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M")
-        self.url = reverse("courses:homework-create", kwargs={"course_id": self.course.id})
+        self.url = reverse(
+            "courses:homework-create", kwargs={"course_id": self.course.id}
+        )
 
     def _base_post_data(self):
         return {
@@ -1028,6 +1060,7 @@ class CourseHomeworkCreateSectionTypeTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
         from homeworks.models import Homework
+
         hw = Homework.objects.get(title="HW", course=self.course)
         self.assertEqual(hw.sections.first().section_type, "non_interactive")
 
@@ -1040,5 +1073,6 @@ class CourseHomeworkCreateSectionTypeTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
         from homeworks.models import Homework
+
         hw = Homework.objects.get(title="HW", course=self.course)
         self.assertEqual(hw.sections.first().section_type, "conversation")
