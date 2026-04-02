@@ -515,29 +515,12 @@ class CourseHomeworkCreateView(View):
         """Prepare data for the form view."""
         from homeworks.forms import HomeworkCreateForm, SectionForm, SectionFormSet
         from django.forms import formset_factory
-        from llm.services import LLMService
 
-        # Create homework form with course pre-populated
-        form = HomeworkCreateForm(initial={"course": course})
+        form = HomeworkCreateForm(initial={"course": course}, course=course)
 
-        # Create empty section form (we'll start with one)
         SectionFormset = formset_factory(SectionForm, extra=1, formset=SectionFormSet)
         section_formset = SectionFormset(prefix="sections")
 
-        # Get all available LLM configs
-        all_configs = LLMService.get_all_configs()
-        available_llm_configs = [
-            {
-                "id": str(config.id),
-                "name": config.name,
-                "model_name": config.model_name,
-                "is_default": config.is_default,
-                "course_id": str(config.course_id) if config.course_id else None,
-            }
-            for config in all_configs
-        ]
-
-        # Return form data
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
@@ -545,7 +528,6 @@ class CourseHomeworkCreateView(View):
             course_id=course.id,
             action="create",
             is_submitted=False,
-            available_llm_configs=available_llm_configs,
         )
 
     def _process_form_submission(
@@ -625,22 +607,6 @@ class CourseHomeworkCreateView(View):
                 # Service returned error
                 messages.error(request, "Failed to create homework. Please try again.")
 
-        # Form has errors, re-render with errors
-        # Get all available LLM configs for the form
-        from llm.services import LLMService
-
-        all_configs = LLMService.get_all_configs()
-        available_llm_configs = [
-            {
-                "id": str(config.id),
-                "name": config.name,
-                "model_name": config.model_name,
-                "is_default": config.is_default,
-                "course_id": str(config.course_id) if config.course_id else None,
-            }
-            for config in all_configs
-        ]
-
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
@@ -648,7 +614,6 @@ class CourseHomeworkCreateView(View):
             course_id=course.id,
             action="create",
             is_submitted=False,
-            available_llm_configs=available_llm_configs,
         )
 
 

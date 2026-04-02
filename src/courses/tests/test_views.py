@@ -767,12 +767,13 @@ class CourseHomeworkCreateViewTests(TestCase):
             course=self.course, teacher=self.teacher, role="owner"
         )
 
-        # Create LLM config for homework
+        # Create LLM config for homework (course-specific)
         self.llm_config = LLMConfig.objects.create(
             name="Test LLM",
             model_name="gpt-4",
             api_key="test-api-key",
             base_prompt="You are a helpful AI tutor.",
+            course=self.course,
         )
 
     def test_get_homework_create_form_renders(self):
@@ -786,8 +787,8 @@ class CourseHomeworkCreateViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "courses/homework_form.html")
 
-    def test_get_homework_create_form_includes_available_llm_configs(self):
-        """Test that the homework create form includes available LLM configs in context."""
+    def test_get_homework_create_form_llm_config_filtered_by_course(self):
+        """Test that the homework create form's LLM config field is filtered by course."""
         self.client.login(username="testteacher", password="password123")
 
         response = self.client.get(
@@ -798,12 +799,8 @@ class CourseHomeworkCreateViewTests(TestCase):
         self.assertIn("data", response.context)
 
         form_data = response.context["data"]
-        self.assertTrue(hasattr(form_data, "available_llm_configs"))
-
-        available_configs = form_data.available_llm_configs
-        self.assertIsInstance(available_configs, list)
-
-        config_ids = [c["id"] for c in available_configs]
+        llm_config_field = form_data.form.fields["llm_config"]
+        config_ids = [str(c.id) for c in llm_config_field.queryset]
         self.assertIn(str(self.llm_config.id), config_ids)
 
     def test_create_homework_for_course_success(self):
