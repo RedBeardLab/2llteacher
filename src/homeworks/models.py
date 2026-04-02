@@ -1,4 +1,5 @@
 import uuid
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
@@ -29,6 +30,13 @@ class Homework(models.Model):
 
     def __str__(self):
         return self.title
+
+    def clean(self):
+        if self.llm_config_id and self.course_id:
+            if self.llm_config.course_id != self.course_id:
+                raise ValidationError(
+                    {"llm_config": "LLM config must belong to the same course as this homework."}
+                )
 
     @property
     def section_count(self):

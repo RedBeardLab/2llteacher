@@ -458,6 +458,69 @@ class HomeworkSectionRelationshipTest(TestCase):
         self.assertTrue(SectionSolution.objects.filter(id=solution_id).exists())
 
 
+class HomeworkLLMConfigCourseValidationTest(TestCase):
+    """Test that Homework.clean() enforces llm_config belongs to the same course."""
+
+    def setUp(self):
+        from courses.models import Course
+
+        self.User = get_user_model()
+        self.user = self.User.objects.create_user(
+            username="testteacher", password="testpass123"
+        )
+        self.teacher = Teacher.objects.create(user=self.user)
+        self.course = Course.objects.create(
+            name="Course A", code="COURSEA", description=""
+        )
+        self.other_course = Course.objects.create(
+            name="Course B", code="COURSEB", description=""
+        )
+        self.llm_config_same_course = LLMConfig.objects.create(
+            course=self.course,
+            name="Config A",
+            model_name="gpt-4",
+            api_key="key",
+            base_prompt="prompt",
+        )
+        self.llm_config_other_course = LLMConfig.objects.create(
+            course=self.other_course,
+            name="Config B",
+            model_name="gpt-4",
+            api_key="key",
+            base_prompt="prompt",
+        )
+
+    def _make_homework(self, llm_config):
+        return Homework(
+            title="HW",
+            description="desc",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timezone.timedelta(days=7),
+            llm_config=llm_config,
+        )
+
+    def test_same_course_llm_config_is_valid(self):
+        hw = self._make_homework(self.llm_config_same_course)
+        hw.full_clean()  # should not raise
+
+    def test_different_course_llm_config_raises(self):
+        hw = self._make_homework(self.llm_config_other_course)
+        with self.assertRaises(ValidationError) as ctx:
+            hw.full_clean()
+        self.assertIn("llm_config", ctx.exception.message_dict)
+
+    def test_no_llm_config_is_valid(self):
+        hw = Homework(
+            title="HW",
+            description="desc",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timezone.timedelta(days=7),
+        )
+        hw.full_clean()  # should not raise
+
+
 class ModelEdgeCasesTest(TestCase):
     """Test cases for model edge cases."""
 
