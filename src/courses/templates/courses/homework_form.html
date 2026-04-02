@@ -81,6 +81,7 @@
 
         <div class="mb-3">
           <label for="{{ data.form.llm_config.id_for_label }}" class="form-label">LLM Configuration (Optional)</label>
+          <div class="form-text mb-2">Select a configuration for the LLM assistant. If none selected, the course default will be used.</div>
           {{ data.form.llm_config }}
           {% if data.form.llm_config.errors %}
           <div class="invalid-feedback d-block">

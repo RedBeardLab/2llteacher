@@ -90,8 +90,16 @@ class HomeworkCreateForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        course = kwargs.pop("course", None)
         super().__init__(*args, **kwargs)
         self.fields["llm_config"].required = False
+
+        if course:
+            from llm.models import LLMConfig
+
+            self.fields["llm_config"].queryset = LLMConfig.objects.filter(
+                course=course, is_active=True
+            ).order_by("name")
 
         # Convert datetime to format expected by datetime-local input
         if self.instance and self.instance.due_date:
