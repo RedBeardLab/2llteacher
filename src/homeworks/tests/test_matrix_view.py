@@ -18,7 +18,7 @@ from homeworks.models import Homework, Section
 from homeworks.services import HomeworkService
 from conversations.models import Conversation, Submission
 from llm.models import LLMConfig
-from courses.models import Course, CourseEnrollment
+from courses.models import Course, CourseEnrollment, CourseTeacher
 
 User = get_user_model()
 
@@ -74,7 +74,8 @@ class HomeworkMatrixViewTest(TestCase):
             code="TEST101",
         )
 
-        # Enroll students in the course
+        # Link teacher to course and enroll students
+        CourseTeacher.objects.create(course=self.course, teacher=self.teacher)
         CourseEnrollment.objects.create(course=self.course, student=self.student1)
         CourseEnrollment.objects.create(course=self.course, student=self.student2)
 
@@ -110,7 +111,7 @@ class HomeworkMatrixViewTest(TestCase):
         )
 
         # Matrix URL
-        self.matrix_url = reverse("homeworks:matrix")
+        self.matrix_url = reverse("courses:matrix", kwargs={"course_id": self.course.id})
 
     def test_matrix_view_requires_login(self):
         """Test that matrix view requires authentication."""
@@ -133,7 +134,7 @@ class HomeworkMatrixViewTest(TestCase):
 
     def test_matrix_data_structure(self):
         """Test that matrix data structure is correct."""
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         self.assertIsNotNone(matrix_data)
         self.assertEqual(matrix_data.total_students, 2)
@@ -143,7 +144,7 @@ class HomeworkMatrixViewTest(TestCase):
 
     def test_matrix_with_no_submissions(self):
         """Test matrix display when no student has submitted anything."""
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         # Check that all cells show not started
         for student_row in matrix_data.student_rows:
@@ -162,7 +163,7 @@ class HomeworkMatrixViewTest(TestCase):
         # Student 1 submits homework 1, section 1
         Submission.objects.create(conversation=conv1, submitted_at=timezone.now())
 
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         # Find student1's row
         student1_row = next(
@@ -199,7 +200,7 @@ class HomeworkMatrixViewTest(TestCase):
             conv = Conversation.objects.create(user=self.student1_user, section=section)
             Submission.objects.create(conversation=conv, submitted_at=timezone.now())
 
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         # Find student1's row
         student1_row = next(
@@ -243,7 +244,7 @@ class HomeworkMatrixViewTest(TestCase):
         )
         Submission.objects.create(conversation=conv2, submitted_at=timezone.now())
 
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         # Verify total submissions
         self.assertEqual(matrix_data.total_submissions, 4)
@@ -282,7 +283,7 @@ class HomeworkMatrixViewTest(TestCase):
         response = self.client.get(self.matrix_url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Homework Matrix Dashboard")
+        self.assertContains(response, "Matrix Dashboard")
         self.assertContains(response, "Alice Smith")
         self.assertContains(response, "Bob Jones")
         self.assertContains(response, "Homework 1")
@@ -293,7 +294,7 @@ class HomeworkMatrixViewTest(TestCase):
         # Delete all students
         Student.objects.all().delete()
 
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         self.assertEqual(matrix_data.total_students, 0)
         self.assertEqual(len(matrix_data.student_rows), 0)
@@ -303,27 +304,37 @@ class HomeworkMatrixViewTest(TestCase):
         # Delete all homeworks
         Homework.objects.all().delete()
 
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         self.assertEqual(matrix_data.total_homeworks, 0)
         self.assertEqual(len(matrix_data.homeworks), 0)
 
-    def test_matrix_link_in_homework_list(self):
-        """Test that matrix link appears in homework list for teachers."""
+    def test_matrix_link_in_course_detail(self):
+        """Test that matrix link appears in course detail for teachers."""
         self.client.login(username="teacher", password="password123")
-        response = self.client.get(reverse("homeworks:list"))
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Matrix Dashboard")
-        self.assertContains(response, reverse("homeworks:matrix"))
+        self.assertContains(
+            response,
+            reverse("courses:matrix", kwargs={"course_id": self.course.id}),
+        )
 
-    def test_matrix_link_not_in_homework_list_for_students(self):
-        """Test that matrix link does not appear for students."""
+    def test_matrix_link_not_in_course_detail_for_students(self):
+        """Test that matrix link does not appear in course detail for students."""
         self.client.login(username="student1", password="password123")
-        response = self.client.get(reverse("homeworks:list"))
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Matrix Dashboard")
+        self.assertNotContains(
+            response,
+            reverse("courses:matrix", kwargs={"course_id": self.course.id}),
+        )
 
     def test_matrix_with_overdue_homework(self):
         """Test matrix display with overdue homework."""
@@ -341,7 +352,7 @@ class HomeworkMatrixViewTest(TestCase):
             homework=overdue_hw, title="Section", content="Content", order=1
         )
 
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         # Verify overdue homework is included
         self.assertEqual(matrix_data.total_homeworks, 3)
@@ -354,7 +365,7 @@ class HomeworkMatrixViewTest(TestCase):
         )
         Submission.objects.create(conversation=conv, submitted_at=timezone.now())
 
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         student1_row = next(
             (
@@ -379,7 +390,7 @@ class HomeworkMatrixViewTest(TestCase):
         )
         conv.soft_delete()
 
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         student1_row = next(
             (
@@ -426,7 +437,7 @@ class HomeworkMatrixViewTest(TestCase):
         Submission.objects.create(conversation=conv2)
 
         # Get matrix data
-        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
 
         self.assertIsNotNone(matrix_data)
         # Should only show the 2 enrolled students, not the non-enrolled one

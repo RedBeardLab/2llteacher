@@ -20,7 +20,7 @@ from accounts.models import Teacher, Student
 from homeworks.models import Homework, Section
 from conversations.models import Conversation, Submission
 from llm.models import LLMConfig
-from courses.models import Course, CourseEnrollment
+from courses.models import Course, CourseEnrollment, CourseTeacher
 
 User = get_user_model()
 
@@ -86,7 +86,8 @@ class HomeworkMatrixExportViewTest(TestCase):
             code="TEST101",
         )
 
-        # Enroll students in the course
+        # Link teacher to course and enroll students
+        CourseTeacher.objects.create(course=self.course, teacher=self.teacher)
         CourseEnrollment.objects.create(course=self.course, student=self.student1)
         CourseEnrollment.objects.create(course=self.course, student=self.student2)
         CourseEnrollment.objects.create(course=self.course, student=self.student3)
@@ -123,7 +124,9 @@ class HomeworkMatrixExportViewTest(TestCase):
         )
 
         # Export URL
-        self.export_url = reverse("homeworks:matrix_export")
+        self.export_url = reverse(
+            "courses:matrix-export", kwargs={"course_id": self.course.id}
+        )
 
     def test_export_view_requires_login(self):
         """Test that export view requires authentication."""

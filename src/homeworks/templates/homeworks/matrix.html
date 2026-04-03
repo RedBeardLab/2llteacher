@@ -1,21 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Homework Matrix Dashboard{% endblock %}
+{% block title %}Matrix Dashboard - {{ course.name }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
-            <h1>Homework Matrix Dashboard</h1>
-            <p class="text-muted">Overview of all students and homework submissions</p>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'courses:list' %}">Courses</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'courses:detail' course.id %}">{{ course.name }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Matrix Dashboard</li>
+                </ol>
+            </nav>
+            <h1>Matrix Dashboard</h1>
+            <p class="text-muted">Overview of students and homework submissions for {{ course.name }}</p>
         </div>
         <div class="text-end">
-            <a href="{% url 'homeworks:matrix_export' %}" class="btn btn-success me-2">
+            <a href="{% url 'courses:matrix-export' course.id %}" class="btn btn-success me-2">
                 <i class="bi bi-download"></i> Export to CSV
             </a>
-            <a href="{% url 'homeworks:list' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back to Homeworks
+            <a href="{% url 'courses:detail' course.id %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Course
             </a>
         </div>
     </div>
@@ -172,7 +179,7 @@
                 {% empty %}
                 <tr>
                     <td colspan="{{ data.homeworks|length|add:2 }}" class="text-center text-muted py-4">
-                        No students found in the system.
+                        No students enrolled in this course.
                     </td>
                 </tr>
                 {% endfor %}

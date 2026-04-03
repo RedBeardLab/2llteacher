@@ -27,4 +27,14 @@ urlpatterns = [
         views.CourseTARemoveView.as_view(),
         name="ta-remove",
     ),
+    path(
+        "<uuid:course_id>/matrix/",
+        views.CourseMatrixView.as_view(),
+        name="matrix",
+    ),
+    path(
+        "<uuid:course_id>/matrix/export/",
+        views.CourseMatrixExportView.as_view(),
+        name="matrix-export",
+    ),
 ]

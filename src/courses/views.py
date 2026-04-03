@@ -725,3 +725,91 @@ class CourseTARemoveView(View):
         return CourseTeacher.objects.filter(
             course=course, teacher=teacher_profile
         ).exists()
+
+
+class CourseMatrixView(View):
+    """
+    Teacher-only view showing a matrix of students vs homeworks for a specific course.
+    """
+
+    @method_decorator(login_required, name="dispatch")
+    @method_decorator(teacher_required, name="dispatch")
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request: TeacherRequest, course_id: UUID) -> HttpResponse:
+        course = get_object_or_404(Course, id=course_id)
+
+        if not CourseTeacher.objects.filter(
+            course=course, teacher=request.user.teacher_profile
+        ).exists():
+            return HttpResponseForbidden("You do not have access to this course.")
+
+        from homeworks.services import HomeworkService
+
+        matrix_data = HomeworkService.get_course_homework_matrix(course_id)
+
+        if matrix_data is None:
+            messages.error(request, "Unable to load matrix data.")
+            return redirect("courses:detail", course_id=course_id)
+
+        return render(
+            request,
+            "homeworks/matrix.html",
+            {"data": matrix_data, "course": course},
+        )
+
+
+class CourseMatrixExportView(View):
+    """
+    Teacher-only view that exports the course homework matrix as a CSV file.
+    """
+
+    @method_decorator(login_required, name="dispatch")
+    @method_decorator(teacher_required, name="dispatch")
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request: TeacherRequest, course_id: UUID) -> HttpResponse:
+        import csv
+
+        course = get_object_or_404(Course, id=course_id)
+
+        if not CourseTeacher.objects.filter(
+            course=course, teacher=request.user.teacher_profile
+        ).exists():
+            return HttpResponseForbidden("You do not have access to this course.")
+
+        from homeworks.services import HomeworkService
+
+        matrix_data = HomeworkService.get_course_homework_matrix(course_id)
+
+        if matrix_data is None:
+            messages.error(request, "Unable to load matrix data.")
+            return redirect("courses:detail", course_id=course_id)
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="homework_grades.csv"'
+
+        writer = csv.writer(response)
+
+        header = ["Student Name", "Student ID", "Student Email"]
+        for hw_id, hw_title, hw_due_date in matrix_data.homeworks:
+            header.append(hw_title)
+        writer.writerow(header)
+
+        for student_row in matrix_data.student_rows:
+            row = [
+                student_row.student_name_csv_format,
+                "",
+                student_row.student_email,
+            ]
+            for cell in student_row.homework_cells:
+                if cell.total_sections > 0:
+                    percentage = (cell.submitted_sections / cell.total_sections) * 100
+                else:
+                    percentage = 0
+                row.append(f"{percentage:.0f}")
+            writer.writerow(row)
+
+        return response

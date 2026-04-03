@@ -698,6 +698,180 @@ class HomeworkService:
 
     @staticmethod
     @traced
+    def get_course_homework_matrix(
+        course_id: UUID,
+    ) -> "HomeworkMatrixData | None":
+        """
+        Get a matrix view of all students and homeworks for a specific course.
+
+        Args:
+            course_id: UUID of the course
+
+        Returns:
+            HomeworkMatrixData with matrix information for the course, or None if error
+        """
+        from .models import Homework
+        from accounts.models import Student
+        from conversations.models import Conversation, Submission
+        from courses.models import Course
+
+        try:
+            course = Course.objects.get(id=course_id)
+
+            homeworks = (
+                Homework.objects.filter(course=course)
+                .order_by("created_at")
+                .prefetch_related("sections")
+            )
+
+            enrolled_students = (
+                Student.objects.filter(enrolled_courses=course)
+                .select_related("user")
+                .order_by("user__first_name", "user__last_name", "user__username")
+                .distinct()
+            )
+
+            homework_list: list[tuple[UUID, str, datetime]] = [
+                (hw.id, hw.title, hw.due_date) for hw in homeworks
+            ]
+
+            conversations = (
+                Conversation.objects.filter(
+                    section__homework__in=homeworks, is_deleted=False
+                )
+                .select_related("user__student_profile", "section__homework")
+                .prefetch_related("messages")
+            )
+
+            submissions = Submission.objects.filter(
+                conversation__section__homework__in=homeworks
+            ).select_related("conversation__section__homework")
+
+            student_homework_conversations: dict[
+                tuple[UUID, UUID], list[Conversation]
+            ] = {}
+            submission_map = {sub.conversation.id: sub for sub in submissions}
+
+            for conv in conversations:
+                student_id = conv.user.student_profile.id
+                homework_id = conv.section.homework.id
+                key = (student_id, homework_id)
+                if key not in student_homework_conversations:
+                    student_homework_conversations[key] = []
+                student_homework_conversations[key].append(conv)
+
+            student_rows = []
+            total_submissions = 0
+
+            for student in enrolled_students:
+                homework_cells = []
+                student_total_submissions = 0
+
+                for homework in homeworks:
+                    convs = student_homework_conversations.get(
+                        (student.id, homework.id), []
+                    )
+
+                    submitted_sections = 0
+                    total_conversations = len(convs)
+                    last_activity = None
+
+                    for conv in convs:
+                        if conv.id in submission_map:
+                            submitted_sections += 1
+                            student_total_submissions += 1
+                        if last_activity is None or conv.updated_at > last_activity:
+                            last_activity = conv.updated_at
+
+                    total_sections = homework.section_count
+                    completion_percentage = (
+                        round((submitted_sections / total_sections) * 100)
+                        if total_sections > 0
+                        else 0
+                    )
+
+                    if submitted_sections == total_sections and total_sections > 0:
+                        status = SectionStatus.SUBMITTED
+                    elif submitted_sections > 0:
+                        if homework.is_overdue:
+                            status = SectionStatus.IN_PROGRESS_OVERDUE
+                        else:
+                            status = SectionStatus.IN_PROGRESS
+                    elif total_conversations > 0:
+                        if homework.is_overdue:
+                            status = SectionStatus.IN_PROGRESS_OVERDUE
+                        else:
+                            status = SectionStatus.IN_PROGRESS
+                    else:
+                        if homework.is_overdue:
+                            status = SectionStatus.OVERDUE
+                        else:
+                            status = SectionStatus.NOT_STARTED
+
+                    homework_cells.append(
+                        HomeworkMatrixCell(
+                            homework_id=homework.id,
+                            student_id=student.id,
+                            status=status,
+                            submitted_sections=submitted_sections,
+                            total_sections=total_sections,
+                            completion_percentage=completion_percentage,
+                            last_activity=last_activity,
+                            total_conversations=total_conversations,
+                        )
+                    )
+
+                total_homeworks = len(homeworks)
+                total_sections_all_homeworks = sum(
+                    hw.section_count for hw in homeworks
+                )
+                overall_completion = (
+                    round(
+                        (student_total_submissions / total_sections_all_homeworks) * 100
+                    )
+                    if total_sections_all_homeworks > 0
+                    else 0
+                )
+
+                student_name = (
+                    f"{student.user.first_name} {student.user.last_name}".strip()
+                )
+                if not student_name:
+                    student_name = student.user.username
+
+                student_rows.append(
+                    StudentMatrixRow(
+                        student_id=student.id,
+                        student_name=student_name,
+                        student_first_name=student.user.first_name,
+                        student_last_name=student.user.last_name,
+                        student_email=student.user.email,
+                        homework_cells=homework_cells,
+                        total_submissions=student_total_submissions,
+                        total_homeworks=total_homeworks,
+                        overall_completion_percentage=overall_completion,
+                    )
+                )
+
+                total_submissions += student_total_submissions
+
+            return HomeworkMatrixData(
+                homeworks=homework_list,
+                student_rows=student_rows,
+                total_students=len(enrolled_students),
+                total_homeworks=len(homeworks),
+                total_submissions=total_submissions,
+            )
+
+        except Course.DoesNotExist:
+            return None
+        except Exception as e:
+            logger.exception("Error getting course homework matrix")
+            record_exception(e)
+            return None
+
+    @staticmethod
+    @traced
     def update_homework(
         homework_id: UUID, data: HomeworkUpdateData
     ) -> HomeworkUpdateResult:

@@ -13,13 +13,6 @@
         <div class="col">
             <h1>Homeworks</h1>
         </div>
-        {% if 'teacher' in data.user_types %}
-        <div class="col-auto">
-            <a href="{% url 'homeworks:matrix' %}" class="btn btn-info">
-                <i class="bi bi-grid-3x3-gap"></i> Matrix Dashboard
-            </a>
-        </div>
-        {% endif %}
     </div>
 
     {% if data.total_count == 0 %}

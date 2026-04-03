@@ -52,6 +52,9 @@
                 <h2 class="mb-0"><i class="bi bi-file-text"></i> Homeworks</h2>
                 {% if 'teacher' in data.user_roles %}
                 <div class="d-flex gap-2">
+                    <a href="{% url 'courses:matrix' data.course_id %}" class="btn btn-info">
+                        <i class="bi bi-grid-3x3-gap"></i> Matrix Dashboard
+                    </a>
                     <a href="{% url 'llm:config-list' data.course_id %}" class="btn btn-outline-secondary">
                         <i class="bi bi-robot"></i> LLM Config
                     </a>
