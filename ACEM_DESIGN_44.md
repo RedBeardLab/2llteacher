@@ -1,11 +1,18 @@
-# Design Document: Course List Description Enhancement
+# Design Document: Course Show Description Enhancement
 
 ## Issue
+
 **Title**: Course show description
 **Description**: The course views show a long description. If one course has a long description the UI looks ugly and unprofessional. Use `details` and `summary` to show an excerpt of the description when available. When not available, do not show description not available. Before the description add also a line with the instructors.
 
+## User Feedback Summary
+
+1. Use **first and last name** to show instructors (not username, not email)
+2. Show instructors in **alphabetical order** regardless of owner/co_teacher status (ignore role)
+
 ## Summary
-Modify the course list view to display descriptions using HTML `details`/`summary` elements, and include instructor names before the description.
+
+Modify the course list view to display descriptions using HTML `details`/`summary` elements, and include instructor names (first and last name, sorted alphabetically) before the description.
 
 ## Files to Modify
 
@@ -13,16 +20,14 @@ Modify the course list view to display descriptions using HTML `details`/`summar
 
 #### Change 1: Add `InstructorItem` dataclass (new)
 
-Add a new dataclass after `CourseItem` to represent an instructor:
+Add a new dataclass after `CourseItem` to represent an instructor with first and last name:
 
 ```python
 @dataclass
 class InstructorItem:
     """Data structure for an instructor in the course list."""
-    id: UUID
-    username: str
-    email: str
-    role: str  # 'owner' or 'co_teacher'
+    first_name: str
+    last_name: str
 ```
 
 #### Change 2: Modify `CourseItem` dataclass
@@ -40,7 +45,7 @@ class CourseItem:
     description: str
     roles: list[str]  # ['teacher', 'student', 'teacher_assistant']
     is_enrolled: bool
-    instructors: list[InstructorItem]  # NEW: List of instructors
+    instructors: list[InstructorItem]  # NEW: List of instructors (sorted alphabetically)
 ```
 
 #### Change 3: Modify `CourseListView._get_view_data()` method
@@ -53,17 +58,19 @@ courses = []
 for course_data in sorted(course_dict.values(), key=lambda x: x["course"].name):
     course = course_data["course"]
     
-    # Get instructors for this course
+    # Get instructors for this course (sorted alphabetically by last_name, first_name)
     instructors = []
     for course_teacher in CourseTeacher.objects.filter(course=course).select_related("teacher__user"):
+        user = course_teacher.teacher.user
         instructors.append(
             InstructorItem(
-                id=course_teacher.teacher.id,
-                username=course_teacher.teacher.user.username,
-                email=course_teacher.teacher.user.email,
-                role=course_teacher.role,
+                first_name=user.first_name,
+                last_name=user.last_name,
             )
         )
+    
+    # Sort instructors alphabetically by last_name, then first_name
+    instructors.sort(key=lambda x: (x.last_name.lower(), x.first_name.lower()))
     
     courses.append(
         CourseItem(
@@ -93,6 +100,7 @@ Replace the description display section (lines 69-79) with the new implementatio
         <template data-append>
             <style>.markdown-body { background-color: transparent !important; }</style>
         </template>
+    </zero-md>
     </div>
 </div>
 ```
@@ -107,7 +115,7 @@ Replace the description display section (lines 69-79) with the new implementatio
     <div class="mb-2 text-muted small">
         <i class="bi bi-person-badge"></i>
         {% for instructor in course.instructors %}
-            {{ instructor.username }}{% if instructor.role == 'owner' %} (Owner){% endif %}{% if not forloop.last %}, {% endif %}
+            {{ instructor.first_name }} {{ instructor.last_name }}{% if not forloop.last %}, {% endif %}
         {% endfor %}
     </div>
     {% endif %}
@@ -138,12 +146,17 @@ Add new test methods to `CourseListViewTests` class to test the new functionalit
 Add the following test methods to `CourseListViewTests`:
 
 ```python
-def test_get_view_data_includes_instructors(self):
-    """Test that course list includes instructor information."""
+def test_get_view_data_includes_instructors_with_names(self):
+    """Test that course list includes instructor first and last name."""
     # Add teacher to course1 as owner
     CourseTeacher.objects.create(
         course=self.course1, teacher=self.teacher, role="owner"
     )
+    
+    # Set first and last name on teacher user
+    self.teacher_user.first_name = "John"
+    self.teacher_user.last_name = "Doe"
+    self.teacher_user.save()
     
     view = CourseListView()
     data = view._get_view_data(self.teacher_user)
@@ -153,24 +166,45 @@ def test_get_view_data_includes_instructors(self):
     
     # Check instructors
     self.assertEqual(len(course1_item.instructors), 1)
-    self.assertEqual(course1_item.instructors[0].username, self.teacher_user.username)
-    self.assertEqual(course1_item.instructors[0].role, "owner")
+    self.assertEqual(course1_item.instructors[0].first_name, "John")
+    self.assertEqual(course1_item.instructors[0].last_name, "Doe")
 
-def test_get_view_data_includes_multiple_instructors(self):
-    """Test that course list includes multiple instructors."""
-    # Create another teacher
+def test_get_view_data_instructors_sorted_alphabetically(self):
+    """Test that instructors are sorted alphabetically by last name."""
+    # Create another teacher with different name
     other_teacher_user = User.objects.create_user(
-        username="otherteacher", email="other@example.com", password="password123"
+        username="otherteacher",
+        email="other@example.com",
+        password="password123",
+        first_name="Alice",
+        last_name="Zebra"
     )
     other_teacher = Teacher.objects.create(user=other_teacher_user)
     
-    # Add both teachers to course1
+    # Create another teacher with name that comes first alphabetically
+    another_teacher_user = User.objects.create_user(
+        username="anotherteacher",
+        email="another@example.com",
+        password="password123",
+        first_name="Bob",
+        last_name="Alpha"
+    )
+    another_teacher = Teacher.objects.create(user=another_teacher_user)
+    
+    # Add teachers to course1 in non-alphabetical order
     CourseTeacher.objects.create(
         course=self.course1, teacher=self.teacher, role="owner"
     )
     CourseTeacher.objects.create(
         course=self.course1, teacher=other_teacher, role="co_teacher"
     )
+    CourseTeacher.objects.create(
+        course=self.course1, teacher=another_teacher, role="co_teacher"
+    )
+    
+    self.teacher_user.first_name = "John"
+    self.teacher_user.last_name = "Doe"
+    self.teacher_user.save()
     
     view = CourseListView()
     data = view._get_view_data(self.teacher_user)
@@ -178,11 +212,11 @@ def test_get_view_data_includes_multiple_instructors(self):
     # Find course1
     course1_item = next(c for c in data.courses if c.id == self.course1.id)
     
-    # Check instructors
-    self.assertEqual(len(course1_item.instructors), 2)
-    roles = [i.role for i in course1_item.instructors]
-    self.assertIn("owner", roles)
-    self.assertIn("co_teacher", roles)
+    # Check instructors are sorted alphabetically by last name
+    self.assertEqual(len(course1_item.instructors), 3)
+    self.assertEqual(course1_item.instructors[0].last_name, "Alpha")   # Bob Alpha
+    self.assertEqual(course1_item.instructors[1].last_name, "Doe")      # John Doe
+    self.assertEqual(course1_item.instructors[2].last_name, "Zebra")    # Alice Zebra
 
 def test_get_view_data_course_without_instructors_shows_empty_list(self):
     """Test that courses without instructors show empty list."""
@@ -193,14 +227,37 @@ def test_get_view_data_course_without_instructors_shows_empty_list(self):
     # course1 should have empty instructors list
     course1_item = next(c for c in data.courses if c.id == self.course1.id)
     self.assertEqual(len(course1_item.instructors), 0)
+
+def test_get_view_data_includes_instructors_for_student_view(self):
+    """Test that students see instructors when viewing course list."""
+    # Add teacher to course1 as owner
+    CourseTeacher.objects.create(
+        course=self.course1, teacher=self.teacher, role="owner"
+    )
+    
+    self.teacher_user.first_name = "John"
+    self.teacher_user.last_name = "Doe"
+    self.teacher_user.save()
+    
+    view = CourseListView()
+    data = view._get_view_data(self.student_user)
+    
+    # Find course1
+    course1_item = next(c for c in data.courses if c.id == self.course1.id)
+    
+    # Check instructors are included for students
+    self.assertEqual(len(course1_item.instructors), 1)
+    self.assertEqual(course1_item.instructors[0].first_name, "John")
+    self.assertEqual(course1_item.instructors[0].last_name, "Doe")
 ```
 
 ## Edge Cases
 
 1. **Course with no description**: The `{% if course.description %}` block ensures nothing is rendered when description is empty
 2. **Course with no instructors**: The `{% if course.instructors %}` block ensures no instructor line is shown when course has no teachers
-3. **Empty instructor username**: Will still display, but this is an existing data integrity issue not caused by this change
+3. **Empty first_name or last_name**: Will still display with whatever is available (empty string if not set)
 4. **Long description**: The `details`/`summary` elements provide a clean UI regardless of description length
+5. **Case-insensitive sorting**: Instructors are sorted by `last_name.lower()` and `first_name.lower()` to ensure case-insensitive alphabetical ordering
 
 ## Testing
 
@@ -220,3 +277,10 @@ Tests to verify:
 2. Update `list.html` - Modify template to use `details`/`summary` and show instructors
 3. Add tests to `test_views.py`
 4. Run tests to verify changes
+
+## Key Differences from Previous Design (per user feedback)
+
+1. **InstructorItem now has `first_name` and `last_name`** instead of `id`, `username`, `email`, `role`
+2. **Instructors are sorted alphabetically by last_name then first_name** (case-insensitive)
+3. **No role is displayed** - we don't differentiate between owner and co_teacher
+4. **Template displays `first_name last_name`** instead of `username`
