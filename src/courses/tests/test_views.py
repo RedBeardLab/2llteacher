@@ -124,6 +124,32 @@ class CourseListViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_course_list_view_renders_description_label_when_description_exists(self):
+        """Test that the 'Description:' label appears when a course has a description."""
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(reverse("courses:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<strong>Description:</strong>", html=True)
+
+    def test_course_list_view_hides_description_section_when_empty(self):
+        """Test that the description section is not rendered when course has no description."""
+        Course.objects.create(
+            name="Empty Course",
+            code="EMPTY101",
+            description="",
+            is_active=True,
+        )
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(reverse("courses:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Empty Course")
+        self.assertContains(response, "Advanced Django")
+        self.assertContains(response, "Introduction to Python")
+        count = response.content.decode().count("<strong>Description:</strong>")
+        self.assertEqual(count, 2)
+
     def test_course_list_view_requires_login(self):
         """Test that the CourseListView requires authentication."""
         # Create an anonymous user request

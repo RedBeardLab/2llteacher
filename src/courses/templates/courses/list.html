@@ -70,6 +70,10 @@
                     <div class="mb-2">
                         <strong>Course Code:</strong> <code>{{ course.code }}</code>
                     </div>
+                    {% if course.description %}
+                    <div class="mb-2">
+                        <strong>Description:</strong>
+                    </div>
                     <div class="card-text">
                         <zero-md src="data:text/markdown;charset=utf-8,{{ course.description|urlencode }}">
                         <template data-append>
@@ -77,6 +81,7 @@
                         </template>
                     </zero-md>
                     </div>
+                    {% endif %}
                 </div>
                 <div class="card-footer">
                     {% if 'teacher' in course.roles %}
