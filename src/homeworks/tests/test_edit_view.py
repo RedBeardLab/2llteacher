@@ -367,7 +367,9 @@ class HomeworkEditSectionTypeTests(TestCase):
         self.teacher = Teacher.objects.create(user=self.teacher_user)
 
         self.course = Course.objects.create(name="Course", code="C101", description="")
-        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
 
         self.homework = Homework.objects.create(
             title="HW",
@@ -432,7 +434,9 @@ class HomeworkEditSectionTypeTests(TestCase):
         """Changing section_type via POST updates the section."""
         self.client.login(username="teacher", password="password")
         data = self._base_post_data()
-        data["sections-0-section_type"] = "non_interactive"  # flip conversation → non_interactive
+        data["sections-0-section_type"] = (
+            "non_interactive"  # flip conversation → non_interactive
+        )
 
         response = self.client.post(self.url, data)
         self.assertEqual(response.status_code, 302)
@@ -450,3 +454,82 @@ class HomeworkEditSectionTypeTests(TestCase):
         self.ni_section.refresh_from_db()
         self.assertEqual(self.conv_section.section_type, "conversation")
         self.assertEqual(self.ni_section.section_type, "non_interactive")
+
+
+class HomeworkEditFormLLMConfigFilteringTest(TestCase):
+    """Test that HomeworkEditForm filters LLM configs by course."""
+
+    def setUp(self):
+        from courses.models import Course, CourseTeacher
+        from llm.models import LLMConfig
+
+        self.client = Client()
+
+        self.teacher_user = User.objects.create_user(
+            username="teacher", email="teacher@example.com", password="password"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        self.course1 = Course.objects.create(
+            name="Course 1", code="C101", description=""
+        )
+        CourseTeacher.objects.create(
+            course=self.course1, teacher=self.teacher, role="owner"
+        )
+
+        self.course2 = Course.objects.create(
+            name="Course 2", code="C102", description=""
+        )
+        CourseTeacher.objects.create(
+            course=self.course2, teacher=self.teacher, role="owner"
+        )
+
+        self.llm_config_course1 = LLMConfig.objects.create(
+            name="Config for Course 1",
+            course=self.course1,
+            model_name="gpt-4",
+            api_key="key1",
+            base_prompt="Prompt 1",
+            is_active=True,
+        )
+
+        self.llm_config_course2 = LLMConfig.objects.create(
+            name="Config for Course 2",
+            course=self.course2,
+            model_name="gpt-4",
+            api_key="key2",
+            base_prompt="Prompt 2",
+            is_active=True,
+        )
+
+        self.llm_config_inactive = LLMConfig.objects.create(
+            name="Inactive Config",
+            course=self.course1,
+            model_name="gpt-4",
+            api_key="key3",
+            base_prompt="Prompt 3",
+            is_active=False,
+        )
+
+        self.homework = Homework.objects.create(
+            title="HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course1,
+            due_date=datetime.datetime(2030, 1, 1),
+        )
+
+        self.url = reverse("homeworks:edit", kwargs={"homework_id": self.homework.id})
+
+    def test_edit_form_only_shows_llm_configs_for_homework_course(self):
+        """Edit form should only show LLMConfigs belonging to the homework's course."""
+        self.client.login(username="teacher", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+        form = response.context["data"].form
+        llm_config_choices = list(form.fields["llm_config"].queryset)
+
+        self.assertIn(self.llm_config_course1, llm_config_choices)
+        self.assertNotIn(self.llm_config_course2, llm_config_choices)
+        self.assertNotIn(self.llm_config_inactive, llm_config_choices)

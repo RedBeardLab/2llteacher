@@ -153,6 +153,13 @@ class HomeworkEditForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["llm_config"].required = False
 
+        if self.instance and self.instance.course:
+            from llm.models import LLMConfig
+
+            self.fields["llm_config"].queryset = LLMConfig.objects.filter(
+                course=self.instance.course, is_active=True
+            ).order_by("name")
+
         # Convert datetime to format expected by datetime-local input
         if self.instance and self.instance.due_date:
             self.initial["due_date"] = self.instance.due_date.strftime("%Y-%m-%dT%H:%M")
