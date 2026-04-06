@@ -1,163 +1,145 @@
-# Homework Description Truncation - Implementation Plan
+# Homework Description Collapsible View - Implementation Plan
 
 ## Issue Summary
 
-**Problem**: The homework list view (`homeworks/list.html`) displays full markdown descriptions for all homework cards. When one homework has a very long description and others don't, the UI looks inconsistent and unprofessional.
+**Problem**: The homework list view (`homeworks/list.html`) displays full markdown descriptions for all homework cards without any collapsible mechanism. When homework assignments have vastly different description lengths, the UI appears inconsistent.
 
-**Goal**: Truncate long homework descriptions in the homework list view, similar to how course descriptions are handled in the course detail view.
+**Goal**: Apply the same `<details>/<summary>` collapsible pattern used in `courses/list.html` to hide long homework descriptions by default while keeping them accessible.
+
+**User Feedback**: Apply the same patterns as in `courses/list.html`
 
 ## Current Implementation
 
-### Course Description Pattern (Reference)
+### Reference Pattern in `courses/list.html` (lines 81-94)
 
-In `src/courses/templates/courses/detail.html` (line 81):
 ```html
-<p class="mb-1 text-muted">{{ homework.description|truncatewords:20 }}</p>
+{% if course.description %}
+<div class="card-text">
+    <details>
+        <summary class="text-primary" style="cursor: pointer;">
+            <i class="bi bi-chevron-down"></i> View Description
+        </summary>
+        <div class="mt-2">
+            <zero-md src="data:text/markdown;charset=utf-8,{{ course.description|urlencode }}">
+            <template data-append>
+                <style>.markdown-body { background-color: transparent !important; }</style>
+            </template>
+        </div>
+    </details>
+</div>
+{% endif %}
 ```
 
-### Homework List Current Implementation
+### Current Homework List Implementation
 
 In `src/homeworks/templates/homeworks/list.html` (lines 57-64):
 ```html
 <div class="card-text">
     <zero-md src="data:text/markdown;charset=utf-8,{{ homework.description|urlencode }}">
-        <template data-append>
-            <style>.markdown-body { background-color: transparent !important; }</style>
-        </template>
-    </zero-md>
+    <template data-append>
+        <style>.markdown-body { background-color: transparent !important; }</style>
+    </template>
+</zero-md>
 </div>
 ```
 
 ## Proposed Solution
 
-Follow the same pattern used in the course detail view: use Django's `|truncatewords:20` filter to limit description display in the list view.
+Apply the identical `<details>/<summary>` pattern from `courses/list.html` to `homeworks/list.html`.
 
-### Files to Modify
+## Files to Modify
 
-1. **`src/homeworks/templates/homeworks/list.html`** - Update the list template to conditionally truncate descriptions
+| File | Change Type | Lines Affected |
+|------|-------------|----------------|
+| `src/homeworks/templates/homeworks/list.html` | Modify | 57-64 |
 
-### Implementation Details
+## Implementation Details
 
-#### Template Changes
+### Template Changes
 
-Replace the full description rendering with a conditional approach:
-- If description is short (≤20 words), show full description
-- If description is longer (>20 words), show truncated version with "Read more" link
+**Location**: `src/homeworks/templates/homeworks/list.html`, lines 57-64
 
-**New code for `list.html` (lines 57-64):**
-
+**Current Code**:
 ```html
 <div class="card-text">
-    {% with homework.description|truncatewords:20 as truncated_desc %}
-        {% if homework.description|wordcount <= 20 %}
-            <zero-md src="data:text/markdown;charset=utf-8,{{ homework.description|urlencode }}">
-                <template data-append>
-                    <style>.markdown-body { background-color: transparent !important; }</style>
-                </template>
-            </zero-md>
-        {% else %}
-            <div class="homework-description" data-full-description="{{ homework.description|urlencode }}">
-                <div class="description-truncated">
-                    <p class="text-muted mb-2">
-                        <zero-md src="data:text/markdown;charset=utf-8,{{ truncated_desc|urlencode }}">
-                            <template data-append>
-                                <style>.markdown-body { background-color: transparent !important; }</style>
-                            </template>
-                        </zero-md>
-                    </p>
-                    <button type="button" class="btn btn-link p-0 text-decoration-none" onclick="toggleHomeworkDescription(this)">
-                        Read more <i class="bi bi-chevron-down"></i>
-                    </button>
-                </div>
-                <div class="description-full d-none">
-                    <zero-md src="data:text/markdown;charset=utf-8,{{ homework.description|urlencode }}">
-                        <template data-append>
-                            <style>.markdown-body { background-color: transparent !important; }</style>
-                        </template>
-                    </zero-md>
-                    <button type="button" class="btn btn-link p-0 text-decoration-none mt-2" onclick="toggleHomeworkDescription(this)">
-                        Show less <i class="bi bi-chevron-up"></i>
-                    </button>
-                </div>
-            </div>
-        {% endif %}
-    {% endwith %}
+    <zero-md src="data:text/markdown;charset=utf-8,{{ homework.description|urlencode }}">
+    <template data-append>
+        <style>.markdown-body { background-color: transparent !important; }</style>
+    </template>
+</zero-md>
 </div>
 ```
 
-#### JavaScript Addition
-
-Add a JavaScript function to `base.html` or create a new file `static/js/homework-ui.js`:
-
-```javascript
-function toggleHomeworkDescription(button) {
-    const container = button.closest('.homework-description');
-    const truncated = container.querySelector('.description-truncated');
-    const full = container.querySelector('.description-full');
-    
-    truncated.classList.toggle('d-none');
-    full.classList.toggle('d-none');
-}
-```
-
-Or inline in the template (simpler approach):
-
+**New Code**:
 ```html
-<script>
-function toggleHomeworkDescription(btn) {
-    const container = btn.closest('.homework-description');
-    const truncated = container.querySelector('.description-truncated');
-    const full = container.querySelector('.description-full');
-    truncated.classList.toggle('d-none');
-    full.classList.toggle('d-none');
-}
-</script>
+{% if homework.description %}
+<div class="card-text">
+    <details>
+        <summary class="text-primary" style="cursor: pointer;">
+            <i class="bi bi-chevron-down"></i> View Description
+        </summary>
+        <div class="mt-2">
+            <zero-md src="data:text/markdown;charset=utf-8,{{ homework.description|urlencode }}">
+            <template data-append>
+                <style>.markdown-body { background-color: transparent !important; }</style>
+            </template>
+        </div>
+    </details>
+</div>
+{% endif %}
 ```
 
-## Alternative Approaches Considered
+## No Changes Required
 
-### Option A: Pure CSS Truncation (Rejected)
-Using CSS `max-height` and `overflow` to truncate zero-md content. This was rejected because zero-md renders markdown into the shadow DOM, making CSS truncation unreliable.
+The following components require no changes:
 
-### Option B: Backend Truncation (Rejected)
-Adding a `description_truncated` field to `HomeworkListItem` dataclass. This adds complexity without significant benefit since template-level truncation is simpler.
-
-### Option C: Character-based Truncation (Rejected)
-Using `|truncatechars:200` instead of `|truncatewords:20`. Word-based truncation is preferred for readability in markdown content.
-
-## Data Structure Changes
-
-No changes required to `HomeworkListItem` dataclass in `views.py`. The truncation happens at the template level using Django's built-in filters.
-
-## Testing Plan
-
-### Manual Testing
-1. Create a homework with a short description (<20 words)
-2. Create a homework with a long description (>20 words)
-3. Verify short descriptions display fully
-4. Verify long descriptions show truncated text with "Read more" button
-5. Click "Read more" and verify full description displays
-6. Click "Show less" and verify truncation returns
-
-### Automated Testing
-No new tests required for this UI-only change. Existing tests verify description data integrity.
+- **`src/homeworks/views.py`**: `HomeworkListItem` dataclass (line 42-57) already includes the `description` field
+- **`src/homeworks/models.py`**: No model changes needed
+- **JavaScript**: No new JavaScript needed - `<details>/<summary>` is native HTML
+- **Tests**: Existing tests verify description data passing; no test changes required
 
 ## Edge Cases
 
-1. **Empty description**: Handled gracefully - `|truncatewords:20` on empty string returns empty string
-2. **Description with exactly 20 words**: Will display full description (wordcount = 20, not > 20)
-3. **Description with special characters**: `urlencode` filter handles special characters in URLs
-4. **Zero-md rendering errors**: Existing behavior unchanged
+| Scenario | Expected Behavior |
+|----------|-------------------|
+| Empty description | No description section rendered (conditional `{% if %}`) |
+| None/Null description | No description section rendered |
+| Very long description | Hidden by default inside `<details>`, expanded on click |
+| Short description | Hidden by default (consistent UI across all cards) |
+| Markdown with special chars | `urlencode` filter handles special characters |
+| HTML/markdown content | Rendered correctly inside zero-md component |
 
-## Rollout Plan
+## Testing Plan
 
-1. Modify `src/homeworks/templates/homeworks/list.html`
-2. Add JavaScript toggle function (either inline or in a new JS file)
-3. Test locally with various description lengths
-4. Commit changes
+### Manual Testing Checklist
+1. Navigate to homework list page
+2. Verify homework cards with descriptions show "View Description" toggle
+3. Verify homework cards without descriptions show no description section
+4. Click "View Description" and verify full description expands
+5. Click collapsed summary and verify description collapses again
+6. Verify markdown renders correctly in expanded view
 
-## File Changes Summary
+### Automated Testing
+```bash
+uv run python run_tests.py --settings=src.llteacher.test_settings apps.homeworks.tests
+```
 
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `src/homeworks/templates/homeworks/list.html` | Modify | Add conditional truncation logic for homework descriptions |
+## Comparison: Before vs After
+
+### Before
+- All descriptions visible by default
+- Inconsistent card heights when descriptions vary in length
+- Visual clutter from long markdown content
+
+### After
+- All descriptions collapsed by default
+- Consistent card appearance
+- Clean "View Description" toggle for all cards
+- Identical UX pattern to courses list page
+
+## Implementation Steps
+
+1. Read `src/homeworks/templates/homeworks/list.html`
+2. Modify lines 57-64 to wrap description in `<details>/<summary>` with conditional
+3. Run tests to verify no regressions
+4. Commit changes (if requested by user)
