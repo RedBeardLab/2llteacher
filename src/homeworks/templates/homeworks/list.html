@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Homeworks{% endblock %}
+{% block title %}Homework{% endblock %}
 
 {% block extra_js %}
 <!-- zero-md for markdown rendering with LaTeX support -->
@@ -11,14 +11,14 @@
 <div class="container mt-4">
     <div class="row mb-4">
         <div class="col">
-            <h1>Homeworks</h1>
+            <h1>Homework</h1>
         </div>
     </div>
 
     {% if data.total_count == 0 %}
     <div class="alert alert-info">
         {% if 'teacher' in data.user_types %}
-            You haven't created any homeworks yet. Go to a course and create a homework from there.
+            You haven't created any homework yet. Go to a course and create a homework from there.
         {% elif 'student' in data.user_types %}
             No homeworks have been assigned to you yet.
         {% else %}
