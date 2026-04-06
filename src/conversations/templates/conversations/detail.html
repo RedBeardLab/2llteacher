@@ -16,7 +16,7 @@
             {% if conversation_data.homework_id %}
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'homeworks:list' %}">Homeworks</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'homeworks:list' %}">Assignments</a></li>
                     <li class="breadcrumb-item"><a href="{% url 'homeworks:detail' homework_id=conversation_data.homework_id %}">{{ conversation_data.homework_title }}</a></li>
                     <li class="breadcrumb-item"><a href="{% url 'homeworks:section_detail' homework_id=conversation_data.homework_id section_id=conversation_data.section_id %}">{{ conversation_data.section_title }}</a></li>
                     <li class="breadcrumb-item active">Conversation</li>
@@ -218,7 +218,7 @@
             {% else %}
             <div class="mt-3">
                 <a href="{% url 'homeworks:list' %}" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Back to Homeworks
+                    <i class="fas fa-arrow-left"></i> Back to Assignments
                 </a>
             </div>
             {% endif %}
