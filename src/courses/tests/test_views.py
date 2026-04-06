@@ -728,6 +728,28 @@ class CourseDetailViewTests(TestCase):
         )
         self.assertIn("student", response.context["data"].user_roles)
 
+    def test_course_detail_shows_course_description(self):
+        """Test that course detail shows the course description."""
+        self.client.login(username="testteacher", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        data = response.context["data"]
+        self.assertEqual(data.course_description, "Test course description")
+
+    def test_course_detail_description_for_student(self):
+        """Test that students also see the course description."""
+        self.client.login(username="teststudent", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        data = response.context["data"]
+        self.assertEqual(data.course_description, "Test course description")
+
 
 class CourseHomeworkCreateViewTests(TestCase):
     """Tests for creating homeworks within a course context."""
