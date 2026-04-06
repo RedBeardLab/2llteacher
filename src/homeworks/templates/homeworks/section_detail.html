@@ -19,7 +19,7 @@
     <!-- Breadcrumb Navigation -->
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'homeworks:list' %}">Homeworks</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'homeworks:list' %}">Homework</a></li>
             <li class="breadcrumb-item"><a href="{% url 'homeworks:detail' data.homework_id %}">{{ data.homework_title }}</a></li>
             <li class="breadcrumb-item active" aria-current="page">Section {{ data.section_order }}: {{ data.section_title }}</li>
         </ol>

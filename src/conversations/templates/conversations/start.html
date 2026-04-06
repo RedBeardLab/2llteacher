@@ -9,7 +9,7 @@
             <!-- Navigation breadcrumb -->
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'homeworks:list' %}">Homeworks</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'homeworks:list' %}">Homework</a></li>
                     <li class="breadcrumb-item"><a href="{% url 'homeworks:detail' homework_id=view_data.homework_id %}">{{ view_data.homework_title }}</a></li>
                     <li class="breadcrumb-item"><a href="{% url 'homeworks:section_detail' homework_id=view_data.homework_id section_id=view_data.section_id %}">{{ view_data.section_title }}</a></li>
                     <li class="breadcrumb-item active">Start Conversation</li>
