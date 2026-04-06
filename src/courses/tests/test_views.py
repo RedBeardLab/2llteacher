@@ -250,6 +250,110 @@ class CourseListViewTests(TestCase):
         self.assertEqual(len(course3_item.roles), 0)
         self.assertFalse(course3_item.is_enrolled)
 
+    def test_get_view_data_includes_instructors_with_names(self):
+        """Test that course list includes instructor first and last name."""
+        # Add teacher to course1 as owner
+        CourseTeacher.objects.create(
+            course=self.course1, teacher=self.teacher, role="owner"
+        )
+
+        # Set first and last name on teacher user
+        self.teacher_user.first_name = "John"
+        self.teacher_user.last_name = "Doe"
+        self.teacher_user.save()
+
+        view = CourseListView()
+        data = view._get_view_data(self.teacher_user)
+
+        # Find course1
+        course1_item = next(c for c in data.courses if c.id == self.course1.id)
+
+        # Check instructors
+        self.assertEqual(len(course1_item.instructors), 1)
+        self.assertEqual(course1_item.instructors[0].first_name, "John")
+        self.assertEqual(course1_item.instructors[0].last_name, "Doe")
+
+    def test_get_view_data_instructors_sorted_alphabetically(self):
+        """Test that instructors are sorted alphabetically by last name."""
+        # Create another teacher with different name
+        other_teacher_user = User.objects.create_user(
+            username="otherteacher",
+            email="other@example.com",
+            password="password123",
+            first_name="Alice",
+            last_name="Zebra",
+        )
+        other_teacher = Teacher.objects.create(user=other_teacher_user)
+
+        # Create another teacher with name that comes first alphabetically
+        another_teacher_user = User.objects.create_user(
+            username="anotherteacher",
+            email="another@example.com",
+            password="password123",
+            first_name="Bob",
+            last_name="Alpha",
+        )
+        another_teacher = Teacher.objects.create(user=another_teacher_user)
+
+        # Add teachers to course1 in non-alphabetical order
+        CourseTeacher.objects.create(
+            course=self.course1, teacher=self.teacher, role="owner"
+        )
+        CourseTeacher.objects.create(
+            course=self.course1, teacher=other_teacher, role="co_teacher"
+        )
+        CourseTeacher.objects.create(
+            course=self.course1, teacher=another_teacher, role="co_teacher"
+        )
+
+        self.teacher_user.first_name = "John"
+        self.teacher_user.last_name = "Doe"
+        self.teacher_user.save()
+
+        view = CourseListView()
+        data = view._get_view_data(self.teacher_user)
+
+        # Find course1
+        course1_item = next(c for c in data.courses if c.id == self.course1.id)
+
+        # Check instructors are sorted alphabetically by last name
+        self.assertEqual(len(course1_item.instructors), 3)
+        self.assertEqual(course1_item.instructors[0].last_name, "Alpha")  # Bob Alpha
+        self.assertEqual(course1_item.instructors[1].last_name, "Doe")  # John Doe
+        self.assertEqual(course1_item.instructors[2].last_name, "Zebra")  # Alice Zebra
+
+    def test_get_view_data_course_without_instructors_shows_empty_list(self):
+        """Test that courses without instructors show empty list."""
+        # Students see all active courses - course1 has no teachers assigned
+        view = CourseListView()
+        data = view._get_view_data(self.student_user)
+
+        # course1 should have empty instructors list
+        course1_item = next(c for c in data.courses if c.id == self.course1.id)
+        self.assertEqual(len(course1_item.instructors), 0)
+
+    def test_get_view_data_includes_instructors_for_student_view(self):
+        """Test that students see instructors when viewing course list."""
+        # Add teacher to course1 as owner
+        CourseTeacher.objects.create(
+            course=self.course1, teacher=self.teacher, role="owner"
+        )
+
+        self.teacher_user.first_name = "John"
+        self.teacher_user.last_name = "Doe"
+        self.teacher_user.save()
+
+        view = CourseListView()
+        data = view._get_view_data(self.student_user)
+
+        # Find course1
+        course1_item = next(c for c in data.courses if c.id == self.course1.id)
+
+        # Check instructors are included for students
+        self.assertEqual(len(course1_item.instructors), 1)
+        self.assertEqual(course1_item.instructors[0].first_name, "John")
+        self.assertEqual(course1_item.instructors[0].last_name, "Doe")
+
 
 class CourseEnrollViewTests(TestCase):
     """Tests for the CourseEnrollView."""

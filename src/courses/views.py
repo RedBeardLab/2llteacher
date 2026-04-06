@@ -31,6 +31,14 @@ from accounts.models import User, TeacherAssistant
 
 
 @dataclass
+class InstructorItem:
+    """Data structure for an instructor in the course list."""
+
+    first_name: str
+    last_name: str
+
+
+@dataclass
 class CourseItem:
     """Data structure for a single course item in the list view."""
 
@@ -40,6 +48,7 @@ class CourseItem:
     description: str
     roles: list[str]  # ['teacher', 'student', 'teacher_assistant']
     is_enrolled: bool  # For backwards compatibility with student enrollment
+    instructors: list[InstructorItem]  # List of instructors (sorted alphabetically)
 
 
 @dataclass
@@ -138,6 +147,23 @@ class CourseListView(View):
         courses = []
         for course_data in sorted(course_dict.values(), key=lambda x: x["course"].name):
             course = course_data["course"]
+
+            # Get instructors for this course (sorted alphabetically by last_name, first_name)
+            instructors = []
+            for course_teacher in CourseTeacher.objects.filter(
+                course=course
+            ).select_related("teacher__user"):
+                user = course_teacher.teacher.user
+                instructors.append(
+                    InstructorItem(
+                        first_name=user.first_name,
+                        last_name=user.last_name,
+                    )
+                )
+
+            # Sort instructors alphabetically by last_name, then first_name
+            instructors.sort(key=lambda x: (x.last_name.lower(), x.first_name.lower()))
+
             courses.append(
                 CourseItem(
                     id=course.id,
@@ -146,6 +172,7 @@ class CourseListView(View):
                     description=course.description,
                     roles=course_data["roles"],
                     is_enrolled=course_data["is_enrolled"],
+                    instructors=instructors,
                 )
             )
 
