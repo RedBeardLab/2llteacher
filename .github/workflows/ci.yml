@@ -2,13 +2,21 @@ name: CI
 
 on:
   push:
-  pull_request:
+    branches: [main]
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+env:
+  TRUSTED_ASSOCIATIONS: '["OWNER", "MEMBER", "COLLABORATOR"]'
 
 jobs:
   lint:
     runs-on: self-hosted
+    if: github.event_name == 'push' || contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.pull_request.author_association)
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -27,8 +35,11 @@ jobs:
 
   typecheck:
     runs-on: self-hosted
+    if: github.event_name == 'push' || contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.pull_request.author_association)
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -44,8 +55,11 @@ jobs:
 
   test:
     runs-on: self-hosted
+    if: github.event_name == 'push' || contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.pull_request.author_association)
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
