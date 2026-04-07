@@ -10,6 +10,10 @@
 - Instructors
 - An "Enroll Now" button (if not enrolled)
 
+## Feedback from User
+
+The `user_roles` used in the codebase should not be strings but enums. A new enum for course roles should be created.
+
 ## Current Behavior
 
 In `src/courses/views.py`, the `CourseDetailView.get()` method (lines 339-383) checks user roles and returns 403 if the user has no role (teacher, enrolled student, or TA) for the course:
@@ -21,81 +25,35 @@ if not user_roles:
 
 ## Proposed Changes
 
-### 1. Modify `CourseDetailView.get()` Method
+### 1. Create Course Role Enum
 
-**File**: `src/courses/views.py`  
-**Location**: Lines 339-383
+**File**: `src/courses/enums.py` (new file)
 
-**Change**: Instead of returning 403 when a student has no role, allow access with limited data. The logic should:
-
-1. Check if user is a teacher teaching the course → full access
-2. Check if user is an enrolled student → full access
-3. Check if user is a TA → full access
-4. **NEW**: Check if user is an unauthenticated student → limited access (can see course info, instructors, and enrollment button)
-
-**Modified Logic**:
 ```python
-def get(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
-    """Handle GET requests to display course detail."""
-    course = get_object_or_404(Course, id=course_id)
+from enum import StrEnum
 
-    teacher_profile = getattr(request.user, "teacher_profile", None)
-    student_profile = getattr(request.user, "student_profile", None)
-    teacher_assistant_profile = getattr(
-        request.user, "teacher_assistant_profile", None
-    )
 
-    user_roles = []
+class CourseRole(StrEnum):
+    """Enumeration of possible user roles within a course context."""
 
-    if (
-        teacher_profile
-        and CourseTeacher.objects.filter(
-            course=course, teacher=teacher_profile
-        ).exists()
-    ):
-        user_roles.append("teacher")
-
-    if student_profile and course.is_student_enrolled(student_profile):
-        user_roles.append("student")
-
-    if teacher_assistant_profile and course.is_teacher_assistant(
-        teacher_assistant_profile
-    ):
-        user_roles.append("teacher_assistant")
-
-    # NEW: Check if user is a logged-in student (even if not enrolled)
-    is_unenrolled_student = (
-        student_profile is not None
-        and "student" not in user_roles
-        and "teacher" not in user_roles
-        and "teacher_assistant" not in user_roles
-    )
-
-    # If user has no role at all (not even unenrolled student), deny access
-    if not user_roles and not is_unenrolled_student:
-        return HttpResponseForbidden("You do not have access to this course.")
-
-    # Get the appropriate data based on user roles
-    data = self._get_view_data(
-        course,
-        user_roles,
-        teacher_profile,
-        student_profile,
-        teacher_assistant_profile,
-        is_unenrolled_student=is_unenrolled_student,
-    )
-
-    return render(request, "courses/detail.html", {"data": data})
+    TEACHER = "teacher"
+    STUDENT = "student"
+    TEACHER_ASSISTANT = "teacher_assistant"
 ```
 
-### 2. Modify `CourseDetailData` Dataclass
+### 2. Update CourseDetailData Dataclass
 
 **File**: `src/courses/views.py`  
 **Location**: Lines 310-323
 
-**Change**: Add `instructors` field and `is_enrolled_student` flag for the template to conditionally show the enrollment button.
+**Changes**:
+- Add `instructors` field
+- Add `is_enrolled` flag for template to conditionally show enrollment status
+- Update `user_roles` type to use `CourseRole` enum
 
 ```python
+from .enums import CourseRole  # Add import
+
 @dataclass
 class CourseDetailData:
     """Data structure for the course detail view."""
@@ -107,67 +65,147 @@ class CourseDetailData:
     homeworks: list[HomeworkItem]
     enrolled_students: list[EnrolledStudentItem] | None
     teacher_assistants: list[TAItem] | None
-    user_roles: list[str]
+    user_roles: list[CourseRole]  # Changed from list[str]
     instructors: list[InstructorItem]  # NEW: List of instructors
-    is_enrolled_student: bool  # NEW: True if user is enrolled student (for template badge)
-    can_enroll: bool  # NEW: True if user can enroll (unenrolled student viewing active course)
+    is_enrolled: bool  # NEW: True if user is enrolled student
 ```
 
-### 3. Modify `_get_view_data()` Method
+### 3. Modify CourseDetailView.get() Method
+
+**File**: `src/courses/views.py`  
+**Location**: Lines 339-383
+
+**Change**: Instead of returning 403 when a student has no role, allow access with limited data.
+
+```python
+def get(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
+    """Handle GET requests to display course detail."""
+    course = get_object_or_404(Course, id=course_id)
+
+    teacher_profile = getattr(request.user, "teacher_profile", None)
+    student_profile = getattr(request.user, "student_profile", None)
+    teacher_assistant_profile = getattr(
+        request.user, "teacher_assistant_profile", None
+    )
+
+    user_roles: list[CourseRole] = []  # Changed type
+
+    if (
+        teacher_profile
+        and CourseTeacher.objects.filter(
+            course=course, teacher=teacher_profile
+        ).exists()
+    ):
+        user_roles.append(CourseRole.TEACHER)
+
+    if student_profile and course.is_student_enrolled(student_profile):
+        user_roles.append(CourseRole.STUDENT)
+
+    if teacher_assistant_profile and course.is_teacher_assistant(
+        teacher_assistant_profile
+    ):
+        user_roles.append(CourseRole.TEACHER_ASSISTANT)
+
+    # Get the appropriate data based on user roles
+    data = self._get_view_data(
+        course,
+        user_roles,
+        teacher_profile,
+        student_profile,
+        teacher_assistant_profile,
+    )
+
+    return render(request, "courses/detail.html", {"data": data})
+```
+
+### 4. Modify _get_view_data() Method
 
 **File**: `src/courses/views.py`  
 **Location**: Lines 385-472
 
-**Change**: 
-- Add `is_unenrolled_student` parameter
-- When `is_unenrolled_student=True`, return limited data (no homeworks, show instructors, `can_enroll=True`)
-- When user has full access, set `can_enroll=False`
+**Changes**:
+- Update signature to use `CourseRole`
+- Add `instructors` and `is_enrolled` to returned data
+- Remove the logic that restricts homework visibility based on enrollment
 
-**Modified Signature**:
 ```python
 def _get_view_data(
     self,
     course: Course,
-    user_roles: list[str],
+    user_roles: list[CourseRole],
     teacher_profile=None,
     student_profile=None,
     teacher_assistant_profile=None,
-    is_unenrolled_student: bool = False,  # NEW parameter
 ) -> CourseDetailData:
-```
+    # ... existing homework retrieval logic (lines 406-420) ...
 
-**Modified Return Logic** (before return statement at line 463):
-```python
-# Get instructors (available to all who can view the course)
-instructors = []
-for ct in CourseTeacher.objects.filter(course=course).select_related("teacher__user"):
-    instructors.append(
-        InstructorItem(
-            first_name=ct.teacher.user.first_name,
-            last_name=ct.teacher.user.last_name,
+    # Get instructors
+    instructors = []
+    for ct in CourseTeacher.objects.filter(course=course).select_related("teacher__user"):
+        instructors.append(
+            InstructorItem(
+                first_name=ct.teacher.user.first_name,
+                last_name=ct.teacher.user.last_name,
+            )
         )
-    )
 
-if is_unenrolled_student:
-    # Unenrolled students see course info and instructors, but not homeworks
+    # Determine if user is enrolled as student
+    is_enrolled = CourseRole.STUDENT in user_roles
+
+    # Get enrolled students if user is a teacher or TA
+    enrolled_students = None
+    if CourseRole.TEACHER in user_roles or CourseRole.TEACHER_ASSISTANT in user_roles:
+        enrollments = (
+            CourseEnrollment.objects.filter(course=course, is_active=True)
+            .select_related("student__user")
+            .order_by("-enrolled_at")
+        )
+        enrolled_students = []
+        for enrollment in enrollments:
+            student = enrollment.student
+            enrolled_students.append(
+                EnrolledStudentItem(
+                    id=student.id,
+                    username=student.user.username,
+                    email=student.user.email,
+                    enrolled_at=enrollment.enrolled_at.strftime("%B %d, %Y"),
+                )
+            )
+
+    # Get teacher assistants if user is a teacher or TA
+    teacher_assistants = None
+    if CourseRole.TEACHER in user_roles or CourseRole.TEACHER_ASSISTANT in user_roles:
+        tas = (
+            CourseTeacherAssistant.objects.filter(course=course)
+            .select_related("teacher_assistant__user")
+            .order_by("-assigned_at")
+        )
+        teacher_assistants = []
+        for ta in tas:
+            teacher_assistants.append(
+                TAItem(
+                    id=ta.teacher_assistant.id,
+                    username=ta.teacher_assistant.user.username,
+                    email=ta.teacher_assistant.user.email,
+                    assigned_at=ta.assigned_at.strftime("%B %d, %Y"),
+                )
+            )
+
     return CourseDetailData(
         course_id=course.id,
         course_name=course.name,
         course_code=course.code,
         course_description=course.description,
-        homeworks=[],  # No homework access for unenrolled students
-        enrolled_students=None,
-        teacher_assistants=None,
-        user_roles=["student"],  # For template conditionals
+        homeworks=homeworks,  # Show homeworks to everyone
+        enrolled_students=enrolled_students,
+        teacher_assistants=teacher_assistants,
+        user_roles=user_roles,
         instructors=instructors,
-        is_enrolled_student=False,
-        can_enroll=course.is_active,  # Can enroll if course is active
+        is_enrolled=is_enrolled,
     )
-
-# ... existing logic for enrolled users ...
 ```
 
-### 4. Modify `CourseEnrollView.post()` Method
+### 5. Modify CourseEnrollView.post() Method
 
 **File**: `src/courses/views.py`  
 **Location**: Line 225
@@ -179,22 +217,39 @@ if is_unenrolled_student:
 return redirect("courses:detail", course_id=course.id)
 ```
 
-### 5. Modify `detail.html` Template
+### 6. Update CourseListView to Use CourseRole Enum
+
+**File**: `src/courses/views.py`
+
+Update `CourseItem` and `CourseListData` to use `CourseRole`:
+
+```python
+from .enums import CourseRole
+
+@dataclass
+class CourseItem:
+    id: UUID
+    name: str
+    code: str
+    description: str
+    roles: list[CourseRole]  # Changed from list[str]
+    is_enrolled: bool
+    instructors: list[InstructorItem]
+```
+
+Update `CourseListView._get_view_data` (around line 120) to use `CourseRole` instead of strings.
+
+### 7. Modify detail.html Template
 
 **File**: `src/courses/templates/courses/detail.html`
 
 **Changes**:
-1. Add enrollment button section (after course header, before homework section)
-2. Conditionally hide homework list for unenrolled students
-3. Add "Enrolled" badge for enrolled students
-4. Add instructors section
 
-**New Template Sections**:
+1. Add enrollment button section (after course description, before homework section):
 
-Add enrollment button after the course header (after line 45):
 ```html
 <!-- Enrollment Section (for unenrolled students) -->
-{% if data.can_enroll and 'teacher' not in data.user_roles %}
+{% if student_profile and not data.is_enrolled and 'teacher' not in data.user_roles and 'teacher_assistant' not in data.user_roles %}
 <div class="row mb-4">
     <div class="col">
         <div class="card border-primary">
@@ -214,7 +269,8 @@ Add enrollment button after the course header (after line 45):
 {% endif %}
 ```
 
-Add instructors section (after description, before homework section):
+2. Add instructors section (after description):
+
 ```html
 <!-- Instructors Section -->
 {% if data.instructors %}
@@ -233,62 +289,63 @@ Add instructors section (after description, before homework section):
 {% endif %}
 ```
 
-Conditionally hide homework list for unenrolled students (modify line 48):
+3. Update the "Enrolled" badge to use `is_enrolled`:
+
 ```html
-<!-- Homework Section -->
-{% if data.homeworks|length > 0 %}
-{% if 'teacher' in data.user_roles or 'student' in data.user_roles %}
-<div class="row mb-4">
-    ...
-</div>
-{% endif %}
+{% if data.is_enrolled %}
+<span class="badge bg-success ms-2">Enrolled</span>
 {% endif %}
 ```
 
 ## Edge Cases
 
-1. **Inactive course**: Students should NOT see an enrollment button for inactive courses. The `can_enroll` flag should only be `True` if `course.is_active` is `True`.
+1. **Inactive course**: Students should NOT see an enrollment button for inactive courses. The enrollment form should check `course.is_active` before allowing enrollment.
 
-2. **Teacher viewing other teacher's course**: Teachers who don't teach a course should still see the course if they have the direct URL (consistent with current behavior).
+2. **Teacher viewing other teacher's course**: Teachers who don't teach a course should still see the course if they have the direct URL (they will see course info but no teacher-specific UI).
 
 3. **Unauthenticated users**: Should still be redirected to login (handled by `@login_required` decorator).
 
 4. **TA viewing course they assist**: TAs have full access, no enrollment button needed.
 
-5. **Already enrolled student**: Should see "Enrolled" badge (already implemented), not enrollment button.
+5. **Already enrolled student**: Should see "Enrolled" badge, not enrollment button.
 
 ## Testing Considerations
 
 ### New Tests to Add
 
-1. **`test_student_can_view_unenrolled_course`**: Verify that a student who is NOT enrolled can access the course detail page.
+1. **`test_student_can_view_unenrolled_course`**: Verify that a student who is NOT enrolled can access the course detail page (status 200).
 
 2. **`test_student_sees_enrollment_button_for_unenrolled_course`**: Verify that an unenrolled student sees the enrollment button.
 
 3. **`test_student_does_not_see_enrollment_button_for_inactive_course`**: Verify that enrollment button is not shown for inactive courses.
 
-4. **`test_student_cannot_see_homeworks_for_unenrolled_course`**: Verify that unenrolled students cannot see homework assignments.
+4. **`test_student_sees_instructors_for_unenrolled_course`**: Verify that uninrolled students can see the instructors list.
 
 5. **`test_enrollment_redirects_to_course_detail`**: Verify that after enrolling, user is redirected to course detail page.
 
 ### Existing Tests to Modify
 
-1. **`test_student_cannot_view_unenrolled_course`** (line 777-786): Change expected behavior from 403 to 200, and verify limited view.
+1. **`test_student_cannot_view_unenrolled_course`** (line 777-786): Change expected behavior from 403 to 200, and verify limited view with `is_enrolled=False`.
+
+2. **`test_course_detail_shows_correct_user_type`** (line 819-833): Update to use `CourseRole` enum values.
 
 ## File Summary
 
-| File | Change Type | Lines Affected |
-|------|-------------|----------------|
-| `src/courses/views.py` | Modify | 310-323, 339-383, 385-472 |
-| `src/courses/templates/courses/detail.html` | Modify | 45-50, 48-87 (homework section), new sections |
-| `src/courses/tests/test_views.py` | Modify | 777-786 (change expected behavior) |
-| `src/courses/tests/test_views.py` | Add | New test methods |
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `src/courses/enums.py` | Create | New file with `CourseRole` enum |
+| `src/courses/views.py` | Modify | Update dataclasses, views to use `CourseRole` enum, add instructor data, modify enrollment redirect |
+| `src/courses/templates/courses/detail.html` | Modify | Add enrollment button, instructors section, update badge logic |
+| `src/courses/tests/test_views.py` | Modify | Update tests for new behavior and enum usage |
 
 ## Implementation Order
 
-1. Modify `CourseDetailData` dataclass to add new fields
-2. Modify `_get_view_data()` method signature and logic
-3. Modify `CourseDetailView.get()` method to pass `is_unenrolled_student`
-4. Modify `CourseEnrollView.post()` to redirect to course detail
-5. Update `detail.html` template with enrollment button and instructors
-6. Update/add tests
+1. Create `src/courses/enums.py` with `CourseRole` enum
+2. Update `CourseItem` and `CourseListData` to use `CourseRole`
+3. Update `CourseDetailData` to include `instructors` and `is_enrolled`
+4. Update `CourseDetailView.get()` to remove 403 for empty roles
+5. Update `_get_view_data()` to return `instructors` and `is_enrolled`
+6. Update `CourseEnrollView.post()` to redirect to course detail
+7. Update `detail.html` template with enrollment button and instructors section
+8. Update tests
+9. Run tests to verify
