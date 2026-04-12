@@ -308,9 +308,9 @@ class ConversationDetailView(View):
 
         # Create combined timeline for instructor (teacher/TA) view
         is_instructor_viewing = (
-            (hasattr(request.user, "teacher_profile") or hasattr(request.user, "teacher_assistant_profile"))
-            and request.user.id != conversation_data.user_id
-        )
+            hasattr(request.user, "teacher_profile")
+            or hasattr(request.user, "teacher_assistant_profile")
+        ) and request.user.id != conversation_data.user_id
         timeline = self._create_timeline(conversation_data, is_instructor_viewing)
 
         # Render the conversation detail template
@@ -350,13 +350,15 @@ class ConversationDetailView(View):
             # Get the conversation to check course assignment
             try:
                 conversation = Conversation.objects.select_related(
-                    'section__homework__course'
+                    "section__homework__course"
                 ).get(id=conversation_data.id)
 
                 # Check if TA is assigned to this course
                 if conversation.section.homework.course:
-                    is_ta_for_course = conversation.section.homework.course.is_teacher_assistant(
-                        user.teacher_assistant_profile
+                    is_ta_for_course = (
+                        conversation.section.homework.course.is_teacher_assistant(
+                            user.teacher_assistant_profile
+                        )
                     )
                     if is_ta_for_course:
                         return True
@@ -814,10 +816,14 @@ class SectionAnswerSubmitView(View):
             user=request.user, section=section, answer=answer_text
         )
 
-        next_section = Section.objects.filter(
-            homework=section.homework,
-            order__gt=section.order,
-        ).order_by("order").first()
+        next_section = (
+            Section.objects.filter(
+                homework=section.homework,
+                order__gt=section.order,
+            )
+            .order_by("order")
+            .first()
+        )
 
         if next_section is None:
             return redirect("homeworks:detail", homework_id=section.homework.id)
@@ -842,7 +848,9 @@ class SectionAnswerDetailView(View):
     def dispatch(self, *args, **kwargs):
         return super().dispatch(*args, **kwargs)
 
-    def get(self, request: HttpRequest, section_id: UUID, student_id: UUID) -> HttpResponse:
+    def get(
+        self, request: HttpRequest, section_id: UUID, student_id: UUID
+    ) -> HttpResponse:
         from homeworks.models import Section
         from accounts.models import Student
         from conversations.models import SectionAnswer
@@ -851,12 +859,16 @@ class SectionAnswerDetailView(View):
             Section.objects.select_related("homework__course"),
             id=section_id,
         )
-        student = get_object_or_404(Student.objects.select_related("user"), id=student_id)
+        student = get_object_or_404(
+            Student.objects.select_related("user"), id=student_id
+        )
 
         teacher_profile = getattr(request.user, "teacher_profile", None)
         ta_profile = getattr(request.user, "teacher_assistant_profile", None)
         if teacher_profile:
-            if not teacher_profile.courses.filter(id=section.homework.course.id).exists():
+            if not teacher_profile.courses.filter(
+                id=section.homework.course.id
+            ).exists():
                 return HttpResponseForbidden("Access denied.")
         elif ta_profile:
             if not section.homework.course.is_teacher_assistant(ta_profile):
@@ -868,8 +880,12 @@ class SectionAnswerDetailView(View):
             section=section, user=student.user
         ).order_by("-submitted_at")
 
-        return render(request, "conversations/section_answers.html", {
-            "section": section,
-            "student": student,
-            "answers": answers,
-        })
+        return render(
+            request,
+            "conversations/section_answers.html",
+            {
+                "section": section,
+                "student": student,
+                "answers": answers,
+            },
+        )
