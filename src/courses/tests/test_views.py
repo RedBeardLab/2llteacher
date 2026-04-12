@@ -743,6 +743,17 @@ class CourseDetailViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "courses/detail.html")
 
+    def test_student_enrolled_has_is_enrolled_true(self):
+        """Test that enrolled students have is_enrolled=True."""
+        self.client.login(username="teststudent", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        data = response.context["data"]
+        self.assertTrue(data.is_enrolled)
+
     def test_student_sees_homeworks_in_course_detail(self):
         """Test that students see homeworks associated with the course."""
         self.client.login(username="teststudent", password="password123")
@@ -774,16 +785,50 @@ class CourseDetailViewTests(TestCase):
         # Students should not see enrolled_students list
         self.assertIsNone(data.enrolled_students)
 
-    def test_student_cannot_view_unenrolled_course(self):
-        """Test that students cannot view courses they're not enrolled in."""
+    def test_student_can_view_unenrolled_course(self):
+        """Test that students can view courses they're not enrolled in."""
         self.client.login(username="otherstudent", password="password123")
 
         response = self.client.get(
             reverse("courses:detail", kwargs={"course_id": self.course.id})
         )
 
-        # Should return forbidden
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "courses/detail.html")
+        data = response.context["data"]
+        self.assertFalse(data.is_enrolled)
+        self.assertIn("student", data.user_roles)
+
+    def test_student_unenrolled_sees_instructors(self):
+        """Test that unenrolled students see instructors in course detail."""
+        self.teacher_user.first_name = "John"
+        self.teacher_user.last_name = "Doe"
+        self.teacher_user.save()
+
+        self.client.login(username="otherstudent", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertEqual(len(data.instructors), 1)
+        self.assertEqual(data.instructors[0].first_name, "John")
+        self.assertEqual(data.instructors[0].last_name, "Doe")
+
+    def test_student_unenrolled_does_not_see_homeworks(self):
+        """Test that unenrolled students do not see homework list."""
+        self.client.login(username="otherstudent", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertEqual(len(data.homeworks), 0)
+        self.assertFalse(data.is_enrolled)
 
     def test_teacher_cannot_view_course_they_dont_teach(self):
         """Test that teachers cannot view courses they don't teach."""
@@ -831,6 +876,33 @@ class CourseDetailViewTests(TestCase):
             reverse("courses:detail", kwargs={"course_id": self.course.id})
         )
         self.assertIn("student", response.context["data"].user_roles)
+
+    def test_teacher_has_is_enrolled_false(self):
+        """Test that teachers have is_enrolled=False since they don't enroll as students."""
+        self.client.login(username="testteacher", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        data = response.context["data"]
+        self.assertFalse(data.is_enrolled)
+
+    def test_course_detail_includes_instructors(self):
+        """Test that course detail includes instructors for teachers."""
+        self.teacher_user.first_name = "John"
+        self.teacher_user.last_name = "Doe"
+        self.teacher_user.save()
+
+        self.client.login(username="testteacher", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        data = response.context["data"]
+        self.assertEqual(len(data.instructors), 1)
+        self.assertEqual(data.instructors[0].first_name, "John")
+        self.assertEqual(data.instructors[0].last_name, "Doe")
 
 
 class CourseHomeworkCreateViewTests(TestCase):

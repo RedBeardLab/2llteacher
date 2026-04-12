@@ -321,6 +321,8 @@ class CourseDetailData:
     user_roles: list[
         str
     ]  # All roles this user has: ['teacher', 'student', 'teacher_assistant']
+    instructors: list[InstructorItem]  # List of instructors (sorted alphabetically)
+    is_enrolled: bool  # True if the student is enrolled in this course
 
 
 class CourseDetailView(View):
@@ -338,18 +340,16 @@ class CourseDetailView(View):
 
     def get(self, request: HttpRequest, course_id: UUID) -> HttpResponse:
         """Handle GET requests to display course detail."""
-        # Get the course
         course = get_object_or_404(Course, id=course_id)
 
-        # Check permissions and get data
         teacher_profile = getattr(request.user, "teacher_profile", None)
         student_profile = getattr(request.user, "student_profile", None)
         teacher_assistant_profile = getattr(
             request.user, "teacher_assistant_profile", None
         )
 
-        # Check access through any role
         user_roles = []
+        is_enrolled = False
 
         if (
             teacher_profile
@@ -359,8 +359,12 @@ class CourseDetailView(View):
         ):
             user_roles.append("teacher")
 
-        if student_profile and course.is_student_enrolled(student_profile):
-            user_roles.append("student")
+        if student_profile:
+            is_enrolled = course.is_student_enrolled(student_profile)
+            if is_enrolled:
+                user_roles.append("student")
+            elif teacher_assistant_profile is None and teacher_profile is None:
+                user_roles.append("student")
 
         if teacher_assistant_profile and course.is_teacher_assistant(
             teacher_assistant_profile
@@ -370,10 +374,10 @@ class CourseDetailView(View):
         if not user_roles:
             return HttpResponseForbidden("You do not have access to this course.")
 
-        # Get the appropriate data based on user roles
         data = self._get_view_data(
             course,
             user_roles,
+            is_enrolled,
             teacher_profile,
             student_profile,
             teacher_assistant_profile,
@@ -386,6 +390,7 @@ class CourseDetailView(View):
         self,
         course: Course,
         user_roles: list[str],
+        is_enrolled: bool,
         teacher_profile=None,
         student_profile=None,
         teacher_assistant_profile=None,
@@ -396,6 +401,7 @@ class CourseDetailView(View):
         Args:
             course: The course to display
             user_roles: List of roles this user has for this course
+            is_enrolled: Whether the student is enrolled in this course
             teacher_profile: Teacher profile if user is a teacher
             student_profile: Student profile if user is a student
             teacher_assistant_profile: Teacher assistant profile if user is a TA
@@ -403,23 +409,35 @@ class CourseDetailView(View):
         Returns:
             CourseDetailData with course info, homeworks, and optionally students/TAs
         """
-        # Get homeworks for this course (direct FK relationship)
         from homeworks.models import Homework
 
         course_homeworks = Homework.objects.filter(course=course).order_by("due_date")
 
         homeworks = []
-        for hw in course_homeworks:
-            homeworks.append(
-                HomeworkItem(
-                    id=hw.id,
-                    title=hw.title,
-                    description=hw.description,
-                    due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p"),
+        if is_enrolled or "teacher" in user_roles or "teacher_assistant" in user_roles:
+            for hw in course_homeworks:
+                homeworks.append(
+                    HomeworkItem(
+                        id=hw.id,
+                        title=hw.title,
+                        description=hw.description,
+                        due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p"),
+                    )
+                )
+
+        instructors = []
+        for course_teacher in CourseTeacher.objects.filter(
+            course=course
+        ).select_related("teacher__user"):
+            user = course_teacher.teacher.user
+            instructors.append(
+                InstructorItem(
+                    first_name=user.first_name,
+                    last_name=user.last_name,
                 )
             )
+        instructors.sort(key=lambda x: (x.last_name.lower(), x.first_name.lower()))
 
-        # Get enrolled students if user is a teacher or TA (TAs need to see students for grading)
         enrolled_students = None
         if "teacher" in user_roles or "teacher_assistant" in user_roles:
             enrollments = (
@@ -440,7 +458,6 @@ class CourseDetailView(View):
                     )
                 )
 
-        # Get teacher assistants if user is a teacher or TA
         teacher_assistants = None
         if "teacher" in user_roles or "teacher_assistant" in user_roles:
             tas = (
@@ -469,6 +486,8 @@ class CourseDetailView(View):
             enrolled_students=enrolled_students,
             teacher_assistants=teacher_assistants,
             user_roles=user_roles,
+            instructors=instructors,
+            is_enrolled=is_enrolled,
         )
 
 

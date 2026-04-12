@@ -24,7 +24,7 @@
                 {% if 'teacher' in data.user_roles %}
                 <span class="badge bg-primary ms-2">Teaching</span>
                 {% endif %}
-                {% if 'student' in data.user_roles %}
+                {% if 'student' in data.user_roles and data.is_enrolled %}
                 <span class="badge bg-success ms-2">Enrolled</span>
                 {% endif %}
                 {% if 'teacher_assistant' in data.user_roles %}
@@ -42,10 +42,44 @@
                 </div>
             </div>
             {% endif %}
+            {% if 'student' in data.user_roles and not data.is_enrolled %}
+            <div class="mb-4">
+                <form method="post" action="{% url 'courses:enroll' data.course_id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Enroll Now
+                    </button>
+                </form>
+            </div>
+            {% endif %}
         </div>
     </div>
 
+    <!-- Instructors Section -->
+    {% if data.instructors %}
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-person-badge"></i> Instructors</h2>
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        <strong>{{ data.instructors|length }}</strong> instructor{{ data.instructors|length|pluralize }}
+                    </p>
+                    <ul class="list-unstyled mb-0">
+                        {% for instructor in data.instructors %}
+                        <li class="mb-2">
+                            <i class="bi bi-person"></i> {{ instructor.first_name }} {{ instructor.last_name }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Homework Section -->
+    {% if 'teacher' in data.user_roles or 'teacher_assistant' in data.user_roles or data.is_enrolled %}
     <div class="row mb-4">
         <div class="col">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -84,6 +118,8 @@
             </div>
             {% endif %}
         </div>
+    </div>
+    {% endif %}
     </div>
 
     <!-- Enrolled Students Section (Teachers and TAs) -->
