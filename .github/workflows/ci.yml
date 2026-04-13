@@ -14,17 +14,14 @@ on:
         required: false
         default: ''
 
-env:
-  TRUSTED_ASSOCIATIONS: '["OWNER", "MEMBER", "COLLABORATOR"]'
-
 jobs:
   lint:
     runs-on: self-hosted
     if: >
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.review.author_association)) ||
-      (github.event_name == 'pull_request_target' && contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.pull_request.author_association))
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association)) ||
+      (github.event_name == 'pull_request_target' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,8 +47,8 @@ jobs:
     if: >
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.review.author_association)) ||
-      (github.event_name == 'pull_request_target' && contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.pull_request.author_association))
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association)) ||
+      (github.event_name == 'pull_request_target' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,8 +71,8 @@ jobs:
     if: >
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.review.author_association)) ||
-      (github.event_name == 'pull_request_target' && contains(fromJSON(env.TRUSTED_ASSOCIATIONS), github.event.pull_request.author_association))
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association)) ||
+      (github.event_name == 'pull_request_target' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association))
     steps:
       - uses: actions/checkout@v4
         with:
