@@ -390,9 +390,12 @@ class CourseEnrollViewTests(TestCase):
             reverse("courses:enroll", kwargs={"course_id": self.course.id})
         )
 
-        # Should redirect to course list
+        # Should redirect to course detail
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("courses:list"))
+        self.assertEqual(
+            response.url,
+            reverse("courses:detail", kwargs={"course_id": self.course.id}),
+        )
 
         # Check that enrollment was created
         enrollment = CourseEnrollment.objects.filter(
@@ -774,16 +777,56 @@ class CourseDetailViewTests(TestCase):
         # Students should not see enrolled_students list
         self.assertIsNone(data.enrolled_students)
 
-    def test_student_cannot_view_unenrolled_course(self):
-        """Test that students cannot view courses they're not enrolled in."""
+    def test_student_can_view_unenrolled_course(self):
+        """Test that students can view courses they're not enrolled in."""
         self.client.login(username="otherstudent", password="password123")
 
         response = self.client.get(
             reverse("courses:detail", kwargs={"course_id": self.course.id})
         )
 
-        # Should return forbidden
-        self.assertEqual(response.status_code, 403)
+        # Should return success
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "courses/detail.html")
+
+        # Check that is_enrolled is False
+        data = response.context["data"]
+        self.assertFalse(data.is_enrolled)
+
+        # Check that homeworks are not shown to unenrolled students
+        self.assertEqual(len(data.homeworks), 0)
+
+    def test_student_sees_enroll_button_when_not_enrolled(self):
+        """Test that students see an enroll button when not enrolled."""
+        self.client.login(username="otherstudent", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # The template should show the "Not Enrolled" badge and enroll button
+        self.assertContains(response, "Not Enrolled")
+        self.assertContains(response, "Enroll in this Course")
+        self.assertContains(
+            response,
+            f'action="{reverse("courses:enroll", kwargs={"course_id": self.course.id})}"',
+        )
+
+    def test_enroll_redirects_to_course_detail(self):
+        """Test that enrolling redirects to course detail page."""
+        self.client.login(username="otherstudent", password="password123")
+
+        response = self.client.post(
+            reverse("courses:enroll", kwargs={"course_id": self.course.id})
+        )
+
+        # Should redirect to course detail
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            reverse("courses:detail", kwargs={"course_id": self.course.id}),
+        )
 
     def test_teacher_cannot_view_course_they_dont_teach(self):
         """Test that teachers cannot view courses they don't teach."""

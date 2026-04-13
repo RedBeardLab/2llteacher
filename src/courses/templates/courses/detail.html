@@ -24,13 +24,26 @@
                 {% if 'teacher' in data.user_roles %}
                 <span class="badge bg-primary ms-2">Teaching</span>
                 {% endif %}
-                {% if 'student' in data.user_roles %}
+                {% if 'student' in data.user_roles and data.is_enrolled %}
                 <span class="badge bg-success ms-2">Enrolled</span>
                 {% endif %}
                 {% if 'teacher_assistant' in data.user_roles %}
                 <span class="badge bg-warning text-dark ms-2">TA</span>
                 {% endif %}
+                {% if 'student' in data.user_roles and not data.is_enrolled %}
+                <span class="badge bg-secondary ms-2">Not Enrolled</span>
+                {% endif %}
             </p>
+            {% if 'student' in data.user_roles and not data.is_enrolled %}
+            <div class="mt-3">
+                <form method="post" action="{% url 'courses:enroll' data.course_id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-plus-circle"></i> Enroll in this Course
+                    </button>
+                </form>
+            </div>
+            {% endif %}
             {% if data.course_description %}
             <div class="card mb-4">
                 <div class="card-body">

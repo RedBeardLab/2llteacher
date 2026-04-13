@@ -221,8 +221,8 @@ class CourseEnrollView(View):
         else:
             messages.success(request, f"Enrolled in {course.name} successfully!")
 
-        # Redirect back to course list
-        return redirect("courses:list")
+        # Redirect back to course detail
+        return redirect("courses:detail", course_id=course.id)
 
 
 @dataclass
@@ -321,6 +321,7 @@ class CourseDetailData:
     user_roles: list[
         str
     ]  # All roles this user has: ['teacher', 'student', 'teacher_assistant']
+    is_enrolled: bool  # True if the user is enrolled as a student
 
 
 class CourseDetailView(View):
@@ -350,6 +351,7 @@ class CourseDetailView(View):
 
         # Check access through any role
         user_roles = []
+        is_enrolled = False
 
         if (
             teacher_profile
@@ -359,21 +361,25 @@ class CourseDetailView(View):
         ):
             user_roles.append("teacher")
 
-        if student_profile and course.is_student_enrolled(student_profile):
-            user_roles.append("student")
+        if student_profile:
+            is_enrolled = course.is_student_enrolled(student_profile)
+            user_roles.append("student")  # Students always have access role
 
         if teacher_assistant_profile and course.is_teacher_assistant(
             teacher_assistant_profile
         ):
             user_roles.append("teacher_assistant")
 
-        if not user_roles:
+        # Students always have access (even if not enrolled) to view course info
+        # Teachers and TAs must be associated with the course
+        if not user_roles and not (student_profile and not is_enrolled):
             return HttpResponseForbidden("You do not have access to this course.")
 
         # Get the appropriate data based on user roles
         data = self._get_view_data(
             course,
             user_roles,
+            is_enrolled,
             teacher_profile,
             student_profile,
             teacher_assistant_profile,
@@ -386,6 +392,7 @@ class CourseDetailView(View):
         self,
         course: Course,
         user_roles: list[str],
+        is_enrolled: bool,
         teacher_profile=None,
         student_profile=None,
         teacher_assistant_profile=None,
@@ -396,6 +403,7 @@ class CourseDetailView(View):
         Args:
             course: The course to display
             user_roles: List of roles this user has for this course
+            is_enrolled: Whether the user is enrolled as a student
             teacher_profile: Teacher profile if user is a teacher
             student_profile: Student profile if user is a student
             teacher_assistant_profile: Teacher assistant profile if user is a TA
@@ -404,20 +412,24 @@ class CourseDetailView(View):
             CourseDetailData with course info, homeworks, and optionally students/TAs
         """
         # Get homeworks for this course (direct FK relationship)
+        # Only show homeworks to enrolled students or teachers/TAs
         from homeworks.models import Homework
 
-        course_homeworks = Homework.objects.filter(course=course).order_by("due_date")
-
         homeworks = []
-        for hw in course_homeworks:
-            homeworks.append(
-                HomeworkItem(
-                    id=hw.id,
-                    title=hw.title,
-                    description=hw.description,
-                    due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p"),
-                )
+        if is_enrolled or "teacher" in user_roles or "teacher_assistant" in user_roles:
+            course_homeworks = Homework.objects.filter(course=course).order_by(
+                "due_date"
             )
+
+            for hw in course_homeworks:
+                homeworks.append(
+                    HomeworkItem(
+                        id=hw.id,
+                        title=hw.title,
+                        description=hw.description,
+                        due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p"),
+                    )
+                )
 
         # Get enrolled students if user is a teacher or TA (TAs need to see students for grading)
         enrolled_students = None
@@ -469,6 +481,7 @@ class CourseDetailView(View):
             enrolled_students=enrolled_students,
             teacher_assistants=teacher_assistants,
             user_roles=user_roles,
+            is_enrolled=is_enrolled,
         )
 
 
