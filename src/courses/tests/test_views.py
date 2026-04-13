@@ -804,6 +804,18 @@ class CourseDetailViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Enroll Now", response.content)
 
+    def test_unenrolled_student_does_not_see_homeworks(self):
+        """Test that unenrolled students do not see the homework list."""
+        self.client.login(username="otherstudent", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b"Homework 1", response.content)
+        self.assertNotIn(b"Homework 2", response.content)
+
     def test_student_sees_instructors_for_unenrolled_course(self):
         """Test that unenrolled students can see the instructors list."""
         self.client.login(username="otherstudent", password="password123")
