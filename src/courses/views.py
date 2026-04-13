@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID
 from django.views import View
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
@@ -358,13 +358,16 @@ class CourseDetailView(View):
         ):
             user_roles.append(CourseRole.TEACHER)
 
-        if student_profile and course.is_student_enrolled(student_profile):
+        if student_profile:
             user_roles.append(CourseRole.STUDENT)
 
         if teacher_assistant_profile and course.is_teacher_assistant(
             teacher_assistant_profile
         ):
             user_roles.append(CourseRole.TEACHER_ASSISTANT)
+
+        if not course.is_active and CourseRole.TEACHER not in user_roles and CourseRole.TEACHER_ASSISTANT not in user_roles:
+            raise Http404
 
         # Get the appropriate data based on user roles
         data = self._get_view_data(
@@ -425,7 +428,7 @@ class CourseDetailView(View):
                 )
             )
 
-        is_enrolled = CourseRole.STUDENT in user_roles
+        is_enrolled = student_profile is not None and course.is_student_enrolled(student_profile)
 
         enrolled_students = None
         if (

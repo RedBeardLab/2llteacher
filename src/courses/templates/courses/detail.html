@@ -60,7 +60,7 @@
             {% endif %}
 
             <!-- Enrollment Section (for unenrolled students) -->
-            {% if student_profile and not data.is_enrolled and 'teacher' not in data.user_roles and 'teacher_assistant' not in data.user_roles %}
+            {% if 'student' in data.user_roles and not data.is_enrolled %}
             <div class="row mb-4">
                 <div class="col">
                     <div class="card border-primary">

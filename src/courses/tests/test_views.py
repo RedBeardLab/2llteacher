@@ -793,6 +793,17 @@ class CourseDetailViewTests(TestCase):
         data = response.context["data"]
         self.assertFalse(data.is_enrolled)
 
+    def test_unenrolled_student_sees_enroll_now_button(self):
+        """Test that unenrolled students see the Enroll Now button on an active course."""
+        self.client.login(username="otherstudent", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Enroll Now", response.content)
+
     def test_student_sees_instructors_for_unenrolled_course(self):
         """Test that unenrolled students can see the instructors list."""
         self.client.login(username="otherstudent", password="password123")
@@ -807,9 +818,8 @@ class CourseDetailViewTests(TestCase):
         self.assertIsNotNone(data.instructors)
         self.assertEqual(len(data.instructors), 1)
 
-    def test_student_does_not_see_enrollment_button_for_inactive_course(self):
-        """Test that enrollment button is not shown for inactive courses."""
-        # Create an inactive course
+    def test_student_gets_404_for_inactive_course(self):
+        """Test that unenrolled students get 404 for inactive courses."""
         inactive_course = Course.objects.create(
             name="Inactive Course",
             code="INACT999",
@@ -826,9 +836,7 @@ class CourseDetailViewTests(TestCase):
             reverse("courses:detail", kwargs={"course_id": inactive_course.id})
         )
 
-        # Template should not show enrollment button for inactive course
-        self.assertEqual(response.status_code, 200)
-        self.assertNotIn(b"Enroll Now", response.content)
+        self.assertEqual(response.status_code, 404)
 
     def test_teacher_cannot_view_course_they_dont_teach(self):
         """Test that teachers cannot view courses they don't teach."""
