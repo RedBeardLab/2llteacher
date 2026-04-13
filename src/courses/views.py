@@ -25,6 +25,7 @@ from llteacher.permissions.decorators import (
     TeacherRequest,
 )
 
+from .enums import CourseRole
 from .models import Course, CourseEnrollment, CourseTeacher, CourseTeacherAssistant
 from .forms import CourseForm
 from accounts.models import User, TeacherAssistant
@@ -46,9 +47,9 @@ class CourseItem:
     name: str
     code: str
     description: str
-    roles: list[str]  # ['teacher', 'student', 'teacher_assistant']
-    is_enrolled: bool  # For backwards compatibility with student enrollment
-    instructors: list[InstructorItem]  # List of instructors (sorted alphabetically)
+    roles: list[CourseRole]
+    is_enrolled: bool
+    instructors: list[InstructorItem]
 
 
 @dataclass
@@ -56,9 +57,7 @@ class CourseListData:
     """Data structure for the course list view."""
 
     courses: list[CourseItem]
-    user_types: list[
-        str
-    ]  # All roles this user has: ['teacher', 'student', 'teacher_assistant']
+    user_types: list[CourseRole]
 
 
 class CourseListView(View):
@@ -99,11 +98,11 @@ class CourseListView(View):
         # Track which user types this user has
         user_types = []
         if teacher_profile:
-            user_types.append("teacher")
+            user_types.append(CourseRole.TEACHER)
         if student_profile:
-            user_types.append("student")
+            user_types.append(CourseRole.STUDENT)
         if teacher_assistant_profile:
-            user_types.append("teacher_assistant")
+            user_types.append(CourseRole.TEACHER_ASSISTANT)
 
         # Aggregate courses from all roles
         course_dict = {}  # Use dict to deduplicate by course.id
@@ -117,7 +116,7 @@ class CourseListView(View):
                         "roles": [],
                         "is_enrolled": False,
                     }
-                course_dict[course.id]["roles"].append("teacher")
+                    course_dict[course.id]["roles"].append(CourseRole.TEACHER)
 
         # Add student courses
         if student_profile:
@@ -129,7 +128,7 @@ class CourseListView(View):
                         "is_enrolled": False,
                     }
                 if course.is_student_enrolled(student_profile):
-                    course_dict[course.id]["roles"].append("student")
+                    course_dict[course.id]["roles"].append(CourseRole.STUDENT)
                     course_dict[course.id]["is_enrolled"] = True
 
         # Add TA courses
@@ -141,7 +140,7 @@ class CourseListView(View):
                         "roles": [],
                         "is_enrolled": False,
                     }
-                course_dict[course.id]["roles"].append("teacher_assistant")
+                course_dict[course.id]["roles"].append(CourseRole.TEACHER_ASSISTANT)
 
         # Convert to CourseItem list
         courses = []
@@ -221,8 +220,8 @@ class CourseEnrollView(View):
         else:
             messages.success(request, f"Enrolled in {course.name} successfully!")
 
-        # Redirect back to course list
-        return redirect("courses:list")
+        # Redirect back to course detail
+        return redirect("courses:detail", course_id=course.id)
 
 
 @dataclass
@@ -318,9 +317,9 @@ class CourseDetailData:
     homeworks: list[HomeworkItem]
     enrolled_students: list[EnrolledStudentItem] | None
     teacher_assistants: list[TAItem] | None
-    user_roles: list[
-        str
-    ]  # All roles this user has: ['teacher', 'student', 'teacher_assistant']
+    user_roles: list[CourseRole]
+    instructors: list[InstructorItem]
+    is_enrolled: bool
 
 
 class CourseDetailView(View):
@@ -349,7 +348,7 @@ class CourseDetailView(View):
         )
 
         # Check access through any role
-        user_roles = []
+        user_roles: list[CourseRole] = []
 
         if (
             teacher_profile
@@ -357,18 +356,15 @@ class CourseDetailView(View):
                 course=course, teacher=teacher_profile
             ).exists()
         ):
-            user_roles.append("teacher")
+            user_roles.append(CourseRole.TEACHER)
 
         if student_profile and course.is_student_enrolled(student_profile):
-            user_roles.append("student")
+            user_roles.append(CourseRole.STUDENT)
 
         if teacher_assistant_profile and course.is_teacher_assistant(
             teacher_assistant_profile
         ):
-            user_roles.append("teacher_assistant")
-
-        if not user_roles:
-            return HttpResponseForbidden("You do not have access to this course.")
+            user_roles.append(CourseRole.TEACHER_ASSISTANT)
 
         # Get the appropriate data based on user roles
         data = self._get_view_data(
@@ -385,7 +381,7 @@ class CourseDetailView(View):
     def _get_view_data(
         self,
         course: Course,
-        user_roles: list[str],
+        user_roles: list[CourseRole],
         teacher_profile=None,
         student_profile=None,
         teacher_assistant_profile=None,
@@ -403,7 +399,6 @@ class CourseDetailView(View):
         Returns:
             CourseDetailData with course info, homeworks, and optionally students/TAs
         """
-        # Get homeworks for this course (direct FK relationship)
         from homeworks.models import Homework
 
         course_homeworks = Homework.objects.filter(course=course).order_by("due_date")
@@ -419,9 +414,24 @@ class CourseDetailView(View):
                 )
             )
 
-        # Get enrolled students if user is a teacher or TA (TAs need to see students for grading)
+        instructors = []
+        for ct in CourseTeacher.objects.filter(course=course).select_related(
+            "teacher__user"
+        ):
+            instructors.append(
+                InstructorItem(
+                    first_name=ct.teacher.user.first_name,
+                    last_name=ct.teacher.user.last_name,
+                )
+            )
+
+        is_enrolled = CourseRole.STUDENT in user_roles
+
         enrolled_students = None
-        if "teacher" in user_roles or "teacher_assistant" in user_roles:
+        if (
+            CourseRole.TEACHER in user_roles
+            or CourseRole.TEACHER_ASSISTANT in user_roles
+        ):
             enrollments = (
                 CourseEnrollment.objects.filter(course=course, is_active=True)
                 .select_related("student__user")
@@ -440,9 +450,11 @@ class CourseDetailView(View):
                     )
                 )
 
-        # Get teacher assistants if user is a teacher or TA
         teacher_assistants = None
-        if "teacher" in user_roles or "teacher_assistant" in user_roles:
+        if (
+            CourseRole.TEACHER in user_roles
+            or CourseRole.TEACHER_ASSISTANT in user_roles
+        ):
             tas = (
                 CourseTeacherAssistant.objects.filter(course=course)
                 .select_related("teacher_assistant__user")
@@ -469,6 +481,8 @@ class CourseDetailView(View):
             enrolled_students=enrolled_students,
             teacher_assistants=teacher_assistants,
             user_roles=user_roles,
+            instructors=instructors,
+            is_enrolled=is_enrolled,
         )
 
 

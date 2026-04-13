@@ -24,7 +24,7 @@
                 {% if 'teacher' in data.user_roles %}
                 <span class="badge bg-primary ms-2">Teaching</span>
                 {% endif %}
-                {% if 'student' in data.user_roles %}
+                {% if data.is_enrolled %}
                 <span class="badge bg-success ms-2">Enrolled</span>
                 {% endif %}
                 {% if 'teacher_assistant' in data.user_roles %}
@@ -39,6 +39,42 @@
                             <style>.markdown-body { background-color: transparent !important; }</style>
                         </template>
                     </zero-md>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Instructors Section -->
+            {% if data.instructors %}
+            <div class="row mb-4">
+                <div class="col">
+                    <h4><i class="bi bi-person-badge"></i> Instructors</h4>
+                    <ul class="list-unstyled">
+                        {% for instructor in data.instructors %}
+                        <li class="mb-2">
+                            <i class="bi bi-person"></i> {{ instructor.first_name }} {{ instructor.last_name }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Enrollment Section (for unenrolled students) -->
+            {% if student_profile and not data.is_enrolled and 'teacher' not in data.user_roles and 'teacher_assistant' not in data.user_roles %}
+            <div class="row mb-4">
+                <div class="col">
+                    <div class="card border-primary">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">You are not enrolled in this course</h5>
+                            <p class="card-text">Enroll now to access homework assignments and participate in conversations.</p>
+                            <form method="post" action="{% url 'courses:enroll' data.course_id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-plus-circle"></i> Enroll Now
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
             {% endif %}
