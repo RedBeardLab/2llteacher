@@ -17,7 +17,10 @@ from django.core.exceptions import ValidationError
 
 import logging
 
-from llteacher.permissions.decorators import course_teacher_required, get_teacher_or_student
+from llteacher.permissions.decorators import (
+    course_teacher_required,
+    get_teacher_or_student,
+)
 from llteacher.tracing import record_exception
 
 from .services import (

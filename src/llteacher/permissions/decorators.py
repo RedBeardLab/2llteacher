@@ -372,9 +372,7 @@ def course_teacher_required(view_func: ViewFunc) -> ViewFunc:
 
         course = get_object_or_404(Course, id=course_id)
         if not CourseTeacher.objects.filter(course=course, teacher=teacher).exists():
-            return HttpResponseForbidden(
-                "You are not a teacher of this course."
-            )
+            return HttpResponseForbidden("You are not a teacher of this course.")
 
         return view_func(request, course_id, *args, **kwargs)
 
