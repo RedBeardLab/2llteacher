@@ -1,5 +1,9 @@
 import uuid
+from typing import TYPE_CHECKING
 from django.db import models
+
+if TYPE_CHECKING:
+    from accounts.models import Student, Teacher, TeacherAssistant
 
 
 class Course(models.Model):
@@ -11,13 +15,13 @@ class Course(models.Model):
     code = models.CharField(max_length=256, unique=True)
 
     # Many-to-many relationships
-    teachers = models.ManyToManyField(
+    teachers: "models.ManyToManyField[Teacher, CourseTeacher]" = models.ManyToManyField(
         "accounts.Teacher", through="CourseTeacher", related_name="courses"
     )
-    students = models.ManyToManyField(
+    students: "models.ManyToManyField[Student, CourseEnrollment]" = models.ManyToManyField(
         "accounts.Student", through="CourseEnrollment", related_name="enrolled_courses"
     )
-    teacher_assistants = models.ManyToManyField(
+    teacher_assistants: "models.ManyToManyField[TeacherAssistant, CourseTeacherAssistant]" = models.ManyToManyField(
         "accounts.TeacherAssistant",
         through="CourseTeacherAssistant",
         related_name="courses",
