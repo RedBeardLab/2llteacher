@@ -11,6 +11,7 @@ from uuid import UUID
 from enum import Enum, StrEnum
 from datetime import datetime
 import logging
+from collections import defaultdict
 
 from django.db import transaction
 from llteacher.tracing import traced, record_exception
@@ -1091,9 +1092,7 @@ class HomeworkService:
             ).select_related("last_message_before_paste__conversation")
 
             # Create a map of conversation_id -> paste event count for quick lookup
-            from collections import defaultdict
-
-            paste_event_count_map = defaultdict(int)
+            paste_event_count_map: defaultdict[UUID, int] = defaultdict(int)
             for paste_event in paste_events:
                 if paste_event.last_message_before_paste:
                     conv_id = paste_event.last_message_before_paste.conversation.id

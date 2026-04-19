@@ -74,7 +74,7 @@ class LLMConfigFormData:
     is_edit: bool = False
     form_title: str = "Create LLM Configuration"
     course_id: Optional[UUID] = None
-    courses: List[dict] = None
+    courses: List[dict] | None = None
 
 
 @dataclass

@@ -6,12 +6,13 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Any, assert_type
+from typing import TYPE_CHECKING, Dict, Any, assert_type, cast
 from uuid import UUID
 from django.forms import formset_factory
 
 if TYPE_CHECKING:
     from django.forms.utils import ErrorDict, ErrorList
+    from .services import HomeworkProgressData
 
 from django.views import View
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
@@ -68,6 +69,15 @@ class HomeworkListData:
     has_progress_data: bool
 
 
+@dataclass
+class HomeworkListEntry:
+    """Internal typed accumulator for homework list assembly."""
+
+    homework: Homework
+    roles: list[str]
+    progress: "HomeworkProgressData | None" = None
+
+
 class HomeworkListView(View):
     """
     View for listing homework assignments.
@@ -116,7 +126,7 @@ class HomeworkListView(View):
             user_types.append("teacher_assistant")
 
         # Use dict to track homeworks and their roles
-        homework_dict = {}
+        homework_dict: dict[UUID, HomeworkListEntry] = {}
 
         # Add teacher homeworks
         if teacher_profile:
@@ -131,12 +141,8 @@ class HomeworkListView(View):
 
             for hw in teacher_homework_objects:
                 if hw.id not in homework_dict:
-                    homework_dict[hw.id] = {
-                        "homework": hw,
-                        "roles": [],
-                        "progress": None,
-                    }
-                homework_dict[hw.id]["roles"].append("teacher")
+                    homework_dict[hw.id] = HomeworkListEntry(homework=hw, roles=[])
+                homework_dict[hw.id].roles.append("teacher")
 
         # Add student homeworks
         if student_profile:
@@ -149,15 +155,13 @@ class HomeworkListView(View):
 
             for hw in student_homework_objects:
                 if hw.id not in homework_dict:
-                    homework_dict[hw.id] = {
-                        "homework": hw,
-                        "roles": [],
-                        "progress": None,
-                    }
-                homework_dict[hw.id]["roles"].append("student")
+                    homework_dict[hw.id] = HomeworkListEntry(homework=hw, roles=[])
+                homework_dict[hw.id].roles.append("student")
                 # Calculate progress for student view
-                homework_dict[hw.id]["progress"] = (
-                    HomeworkService.get_student_homework_progress(student_profile, hw)
+                homework_dict[
+                    hw.id
+                ].progress = HomeworkService.get_student_homework_progress(
+                    student_profile, hw
                 )
 
         # Add TA homeworks
@@ -171,22 +175,18 @@ class HomeworkListView(View):
 
             for hw in ta_homework_objects:
                 if hw.id not in homework_dict:
-                    homework_dict[hw.id] = {
-                        "homework": hw,
-                        "roles": [],
-                        "progress": None,
-                    }
-                homework_dict[hw.id]["roles"].append("teacher_assistant")
+                    homework_dict[hw.id] = HomeworkListEntry(homework=hw, roles=[])
+                homework_dict[hw.id].roles.append("teacher_assistant")
 
         # Convert to HomeworkListItem
-        homeworks = []
+        homeworks: list[HomeworkListItem] = []
         has_progress_data = "student" in user_types
 
         for hw_data in sorted(
-            homework_dict.values(), key=lambda x: x["homework"].created_at, reverse=True
+            homework_dict.values(), key=lambda x: x.homework.created_at, reverse=True
         ):
-            hw = hw_data["homework"]
-            progress_data = hw_data["progress"]
+            hw = hw_data.homework
+            progress_data = hw_data.progress
 
             # Prepare section data and progress if available
             sections = None
@@ -250,7 +250,7 @@ class HomeworkListView(View):
                     section_count=hw.section_count,
                     created_at=hw.created_at,
                     is_overdue=hw.is_overdue,
-                    roles=hw_data["roles"],
+                    roles=hw_data.roles,
                     sections=sections,
                     completed_percentage=completed_percentage,
                     in_progress_percentage=in_progress_percentage,
@@ -401,8 +401,9 @@ class HomeworkEditView(View):
             initial_section_data.append(section_data)
 
         # Create section formset with initial data
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(
             prefix="sections", initial=initial_section_data
@@ -426,8 +427,9 @@ class HomeworkEditView(View):
         form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(request.POST, prefix="sections")
         assert_type(section_formset, SectionFormSet)
@@ -1136,11 +1138,14 @@ class NonInteractiveSectionAnswerView(View):
         ):
             return HttpResponseForbidden("You are not enrolled in this course.")
 
-        answers = list(
-            SectionAnswer.objects.filter(section=section, user=request.user)
+        answers: list[dict[str, Any]] = [
+            {"answer": answer["answer"], "submitted_at": answer["submitted_at"]}
+            for answer in SectionAnswer.objects.filter(
+                section=section, user=student_profile.user
+            )
             .order_by("-submitted_at")
             .values("answer", "submitted_at")
-        )
+        ]
 
         return NonInteractiveSectionData(
             homework_id=homework.id,

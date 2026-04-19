@@ -6,7 +6,7 @@ Following a testable-first approach with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, List, TYPE_CHECKING, Iterator
+from typing import Optional, Dict, Any, List, TYPE_CHECKING, Iterator, cast
 from uuid import UUID
 import uuid
 import logging
@@ -18,6 +18,10 @@ from enum import StrEnum
 if TYPE_CHECKING:
     from conversations.models import Conversation
     from .models import LLMConfig
+    from openai.types.chat import ChatCompletionChunk
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCallUnion,
+    )
 
 from django.conf import settings
 import httpx
@@ -238,6 +242,22 @@ class LLMService:
         )
 
     @staticmethod
+    def _get_function_tool_call_payload(
+        tool_call: "ChatCompletionMessageToolCallUnion",
+    ) -> tuple[str, str] | None:
+        """Return `(name, arguments_json)` for function-style tool calls only."""
+        if tool_call.type == "function":
+            return tool_call.function.name, tool_call.function.arguments
+
+        function = getattr(tool_call, "function", None)
+        name = getattr(function, "name", None)
+        arguments = getattr(function, "arguments", None)
+        if isinstance(name, str) and isinstance(arguments, str):
+            return name, arguments
+
+        return None
+
+    @staticmethod
     @traced
     def get_response(
         conversation: "Conversation",
@@ -388,18 +408,23 @@ class LLMService:
                 function_calls = []
                 if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
                     for tool_call in choice.message.tool_calls:
+                        payload = LLMService._get_function_tool_call_payload(tool_call)
+                        if payload is None:
+                            continue
+
+                        function_name, function_arguments = payload
                         try:
-                            arguments = json.loads(tool_call.function.arguments)
+                            arguments = json.loads(function_arguments)
                             function_calls.append(
                                 FunctionCall(
                                     id=tool_call.id,
-                                    name=tool_call.function.name,
+                                    name=function_name,
                                     arguments=arguments,
                                 )
                             )
                         except json.JSONDecodeError as e:
                             logger.error(
-                                f"Failed to parse function arguments: {tool_call.function.arguments}, error: {e}"
+                                f"Failed to parse function arguments: {function_arguments}, error: {e}"
                             )
 
                 # Determine finish reason
@@ -865,13 +890,16 @@ class LLMService:
         set_span_attributes(request_attrs)
 
         # Make streaming API call with tools
-        stream = client.chat.completions.create(
-            model=llm_config.model_name,
-            messages=messages,  # type: ignore
-            temperature=llm_config.temperature,
-            max_completion_tokens=llm_config.max_completion_tokens,
-            stream=True,  # Enable streaming
-            tools=tools,  # type: ignore
+        stream = cast(
+            Iterator["ChatCompletionChunk"],
+            client.chat.completions.create(
+                model=llm_config.model_name,
+                messages=messages,  # type: ignore
+                temperature=llm_config.temperature,
+                max_completion_tokens=llm_config.max_completion_tokens,
+                stream=True,  # Enable streaming
+                tools=tools,  # type: ignore
+            ),
         )
 
         # Stream tokens and capture finish reason and tool calls

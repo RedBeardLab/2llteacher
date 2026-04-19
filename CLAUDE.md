@@ -10,18 +10,18 @@ This document contains key information about the LLTeacher v2 project to help wi
 
 ## Running Tests
 
-Use the optimized test runner with uv:
+Use the canonical test command with uv:
 
 ```bash
-uv run python run_tests.py --settings=src.llteacher.test_settings <app_path>.<test_module>
+uv run coverage run manage.py test --settings=src.llteacher.test_settings src
 ```
 
 Example:
 ```bash
-uv run python run_tests.py --settings=src.llteacher.test_settings apps.homeworks.tests.test_section_detail_view
+uv run coverage run manage.py test --settings=src.llteacher.test_settings src
 ```
 
-The test runner uses the test settings module located at `src.llteacher.test_settings` which provides optimized test settings including an in-memory database for faster tests.
+The test command uses the test settings module located at `src.llteacher.test_settings`, which provides optimized test settings including an in-memory database for faster tests.
 
 To run the code in testing mode we can use `--settings=src.llteacher.settings` instead.
 

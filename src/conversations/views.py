@@ -108,9 +108,9 @@ class ConversationDetailData:
     messages: List[MessageViewData]
     can_submit: bool
     is_teacher_test: bool
-    paste_events: List[PasteEventViewData] = None
-    rapid_text_growth_events: List[RapidTextGrowthEventViewData] = None
-    user_id: UUID = None
+    paste_events: List[PasteEventViewData] | None = None
+    rapid_text_growth_events: List[RapidTextGrowthEventViewData] | None = None
+    user_id: UUID | None = None
 
 
 @dataclass
@@ -154,6 +154,9 @@ class MessageProcessingMixin:
             return None, "Message content is required."
 
         # Create processing request
+        if not request.user.is_authenticated:
+            return None, "Authentication required."
+
         processing_request = MessageProcessingRequest(
             conversation_id=conversation_id,
             user=request.user,
@@ -813,7 +816,7 @@ class SectionAnswerSubmitView(View):
             )
 
         SectionAnswer.objects.create(
-            user=request.user, section=section, answer=answer_text
+            user=student_profile.user, section=section, answer=answer_text
         )
 
         next_section = (
