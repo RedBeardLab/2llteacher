@@ -408,9 +408,7 @@ class LLMService:
                 function_calls = []
                 if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
                     for tool_call in choice.message.tool_calls:
-                        payload = LLMService._get_function_tool_call_payload(
-                            tool_call
-                        )
+                        payload = LLMService._get_function_tool_call_payload(tool_call)
                         if payload is None:
                             continue
 

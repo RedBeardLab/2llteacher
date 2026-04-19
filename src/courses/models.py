@@ -18,8 +18,12 @@ class Course(models.Model):
     teachers: "models.ManyToManyField[Teacher, CourseTeacher]" = models.ManyToManyField(
         "accounts.Teacher", through="CourseTeacher", related_name="courses"
     )
-    students: "models.ManyToManyField[Student, CourseEnrollment]" = models.ManyToManyField(
-        "accounts.Student", through="CourseEnrollment", related_name="enrolled_courses"
+    students: "models.ManyToManyField[Student, CourseEnrollment]" = (
+        models.ManyToManyField(
+            "accounts.Student",
+            through="CourseEnrollment",
+            related_name="enrolled_courses",
+        )
     )
     teacher_assistants: "models.ManyToManyField[TeacherAssistant, CourseTeacherAssistant]" = models.ManyToManyField(
         "accounts.TeacherAssistant",

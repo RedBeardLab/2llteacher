@@ -158,8 +158,10 @@ class HomeworkListView(View):
                     homework_dict[hw.id] = HomeworkListEntry(homework=hw, roles=[])
                 homework_dict[hw.id].roles.append("student")
                 # Calculate progress for student view
-                homework_dict[hw.id].progress = (
-                    HomeworkService.get_student_homework_progress(student_profile, hw)
+                homework_dict[
+                    hw.id
+                ].progress = HomeworkService.get_student_homework_progress(
+                    student_profile, hw
                 )
 
         # Add TA homeworks
