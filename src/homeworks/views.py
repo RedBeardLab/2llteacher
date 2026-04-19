@@ -22,7 +22,6 @@ import logging
 
 from django.utils import timezone
 from django.contrib import messages
-import csv
 
 from llteacher.permissions.decorators import teacher_required, TeacherRequest
 
