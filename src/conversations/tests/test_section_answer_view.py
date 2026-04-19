@@ -201,14 +201,23 @@ class SectionAnswerDetailViewTests(TestCase):
         )
         self.student = Student.objects.create(user=self.student_user)
 
-        self.course = Course.objects.create(name="Test Course", code="TC101", description="")
+        self.course = Course.objects.create(
+            name="Test Course", code="TC101", description=""
+        )
         self.course.students.add(self.student)
 
         from courses.models import CourseTeacher
-        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
 
-        self.other_course = Course.objects.create(name="Other Course", code="OC101", description="")
-        CourseTeacher.objects.create(course=self.other_course, teacher=self.other_teacher, role="owner")
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+
+        self.other_course = Course.objects.create(
+            name="Other Course", code="OC101", description=""
+        )
+        CourseTeacher.objects.create(
+            course=self.other_course, teacher=self.other_teacher, role="owner"
+        )
 
         self.homework = Homework.objects.create(
             title="HW1",
@@ -253,8 +262,12 @@ class SectionAnswerDetailViewTests(TestCase):
         self.assertIn("/accounts/login/", response.url)
 
     def test_shows_all_answers_newest_first(self):
-        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="First answer")
-        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="Second answer")
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="First answer"
+        )
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="Second answer"
+        )
 
         self.client.login(username="teacher", password="pass")
         response = self.client.get(self.url)
