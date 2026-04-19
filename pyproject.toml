@@ -6,7 +6,7 @@ authors = [{ name = "LLTeacher Team", email = "team@llteacher.com" }]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "django>=5.2.4",
+    "django>=5.2.13",
     "gunicorn",
     "python-dotenv",
     "python-json-logger",
