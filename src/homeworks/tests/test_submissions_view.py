@@ -629,8 +629,12 @@ class HomeworkSubmissionsNonInteractiveServiceTest(TestCase):
     def test_non_interactive_section_with_answers(self):
         from conversations.models import SectionAnswer
 
-        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="First answer")
-        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="Second answer")
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="First answer"
+        )
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="Second answer"
+        )
 
         result = HomeworkService.get_homework_submissions(self.homework.id)
 
@@ -659,14 +663,18 @@ class HomeworkSubmissionsNonInteractiveServiceTest(TestCase):
     def test_non_interactive_section_counts_toward_participation(self):
         from conversations.models import SectionAnswer
 
-        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="My answer")
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="My answer"
+        )
 
         result = HomeworkService.get_homework_submissions(self.homework.id)
 
         self.assertIsNotNone(result)
         student_summary = result.students[0]
         self.assertTrue(student_summary.has_interactions)
-        self.assertEqual(student_summary.participation_status, ParticipationStatus.ACTIVE)
+        self.assertEqual(
+            student_summary.participation_status, ParticipationStatus.ACTIVE
+        )
 
 
 class HomeworkSubmissionsNonInteractiveViewTest(TestCase):
@@ -689,7 +697,10 @@ class HomeworkSubmissionsNonInteractiveViewTest(TestCase):
         CourseEnrollment.objects.create(course=self.course, student=self.student)
 
         from courses.models import CourseTeacher
-        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
+
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
 
         self.homework = Homework.objects.create(
             title="HW",
@@ -710,8 +721,12 @@ class HomeworkSubmissionsNonInteractiveViewTest(TestCase):
     def test_submissions_view_shows_non_interactive_answer_count(self):
         from conversations.models import SectionAnswer
 
-        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="Four")
-        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="4")
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="Four"
+        )
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="4"
+        )
 
         self.client.login(username="teacher", password="pass")
         url = reverse("homeworks:submissions", kwargs={"homework_id": self.homework.id})
@@ -723,7 +738,9 @@ class HomeworkSubmissionsNonInteractiveViewTest(TestCase):
     def test_submissions_view_shows_view_all_answers_link(self):
         from conversations.models import SectionAnswer
 
-        SectionAnswer.objects.create(user=self.student_user, section=self.ni_section, answer="Four")
+        SectionAnswer.objects.create(
+            user=self.student_user, section=self.ni_section, answer="Four"
+        )
 
         self.client.login(username="teacher", password="pass")
         url = reverse("homeworks:submissions", kwargs={"homework_id": self.homework.id})

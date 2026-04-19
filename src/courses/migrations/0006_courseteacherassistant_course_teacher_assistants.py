@@ -6,30 +6,52 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0003_teacherassistant'),
-        ('courses', '0005_remove_course_homeworks_delete_coursehomework'),
+        ("accounts", "0003_teacherassistant"),
+        ("courses", "0005_remove_course_homeworks_delete_coursehomework"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CourseTeacherAssistant',
+            name="CourseTeacherAssistant",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('assigned_at', models.DateTimeField(auto_now_add=True)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='courses.course')),
-                ('teacher_assistant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='accounts.teacherassistant')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("assigned_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="courses.course"
+                    ),
+                ),
+                (
+                    "teacher_assistant",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="accounts.teacherassistant",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'courses_course_teacher_assistant',
-                'ordering': ['assigned_at'],
-                'unique_together': {('course', 'teacher_assistant')},
+                "db_table": "courses_course_teacher_assistant",
+                "ordering": ["assigned_at"],
+                "unique_together": {("course", "teacher_assistant")},
             },
         ),
         migrations.AddField(
-            model_name='course',
-            name='teacher_assistants',
-            field=models.ManyToManyField(related_name='courses', through='courses.CourseTeacherAssistant', to='accounts.teacherassistant'),
+            model_name="course",
+            name="teacher_assistants",
+            field=models.ManyToManyField(
+                related_name="courses",
+                through="courses.CourseTeacherAssistant",
+                to="accounts.teacherassistant",
+            ),
         ),
     ]

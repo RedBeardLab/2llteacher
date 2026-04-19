@@ -254,8 +254,12 @@ class SectionDetailViewNonInteractiveTestCase(TestCase):
         self.course = Course.objects.create(
             name="Course", code="C101", description="", is_active=True
         )
-        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
-        CourseEnrollment.objects.create(course=self.course, student=self.student, is_active=True)
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student, is_active=True
+        )
 
         self.homework = Homework.objects.create(
             title="HW",

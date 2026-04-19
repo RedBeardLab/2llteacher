@@ -822,9 +822,7 @@ class HomeworkService:
                     )
 
                 total_homeworks = len(homeworks)
-                total_sections_all_homeworks = sum(
-                    hw.section_count for hw in homeworks
-                )
+                total_sections_all_homeworks = sum(hw.section_count for hw in homeworks)
                 overall_completion = (
                     round(
                         (student_total_submissions / total_sections_all_homeworks) * 100
@@ -1043,7 +1041,12 @@ class HomeworkService:
         """
         from .models import Homework, Section as SectionModel
         from accounts.models import Student
-        from conversations.models import Conversation, Submission, PasteEvent, SectionAnswer
+        from conversations.models import (
+            Conversation,
+            Submission,
+            PasteEvent,
+            SectionAnswer,
+        )
 
         try:
             # Get the homework with sections ordered by section order
@@ -1108,7 +1111,9 @@ class HomeworkService:
                 sp = getattr(ans.user, "student_profile", None)
                 if sp is None:
                     continue
-                student_answers_map.setdefault(sp.id, {}).setdefault(ans.section.id, []).append(ans)
+                student_answers_map.setdefault(sp.id, {}).setdefault(
+                    ans.section.id, []
+                ).append(ans)
 
             # Group conversations by student and section
             student_section_conversations_map: dict[
@@ -1154,18 +1159,28 @@ class HomeworkService:
                 last_activity = None
 
                 for section in homework_sections:
-                    if section.section_type == SectionModel.SECTION_TYPE_NON_INTERACTIVE:
+                    if (
+                        section.section_type
+                        == SectionModel.SECTION_TYPE_NON_INTERACTIVE
+                    ):
                         # Non-interactive section: use SectionAnswer instead of conversations
-                        section_ans = student_answers_map.get(student.id, {}).get(section.id, [])
+                        section_ans = student_answers_map.get(student.id, {}).get(
+                            section.id, []
+                        )
                         answer_count = len(section_ans)
                         has_answer = answer_count > 0
                         latest_answer = section_ans[0].answer if has_answer else None
-                        latest_answer_date = section_ans[0].submitted_at if has_answer else None
+                        latest_answer_date = (
+                            section_ans[0].submitted_at if has_answer else None
+                        )
 
                         if has_answer:
                             sections_started += 1
                             total_answers += 1
-                            if last_activity is None or latest_answer_date > last_activity:
+                            if (
+                                last_activity is None
+                                or latest_answer_date > last_activity
+                            ):
                                 last_activity = latest_answer_date
                         else:
                             missing_sections += 1
@@ -1187,7 +1202,9 @@ class HomeworkService:
                             )
                         )
                     else:
-                        section_conversations = student_conversations.get(section.id, [])
+                        section_conversations = student_conversations.get(
+                            section.id, []
+                        )
                         has_conversation = len(section_conversations) > 0
 
                         if not has_conversation:
@@ -1235,7 +1252,9 @@ class HomeworkService:
                                     submission_date=submission.submitted_at
                                     if submission
                                     else None,
-                                    paste_event_count=paste_event_count_map.get(conv.id, 0),
+                                    paste_event_count=paste_event_count_map.get(
+                                        conv.id, 0
+                                    ),
                                 )
                             )
 

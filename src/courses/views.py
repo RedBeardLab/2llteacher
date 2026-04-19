@@ -366,7 +366,11 @@ class CourseDetailView(View):
         ):
             user_roles.append(CourseRole.TEACHER_ASSISTANT)
 
-        if not course.is_active and CourseRole.TEACHER not in user_roles and CourseRole.TEACHER_ASSISTANT not in user_roles:
+        if (
+            not course.is_active
+            and CourseRole.TEACHER not in user_roles
+            and CourseRole.TEACHER_ASSISTANT not in user_roles
+        ):
             raise Http404
 
         # Get the appropriate data based on user roles
@@ -428,7 +432,9 @@ class CourseDetailView(View):
                 )
             )
 
-        is_enrolled = student_profile is not None and course.is_student_enrolled(student_profile)
+        is_enrolled = student_profile is not None and course.is_student_enrolled(
+            student_profile
+        )
 
         enrolled_students = None
         if (
