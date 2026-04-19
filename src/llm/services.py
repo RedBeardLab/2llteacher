@@ -246,10 +246,16 @@ class LLMService:
         tool_call: "ChatCompletionMessageToolCallUnion",
     ) -> tuple[str, str] | None:
         """Return `(name, arguments_json)` for function-style tool calls only."""
-        if tool_call.type != "function":
-            return None
+        if tool_call.type == "function":
+            return tool_call.function.name, tool_call.function.arguments
 
-        return tool_call.function.name, tool_call.function.arguments
+        function = getattr(tool_call, "function", None)
+        name = getattr(function, "name", None)
+        arguments = getattr(function, "arguments", None)
+        if isinstance(name, str) and isinstance(arguments, str):
+            return name, arguments
+
+        return None
 
     @staticmethod
     @traced

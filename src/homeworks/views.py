@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Any, assert_type
+from typing import TYPE_CHECKING, Dict, Any, assert_type, cast
 from uuid import UUID
 from django.forms import formset_factory
 
@@ -399,8 +399,9 @@ class HomeworkEditView(View):
             initial_section_data.append(section_data)
 
         # Create section formset with initial data
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(
             prefix="sections", initial=initial_section_data
@@ -424,8 +425,9 @@ class HomeworkEditView(View):
         form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
-        SectionFormset: type[SectionFormSet] = formset_factory(
-            SectionForm, extra=0, formset=SectionFormSet
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(request.POST, prefix="sections")
         assert_type(section_formset, SectionFormSet)
@@ -1134,11 +1136,14 @@ class NonInteractiveSectionAnswerView(View):
         ):
             return HttpResponseForbidden("You are not enrolled in this course.")
 
-        answers = list(
-            SectionAnswer.objects.filter(section=section, user=request.user)
+        answers: list[dict[str, Any]] = [
+            {"answer": answer["answer"], "submitted_at": answer["submitted_at"]}
+            for answer in SectionAnswer.objects.filter(
+                section=section, user=student_profile.user
+            )
             .order_by("-submitted_at")
             .values("answer", "submitted_at")
-        )
+        ]
 
         return NonInteractiveSectionData(
             homework_id=homework.id,

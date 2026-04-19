@@ -14,8 +14,7 @@ The application includes optimized test settings that provide significant perfor
 
 ### Using UV
 ```bash
-uv run python run_tests.py src 
-uv run python manage.py test --settings=src.llteacher.test_settings src 
+uv run coverage run manage.py test --settings=src.llteacher.test_settings src
 ```
 
 ## Test Configuration
