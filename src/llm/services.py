@@ -16,6 +16,7 @@ from enum import StrEnum
 
 # Handle imports for type checking
 if TYPE_CHECKING:
+    from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
     from conversations.models import Conversation
     from .models import LLMConfig
 
@@ -388,6 +389,8 @@ class LLMService:
                 function_calls = []
                 if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
                     for tool_call in choice.message.tool_calls:
+                        if not hasattr(tool_call, "function"):
+                            continue
                         try:
                             arguments = json.loads(tool_call.function.arguments)
                             function_calls.append(
@@ -881,6 +884,8 @@ class LLMService:
         tool_calls_accumulator = {}  # Accumulate tool call deltas by index
 
         for chunk in stream:
+            if not isinstance(chunk, ChatCompletionChunk):
+                continue
             if chunk.choices and len(chunk.choices) > 0:
                 choice = chunk.choices[0]
 
