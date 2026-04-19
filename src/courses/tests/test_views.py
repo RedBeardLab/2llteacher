@@ -850,8 +850,8 @@ class CourseDetailViewTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_teacher_cannot_view_course_they_dont_teach(self):
-        """Test that teachers cannot view courses they don't teach."""
+    def test_teacher_can_view_course_they_dont_teach(self):
+        """Test that teachers can view courses they don't teach."""
         # Create another teacher
         other_teacher_user = User.objects.create_user(
             username="otherteacher",
@@ -866,7 +866,7 @@ class CourseDetailViewTests(TestCase):
             reverse("courses:detail", kwargs={"course_id": self.course.id})
         )
 
-        # Should return 200 - teachers can view any course now
+        # Should return 200 - teachers can view any course
         self.assertEqual(response.status_code, 200)
 
     def test_course_detail_requires_login(self):
