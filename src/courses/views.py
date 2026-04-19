@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, cast
 from uuid import UUID
 from django.views import View
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
@@ -568,7 +568,10 @@ class CourseHomeworkCreateView(View):
 
         form = HomeworkCreateForm(initial={"course": course}, course=course)
 
-        SectionFormset = formset_factory(SectionForm, extra=1, formset=SectionFormSet)
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=1, formset=SectionFormSet),
+        )
         section_formset = SectionFormset(prefix="sections")
 
         return HomeworkFormData(
@@ -594,12 +597,15 @@ class CourseHomeworkCreateView(View):
 
         # Create a mutable copy of POST data and inject course
         post_data = request.POST.copy()
-        post_data["course"] = course.id
+        post_data["course"] = str(course.id)
 
         # Create forms from POST data
         form = HomeworkCreateForm(post_data)
 
-        SectionFormset = formset_factory(SectionForm, extra=0, formset=SectionFormSet)
+        SectionFormset = cast(
+            type[SectionFormSet],
+            formset_factory(SectionForm, extra=0, formset=SectionFormSet),
+        )
         section_formset = SectionFormset(request.POST, prefix="sections")
 
         # Check form validity
