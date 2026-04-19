@@ -111,7 +111,9 @@ class HomeworkMatrixViewTest(TestCase):
         )
 
         # Matrix URL
-        self.matrix_url = reverse("courses:matrix", kwargs={"course_id": self.course.id})
+        self.matrix_url = reverse(
+            "courses:matrix", kwargs={"course_id": self.course.id}
+        )
 
     def test_matrix_view_requires_login(self):
         """Test that matrix view requires authentication."""

@@ -148,7 +148,9 @@ class Command(BaseCommand):
         for student in students[:2]:  # Only first 2 students enrolled
             CourseEnrollment.objects.create(course=course2, student=student)
 
-        self.stdout.write("  ✓ Created 2 courses with teacher assignments and enrollments")
+        self.stdout.write(
+            "  ✓ Created 2 courses with teacher assignments and enrollments"
+        )
         return [course1, course2]
 
     def create_llm_configs(self, courses):

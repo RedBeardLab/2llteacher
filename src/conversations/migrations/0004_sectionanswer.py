@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("conversations", "0003_rapidtextgrowthevent"),
         ("homeworks", "0005_section_section_type"),

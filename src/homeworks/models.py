@@ -35,7 +35,9 @@ class Homework(models.Model):
         if self.llm_config_id and self.course_id:
             if self.llm_config.course_id != self.course_id:
                 raise ValidationError(
-                    {"llm_config": "LLM config must belong to the same course as this homework."}
+                    {
+                        "llm_config": "LLM config must belong to the same course as this homework."
+                    }
                 )
 
     @property
