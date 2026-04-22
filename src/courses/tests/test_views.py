@@ -830,6 +830,39 @@ class CourseDetailViewTests(TestCase):
         self.assertIsNotNone(data.instructors)
         self.assertEqual(len(data.instructors), 1)
 
+    def test_unenrolled_student_can_see_course_details(self):
+        """
+        Test that unenrolled students can see the full course page with
+        description, instructors, and enroll button.
+
+        This verifies the fix for the issue:
+        'Allow students to see course that they are not enrolled in'
+        """
+        self.client.login(username="otherstudent", password="password123")
+
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+
+        # Student should get 200, not an error
+        self.assertEqual(response.status_code, 200)
+
+        # Should see the course name
+        self.assertIn(b"Test Course", response.content)
+
+        # Should see the course code
+        self.assertIn(b"TEST101", response.content)
+
+        # Should see instructors section
+        self.assertIn(b"Instructors", response.content)
+
+        # Should see the enroll button
+        self.assertIn(b"Enroll Now", response.content)
+
+        # Should NOT see the homework list (since not enrolled)
+        self.assertNotIn(b"Homework 1", response.content)
+        self.assertNotIn(b"Homework 2", response.content)
+
     def test_student_gets_404_for_inactive_course(self):
         """Test that unenrolled students get 404 for inactive courses."""
         inactive_course = Course.objects.create(
