@@ -987,7 +987,14 @@ class CourseHomeworkCreateViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "courses/homework_form.html")
+        self.assertTemplateUsed(response, "homeworks/form.html")
+        self.assertContains(response, "Create Homework")
+        self.assertContains(response, self.course.name)
+        self.assertContains(
+            response, reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        self.assertContains(response, 'id="id_sections-0-section_type"', html=False)
+        self.assertContains(response, "Add Another Section")
 
     def test_get_homework_create_form_llm_config_filtered_by_course(self):
         """Test that the homework create form's LLM config field is filtered by course."""
@@ -1116,6 +1123,11 @@ class CourseHomeworkCreateViewTests(TestCase):
 
         # Should not redirect (form has errors)
         self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "homeworks/form.html")
+        self.assertContains(response, self.course.name)
+        self.assertContains(
+            response, reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
 
         # Check that no homework was created
         from homeworks.models import Homework
@@ -1156,6 +1168,7 @@ class CourseHomeworkCreateViewTests(TestCase):
 
         # Should not redirect (form has errors)
         self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "homeworks/form.html")
 
         # Check that no homework was created
         from homeworks.models import Homework

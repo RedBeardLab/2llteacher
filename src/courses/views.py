@@ -534,7 +534,7 @@ class CourseHomeworkCreateView(View):
             )
 
         data = self._get_view_data(request, course)
-        return render(request, "courses/homework_form.html", {"data": data})
+        return render(request, "homeworks/form.html", {"data": data})
 
     def post(self, request: TeacherRequest, course_id: UUID) -> HttpResponse:
         """Handle POST requests to process the form submission."""
@@ -552,7 +552,7 @@ class CourseHomeworkCreateView(View):
             messages.success(request, "Homework created successfully!")
             return redirect("courses:detail", course_id=course.id)
 
-        return render(request, "courses/homework_form.html", {"data": data})
+        return render(request, "homeworks/form.html", {"data": data})
 
     def _can_teacher_create_homework(self, teacher_profile, course: Course) -> bool:
         """Check if teacher can create homework for this course."""
