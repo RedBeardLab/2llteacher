@@ -327,7 +327,8 @@ class CourseDetailView(View):
     View for viewing course details.
 
     For teachers: Shows course info, homeworks, and enrolled students
-    For students: Shows course info and homeworks (only if enrolled)
+    For students: Shows course info, description, instructors, and enroll button
+                  (homeworks only if enrolled)
     """
 
     @method_decorator(login_required, name="dispatch")
