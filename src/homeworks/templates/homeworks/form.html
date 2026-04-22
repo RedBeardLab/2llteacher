@@ -28,16 +28,38 @@
 
 {% block content %}
 <div class="container mt-4">
+  {% if data.action == 'create' and data.course_id %}
+  <div class="row mb-2">
+    <div class="col">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'courses:list' %}">Courses</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'courses:detail' data.course_id %}">{{ data.course_name }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Create Homework</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+  {% endif %}
   <div class="row mb-4">
     <div class="col">
       <h1>
         {% if data.action == 'create' %}Create New Homework{% else %}Edit Homework{% endif %}
       </h1>
+      {% if data.action == 'create' and data.course_name %}
+      <p class="text-muted">for {{ data.course_name }}</p>
+      {% endif %}
     </div>
     <div class="col-auto">
+      {% if data.action == 'create' and data.course_id %}
+      <a href="{% url 'courses:detail' data.course_id %}" class="btn btn-outline-secondary">
+        <i class="bi bi-x-circle"></i> Cancel
+      </a>
+      {% else %}
       <a href="{% url 'homeworks:list' %}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back to List
       </a>
+      {% endif %}
     </div>
   </div>
 
