@@ -56,11 +56,13 @@ class SectionCreateData:
 @dataclass
 class HomeworkCreateData:
     title: str
-    description: str
-    due_date: Any  # datetime
     sections: list[SectionCreateData]
     course_id: UUID  # Required - every homework belongs to a course
+    due_date: datetime
+    description: str = ""
     llm_config: UUID | None = None
+    homework_type: str = "published"
+    publish_at: datetime | None = None
 
 
 @dataclass
@@ -108,7 +110,7 @@ class HomeworkDetailData:
     id: UUID
     title: str
     description: str
-    due_date: datetime
+    due_date: datetime | None
     created_by: UUID
     created_at: datetime
     updated_at: datetime
@@ -122,11 +124,13 @@ class HomeworkUpdateData:
 
     title: str | None = None
     description: str | None = None
-    due_date: Any | None = None  # datetime
+    due_date: datetime | None = None
     llm_config: UUID | None = None
     sections_to_update: list[Any] | None = None  # Will be defined with proper type
     sections_to_create: list[SectionCreateData] | None = None
     sections_to_delete: list[UUID] | None = None
+    homework_type: str | None = None
+    publish_at: datetime | None = None
 
 
 @dataclass
@@ -204,7 +208,7 @@ class HomeworkSubmissionsData:
 
     homework_id: UUID
     homework_title: str
-    homework_due_date: datetime
+    homework_due_date: datetime | None
     total_sections: int
     students: list[StudentSubmissionSummary]
     total_students: int
@@ -302,7 +306,8 @@ class HomeworkService:
 
         try:
             with transaction.atomic():
-                # Create homework
+                # Create homework — draft type implies is_hidden=True
+                is_draft = data.homework_type == "draft"
                 homework = Homework.objects.create(
                     title=data.title,
                     description=data.description,
@@ -310,6 +315,9 @@ class HomeworkService:
                     created_by=teacher,
                     course_id=data.course_id,
                     llm_config_id=data.llm_config,
+                    homework_type=data.homework_type,
+                    publish_at=data.publish_at,
+                    is_hidden=is_draft,
                 )
 
                 # Create sections
@@ -346,6 +354,58 @@ class HomeworkService:
                 success=False,
                 error=str(e),
             )
+
+    @staticmethod
+    def publish_homework(homework_id: UUID) -> "HomeworkUpdateResult":
+        """Immediately publish a draft homework.
+
+        Sets is_hidden=False, homework_type='published', publish_at=None.
+        is_hidden is the access-control source of truth.
+        """
+        from .models import Homework, HomeworkType
+
+        try:
+            homework = Homework.objects.get(id=homework_id)
+            homework.is_hidden = False
+            homework.homework_type = HomeworkType.PUBLISHED
+            homework.publish_at = None
+            homework.save(
+                update_fields=["is_hidden", "homework_type", "publish_at", "updated_at"]
+            )
+            return HomeworkUpdateResult(success=True, homework_id=homework_id)
+        except Homework.DoesNotExist:
+            return HomeworkUpdateResult(success=False, error="Homework not found")
+        except Exception as e:
+            record_exception(e)
+            return HomeworkUpdateResult(success=False, error=str(e))
+
+    @staticmethod
+    def auto_publish_due_drafts() -> int:
+        """Bulk-publish all drafts whose publish_at has passed.
+
+        Updates is_hidden=False, homework_type='published', publish_at=None.
+        Returns the count of homeworks published.
+        Called lazily on page load — no background worker required.
+        """
+        from django.utils import timezone
+        from .models import Homework, HomeworkType
+
+        try:
+            count = Homework.objects.filter(
+                homework_type=HomeworkType.DRAFT,
+                publish_at__lte=timezone.now(),
+            ).update(
+                is_hidden=False,
+                homework_type=HomeworkType.PUBLISHED,
+                publish_at=None,
+            )
+            if count:
+                logger.info("Auto-published %d draft homework(s)", count)
+            return count
+        except Exception as e:
+            record_exception(e)
+            logger.error("auto_publish_due_drafts failed: %s", e)
+            return 0
 
     @staticmethod
     @traced

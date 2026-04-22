@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Optional, cast
+from typing import TYPE_CHECKING, Any, List, Optional, cast
 from uuid import UUID
 from django.views import View
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
@@ -284,6 +284,13 @@ class HomeworkItem:
     title: str
     description: str
     due_date: str  # Formatted due date
+    is_draft: bool = False
+    is_overdue: bool = False
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
+    expires_at: Any = None
+    publish_at: Any = None
+    section_count: int = 0
 
 
 @dataclass
@@ -407,17 +414,34 @@ class CourseDetailView(View):
             CourseDetailData with course info, homeworks, and optionally students/TAs
         """
         from homeworks.models import Homework
+        from homeworks.services import HomeworkService
 
-        course_homeworks = Homework.objects.filter(course=course).order_by("due_date")
+        # Auto-publish any scheduled drafts before building the list
+        try:
+            HomeworkService.auto_publish_due_drafts()
+        except Exception:
+            pass
+
+        is_student_view = CourseRole.STUDENT in user_roles and CourseRole.TEACHER not in user_roles and CourseRole.TEACHER_ASSISTANT not in user_roles
+        hw_qs = Homework.objects.filter(course=course).order_by("due_date")
+        if is_student_view:
+            hw_qs = hw_qs.filter(is_hidden=False)
 
         homeworks = []
-        for hw in course_homeworks:
+        for hw in hw_qs:
             homeworks.append(
                 HomeworkItem(
                     id=hw.id,
                     title=hw.title,
                     description=hw.description,
                     due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p"),
+                    is_draft=hw.is_draft,
+                    is_overdue=hw.is_overdue,
+                    is_hidden=hw.is_hidden,
+                    is_accessible_to_students=hw.is_accessible_to_students,
+                    expires_at=hw.expires_at,
+                    publish_at=hw.publish_at,
+                    section_count=hw.section_count,
                 )
             )
 
@@ -495,17 +519,7 @@ class CourseDetailView(View):
         )
 
 
-@dataclass
-class HomeworkFormData:
-    """Data structure for homework form view."""
-
-    form: "HomeworkCreateForm"
-    section_forms: "SectionFormSet"
-    course_name: str
-    course_id: UUID
-    action: str  # 'create'
-    is_submitted: bool
-    available_llm_configs: Optional[List[dict]] = None
+from homeworks.views import HomeworkFormData  # noqa: E402
 
 
 class CourseHomeworkCreateView(View):
@@ -577,6 +591,7 @@ class CourseHomeworkCreateView(View):
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
+            user_type="teacher",
             course_name=course.name,
             course_id=course.id,
             action="create",
@@ -654,6 +669,7 @@ class CourseHomeworkCreateView(View):
                 return HomeworkFormData(
                     form=form,
                     section_forms=section_formset,
+                    user_type="teacher",
                     course_name=course.name,
                     course_id=course.id,
                     action="create",
@@ -666,6 +682,7 @@ class CourseHomeworkCreateView(View):
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
+            user_type="teacher",
             course_name=course.name,
             course_id=course.id,
             action="create",
