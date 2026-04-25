@@ -296,8 +296,8 @@
     </div>
 
     <!-- Submit Buttons -->
-    <div class="d-flex justify-content-end gap-2">
-      <button type="submit" name="save_draft" class="btn btn-outline-secondary" formnovalidate>
+    <div class="d-flex justify-content-end gap-2 align-items-center flex-wrap">
+      <button type="submit" name="save_draft" id="save-draft-button" class="btn btn-outline-secondary" formnovalidate>
         <i class="bi bi-file-earmark"></i> Save as Draft
       </button>
       <button type="submit" name="publish" class="btn btn-primary">
@@ -320,19 +320,20 @@
     const addSectionBtn = document.getElementById('add-section');
     const publishNowToggle = document.getElementById('publish-now-toggle');
     const publishAtWrapper = document.getElementById('publish-at-wrapper');
+    const publishAtInput = publishAtWrapper.querySelector('input');
 
-    // Show/hide publish_at based on toggle
-    function updatePublishAtVisibility() {
+    function updatePublishingControls() {
       if (publishNowToggle.checked) {
         publishAtWrapper.style.opacity = '0.4';
-        publishAtWrapper.querySelector('input').disabled = true;
+        publishAtInput.disabled = true;
       } else {
         publishAtWrapper.style.opacity = '1';
-        publishAtWrapper.querySelector('input').disabled = false;
+        publishAtInput.disabled = false;
       }
     }
-    publishNowToggle.addEventListener('change', updatePublishAtVisibility);
-    updatePublishAtVisibility();
+    publishNowToggle.addEventListener('change', updatePublishingControls);
+    publishAtInput.addEventListener('input', updatePublishingControls);
+    updatePublishingControls();
 
     // Add section button
     addSectionBtn.addEventListener('click', function() {

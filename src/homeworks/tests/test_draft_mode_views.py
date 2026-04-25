@@ -6,8 +6,8 @@ Covers:
 - Teacher sees draft homework in both views with correct flags
 - save_draft POST on edit bypasses validation and marks homework as draft
 - publish_now action on detail page publishes the homework
-- auto_publish_due_drafts is called on every homework list load
-- Scheduled draft stays hidden when publish_at is in the future
+- auto_publish_due_scheduled is called on every homework list load
+- Scheduled homework stays hidden when publish_at is in the future
 """
 
 from datetime import timedelta
@@ -112,13 +112,13 @@ class DraftHomeworkListTests(DraftViewsSetUpMixin):
 
     def test_auto_publish_called_on_student_list_load(self):
         self.client.login(username="student", password="pass")
-        with patch("homeworks.views.HomeworkService.auto_publish_due_drafts") as mock_ap:
+        with patch("homeworks.views.HomeworkService.auto_publish_due_scheduled") as mock_ap:
             self.client.get(reverse("homeworks:list"))
         mock_ap.assert_called_once()
 
     def test_auto_publish_called_on_teacher_list_load(self):
         self.client.login(username="teacher", password="pass")
-        with patch("homeworks.views.HomeworkService.auto_publish_due_drafts") as mock_ap:
+        with patch("homeworks.views.HomeworkService.auto_publish_due_scheduled") as mock_ap:
             self.client.get(reverse("homeworks:list"))
         mock_ap.assert_called_once()
 
@@ -225,6 +225,40 @@ class EditViewDraftSaveTests(DraftViewsSetUpMixin):
         self.assertTrue(self.draft.is_hidden)
         self.assertEqual(self.draft.homework_type, HomeworkType.DRAFT)
 
+    def test_save_draft_with_publish_at_keeps_homework_draft(self):
+        self.client.login(username="teacher", password="pass")
+        publish_at = timezone.now() + timedelta(days=2)
+        publish_at_value = publish_at.strftime("%Y-%m-%dT%H:%M")
+        data = {
+            "title": "T",
+            "description": "D",
+            "publish_at": publish_at_value,
+            "save_draft": "1",
+        }
+        self.client.post(self._edit_url(), data)
+        self.draft.refresh_from_db()
+        self.assertEqual(self.draft.homework_type, HomeworkType.DRAFT)
+        self.assertEqual(
+            timezone.localtime(self.draft.publish_at).strftime("%Y-%m-%dT%H:%M"),
+            publish_at_value,
+        )
+
+    def test_save_draft_with_publish_now_clears_publish_at(self):
+        self.client.login(username="teacher", password="pass")
+        self.draft.homework_type = HomeworkType.SCHEDULED
+        self.draft.publish_at = timezone.now() + timedelta(days=2)
+        self.draft.save(update_fields=["homework_type", "publish_at"])
+        data = {
+            "title": "T",
+            "description": "D",
+            "publish_now": "on",
+            "save_draft": "1",
+        }
+        self.client.post(self._edit_url(), data)
+        self.draft.refresh_from_db()
+        self.assertEqual(self.draft.homework_type, HomeworkType.DRAFT)
+        self.assertIsNone(self.draft.publish_at)
+
     def test_save_draft_bypasses_section_validation(self):
         """save_draft with no sections should succeed (no 400/form error)."""
         self.client.login(username="teacher", password="pass")
@@ -235,25 +269,27 @@ class EditViewDraftSaveTests(DraftViewsSetUpMixin):
 
 
 # ---------------------------------------------------------------------------
-# Scheduled draft stays hidden
+# Scheduled homework stays hidden
 # ---------------------------------------------------------------------------
 
-class ScheduledDraftTests(DraftViewsSetUpMixin):
+class ScheduledHomeworkTests(DraftViewsSetUpMixin):
 
-    def test_scheduled_draft_not_visible_to_student_before_publish_at(self):
-        """A draft with publish_at in the future must not appear in student list."""
+    def test_scheduled_homework_not_visible_to_student_before_publish_at(self):
+        """Scheduled homework with publish_at in the future is hidden from students."""
+        self.draft.homework_type = HomeworkType.SCHEDULED
         self.draft.publish_at = timezone.now() + timedelta(hours=2)
-        self.draft.save(update_fields=["publish_at"])
+        self.draft.save(update_fields=["homework_type", "publish_at"])
 
         self.client.login(username="student", password="pass")
         response = self.client.get(reverse("homeworks:list"))
         hw_ids = [str(hw.id) for hw in response.context["data"].homeworks]
         self.assertNotIn(str(self.draft.id), hw_ids)
 
-    def test_auto_publish_publishes_past_draft_on_list_load(self):
-        """A draft with publish_at in the past becomes published on list load."""
+    def test_auto_publish_publishes_past_scheduled_homework_on_list_load(self):
+        """Scheduled homework with publish_at in the past becomes published on list load."""
+        self.draft.homework_type = HomeworkType.SCHEDULED
         self.draft.publish_at = timezone.now() - timedelta(seconds=5)
-        self.draft.save(update_fields=["publish_at"])
+        self.draft.save(update_fields=["homework_type", "publish_at"])
 
         self.client.login(username="teacher", password="pass")
         self.client.get(reverse("homeworks:list"))
@@ -261,3 +297,15 @@ class ScheduledDraftTests(DraftViewsSetUpMixin):
         self.draft.refresh_from_db()
         self.assertFalse(self.draft.is_hidden)
         self.assertEqual(self.draft.homework_type, HomeworkType.PUBLISHED)
+
+    def test_auto_publish_does_not_publish_plain_draft_with_past_publish_at(self):
+        """Plain drafts do not auto-publish even if publish_at is in the past."""
+        self.draft.publish_at = timezone.now() - timedelta(seconds=5)
+        self.draft.save(update_fields=["publish_at"])
+
+        self.client.login(username="teacher", password="pass")
+        self.client.get(reverse("homeworks:list"))
+
+        self.draft.refresh_from_db()
+        self.assertTrue(self.draft.is_hidden)
+        self.assertEqual(self.draft.homework_type, HomeworkType.DRAFT)

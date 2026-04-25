@@ -63,6 +63,10 @@ class HomeworkDraftModelTests(TestCase):
         hw = self._make(homework_type=HomeworkType.PUBLISHED)
         self.assertFalse(hw.is_draft)
 
+    def test_is_draft_false_when_type_is_scheduled(self):
+        hw = self._make(homework_type=HomeworkType.SCHEDULED)
+        self.assertFalse(hw.is_draft)
+
     def test_is_draft_false_when_type_is_hidden(self):
         hw = self._make(homework_type=HomeworkType.HIDDEN)
         self.assertFalse(hw.is_draft)
@@ -130,14 +134,21 @@ class HomeworkDraftModelTests(TestCase):
 
     def test_should_auto_publish_false_when_publish_at_in_future(self):
         hw = self._make(
-            homework_type=HomeworkType.DRAFT,
+            homework_type=HomeworkType.SCHEDULED,
             publish_at=timezone.now() + timedelta(hours=1),
         )
         self.assertFalse(hw.should_auto_publish)
 
-    def test_should_auto_publish_true_when_publish_at_in_past(self):
+    def test_should_auto_publish_false_when_draft_publish_at_in_past(self):
         hw = self._make(
             homework_type=HomeworkType.DRAFT,
+            publish_at=timezone.now() - timedelta(seconds=1),
+        )
+        self.assertFalse(hw.should_auto_publish)
+
+    def test_should_auto_publish_true_when_scheduled_publish_at_in_past(self):
+        hw = self._make(
+            homework_type=HomeworkType.SCHEDULED,
             publish_at=timezone.now() - timedelta(seconds=1),
         )
         self.assertTrue(hw.should_auto_publish)

@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, assert_type, cast
 from uuid import UUID
 from django.views import View
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
@@ -413,9 +413,9 @@ class CourseDetailView(View):
         from homeworks.models import Homework
         from homeworks.services import HomeworkService
 
-        # Auto-publish any scheduled drafts before building the list
+        # Auto-publish any scheduled homework before building the list
         try:
-            HomeworkService.auto_publish_due_drafts()
+            HomeworkService.auto_publish_due_scheduled()
         except Exception:
             pass
 
@@ -614,23 +614,36 @@ class CourseHomeworkCreateView(View):
             HomeworkCreateData,
             SectionCreateData,
         )
+        from homeworks.models import HomeworkType
         from django.forms import formset_factory
+
+        is_draft_save = "save_draft" in request.POST
+        publish_now = "publish_now" in request.POST
 
         # Create a mutable copy of POST data and inject course
         post_data = request.POST.copy()
         post_data["course"] = str(course.id)
 
         # Create forms from POST data
-        form = HomeworkCreateForm(post_data)
+        form = HomeworkCreateForm(post_data, is_draft_save=is_draft_save)
 
         SectionFormset = cast(
             type[SectionFormSet],
             formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(request.POST, prefix="sections")
+        assert_type(section_formset, SectionFormSet)
+        section_formset.is_draft_save = is_draft_save
 
-        # Check form validity
         if form.is_valid() and section_formset.is_valid():
+            publish_at = None if publish_now else form.cleaned_data.get("publish_at")
+            if is_draft_save:
+                homework_type = HomeworkType.DRAFT
+            elif publish_at:
+                homework_type = HomeworkType.SCHEDULED
+            else:
+                homework_type = HomeworkType.PUBLISHED
+
             # Extract homework data from form
             homework_data = HomeworkCreateData(
                 title=form.cleaned_data["title"],
@@ -641,6 +654,8 @@ class CourseHomeworkCreateView(View):
                 llm_config=form.cleaned_data["llm_config"].id
                 if form.cleaned_data["llm_config"]
                 else None,
+                homework_type=homework_type,
+                publish_at=publish_at,
             )
 
             # Extract sections data from formset

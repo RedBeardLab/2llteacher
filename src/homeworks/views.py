@@ -133,9 +133,9 @@ class HomeworkListView(View):
         """
         from django.db.models import Q
 
-        # Auto-publish any scheduled drafts before building the list
+        # Auto-publish any scheduled homework before building the list
         try:
-            HomeworkService.auto_publish_due_drafts()
+            HomeworkService.auto_publish_due_scheduled()
         except Exception:
             pass  # Never break the page load
 
@@ -473,7 +473,7 @@ class HomeworkEditView(View):
         """Process the form submission for updating a homework.
 
         The submit button name determines the publish action:
-          name="save_draft"  → keep/set as draft (is_hidden=True, homework_type=draft)
+          name="save_draft"  → keep/set as draft
           name="publish"     → publish immediately or on schedule
         """
         is_draft_save = "save_draft" in request.POST
@@ -481,14 +481,30 @@ class HomeworkEditView(View):
         # Draft save: bypass all validation, update only the raw text fields
         if is_draft_save:
             from .models import HomeworkType
+            from django.utils.dateparse import parse_datetime
 
             homework.title = request.POST.get("title") or homework.title
             homework.description = request.POST.get("description") or homework.description
+            update_fields = [
+                "title",
+                "description",
+                "homework_type",
+                "is_hidden",
+                "updated_at",
+            ]
+            if "publish_now" in request.POST:
+                homework.publish_at = None
+                update_fields.append("publish_at")
+            elif "publish_at" in request.POST:
+                publish_at_value = request.POST.get("publish_at")
+                publish_at = parse_datetime(publish_at_value) if publish_at_value else None
+                if publish_at and timezone.is_naive(publish_at):
+                    publish_at = timezone.make_aware(publish_at)
+                homework.publish_at = publish_at
+                update_fields.append("publish_at")
             homework.homework_type = HomeworkType.DRAFT
             homework.is_hidden = True
-            homework.save(
-                update_fields=["title", "description", "homework_type", "is_hidden", "updated_at"]
-            )
+            homework.save(update_fields=update_fields)
             return HomeworkFormData(
                 form=HomeworkEditForm(instance=homework),
                 section_forms=None,  # type: ignore[arg-type]
@@ -520,7 +536,7 @@ class HomeworkEditView(View):
                 homework_instance.is_hidden = False
                 homework_instance.publish_at = None
             elif form.cleaned_data.get("publish_at"):
-                homework_instance.homework_type = HomeworkType.DRAFT
+                homework_instance.homework_type = HomeworkType.SCHEDULED
                 homework_instance.is_hidden = True
                 homework_instance.publish_at = form.cleaned_data["publish_at"]
             # else: preserve existing homework_type / is_hidden / publish_at

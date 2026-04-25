@@ -293,7 +293,7 @@ class HomeworkService:
         Returns:
             HomeworkCreateResult object with operation results
         """
-        from .models import Homework, Section, SectionSolution
+        from .models import Homework, HomeworkType, Section, SectionSolution
 
         # Validate data
         if not data.title.strip():
@@ -306,8 +306,11 @@ class HomeworkService:
 
         try:
             with transaction.atomic():
-                # Create homework — draft type implies is_hidden=True
-                is_draft = data.homework_type == "draft"
+                # Draft and scheduled homework stay hidden until explicitly published.
+                is_hidden = data.homework_type in {
+                    HomeworkType.DRAFT,
+                    HomeworkType.SCHEDULED,
+                }
                 homework = Homework.objects.create(
                     title=data.title,
                     description=data.description,
@@ -317,7 +320,7 @@ class HomeworkService:
                     llm_config_id=data.llm_config,
                     homework_type=data.homework_type,
                     publish_at=data.publish_at,
-                    is_hidden=is_draft,
+                    is_hidden=is_hidden,
                 )
 
                 # Create sections
@@ -380,8 +383,8 @@ class HomeworkService:
             return HomeworkUpdateResult(success=False, error=str(e))
 
     @staticmethod
-    def auto_publish_due_drafts() -> int:
-        """Bulk-publish all drafts whose publish_at has passed.
+    def auto_publish_due_scheduled() -> int:
+        """Bulk-publish all scheduled homework whose publish_at has passed.
 
         Updates is_hidden=False, homework_type='published', publish_at=None.
         Returns the count of homeworks published.
@@ -392,7 +395,7 @@ class HomeworkService:
 
         try:
             count = Homework.objects.filter(
-                homework_type=HomeworkType.DRAFT,
+                homework_type=HomeworkType.SCHEDULED,
                 publish_at__lte=timezone.now(),
             ).update(
                 is_hidden=False,
@@ -404,7 +407,7 @@ class HomeworkService:
             return count
         except Exception as e:
             record_exception(e)
-            logger.error("auto_publish_due_drafts failed: %s", e)
+            logger.error("auto_publish_due_scheduled failed: %s", e)
             return 0
 
     @staticmethod

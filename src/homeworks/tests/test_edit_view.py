@@ -8,6 +8,7 @@ existing homework assignments and their sections.
 import uuid
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
 from unittest.mock import patch
 import datetime
 
@@ -454,6 +455,133 @@ class HomeworkEditSectionTypeTests(TestCase):
         self.ni_section.refresh_from_db()
         self.assertEqual(self.conv_section.section_type, "conversation")
         self.assertEqual(self.ni_section.section_type, "non_interactive")
+
+
+class HomeworkEditIdentityTests(TestCase):
+    """Test that edit operations update existing records instead of replacing them."""
+
+    def setUp(self):
+        from courses.models import Course, CourseTeacher
+
+        self.client = Client()
+        self.teacher_user = User.objects.create_user(
+            username="identity_teacher",
+            email="identity_teacher@example.com",
+            password="password",
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+        self.course = Course.objects.create(
+            name="Identity Course", code="IDENT101", description=""
+        )
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+        self.homework = Homework.objects.create(
+            title="Identity Homework",
+            description="desc",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=datetime.datetime(2030, 1, 1),
+        )
+        self.section_one = Section.objects.create(
+            homework=self.homework,
+            title="One",
+            content="First",
+            order=1,
+            section_type=Section.SECTION_TYPE_CONVERSATION,
+        )
+        self.section_two = Section.objects.create(
+            homework=self.homework,
+            title="Two",
+            content="Second",
+            order=2,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+        self.url = reverse("homeworks:edit", kwargs={"homework_id": self.homework.id})
+
+    def _post_data(self, **overrides):
+        data = {
+            "title": "Edited Identity Homework",
+            "description": "updated",
+            "due_date": "2030-02-01T00:00:00",
+            "llm_config": "",
+            "sections-TOTAL_FORMS": "2",
+            "sections-INITIAL_FORMS": "2",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-id": str(self.section_one.id),
+            "sections-0-title": "One edited",
+            "sections-0-content": "First edited",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+            "sections-0-section_type": Section.SECTION_TYPE_CONVERSATION,
+            "sections-1-id": str(self.section_two.id),
+            "sections-1-title": "Two edited",
+            "sections-1-content": "Second edited",
+            "sections-1-order": "2",
+            "sections-1-solution": "",
+            "sections-1-section_type": Section.SECTION_TYPE_NON_INTERACTIVE,
+        }
+        data.update(overrides)
+        return data
+
+    def _assert_identity_maintained(self):
+        self.assertTrue(Homework.objects.filter(id=self.homework.id).exists())
+        self.assertEqual(Homework.objects.count(), 1)
+        self.assertEqual(
+            set(
+                Section.objects.filter(homework_id=self.homework.id).values_list(
+                    "id", flat=True
+                )
+            ),
+            {self.section_one.id, self.section_two.id},
+        )
+
+    def test_publish_now_edit_maintains_homework_and_section_identity(self):
+        self.client.login(username="identity_teacher", password="password")
+
+        response = self.client.post(
+            self.url,
+            self._post_data(publish="1", publish_now="on"),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self._assert_identity_maintained()
+        self.homework.refresh_from_db()
+        self.assertEqual(self.homework.title, "Edited Identity Homework")
+
+    def test_scheduled_publish_edit_maintains_homework_and_section_identity(self):
+        self.client.login(username="identity_teacher", password="password")
+        publish_at = "2030-01-15T10:30"
+
+        response = self.client.post(
+            self.url,
+            self._post_data(publish="1", publish_at=publish_at),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self._assert_identity_maintained()
+        self.homework.refresh_from_db()
+        from homeworks.models import HomeworkType
+
+        self.assertEqual(self.homework.homework_type, HomeworkType.SCHEDULED)
+        self.assertEqual(
+            timezone.localtime(self.homework.publish_at).strftime("%Y-%m-%dT%H:%M"),
+            publish_at,
+        )
+
+    def test_save_draft_edit_maintains_homework_and_section_identity(self):
+        self.client.login(username="identity_teacher", password="password")
+
+        response = self.client.post(
+            self.url,
+            {"title": "Draft Identity Homework", "description": "draft", "save_draft": "1"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self._assert_identity_maintained()
+        self.homework.refresh_from_db()
+        self.assertEqual(self.homework.title, "Draft Identity Homework")
 
 
 class HomeworkEditFormLLMConfigFilteringTest(TestCase):

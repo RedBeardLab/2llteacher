@@ -7,6 +7,7 @@ from django.utils import timezone
 
 class HomeworkType(models.TextChoices):
     DRAFT = "draft", "Draft"
+    SCHEDULED = "scheduled", "Scheduled"
     PUBLISHED = "published", "Published"
     HIDDEN = "hidden", "Hidden"
 
@@ -97,9 +98,9 @@ class Homework(models.Model):
 
     @property
     def should_auto_publish(self) -> bool:
-        """True when a draft has a past publish_at and should be auto-published."""
+        """True when scheduled homework has reached its publish time."""
         return (
-            self.homework_type == HomeworkType.DRAFT
+            self.homework_type == HomeworkType.SCHEDULED
             and self.publish_at is not None
             and timezone.now() >= self.publish_at
         )
