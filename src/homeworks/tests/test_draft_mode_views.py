@@ -157,6 +157,33 @@ class DraftHomeworkDetailTests(DraftViewsSetUpMixin):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["data"].is_hidden)
 
+    def test_draft_with_publish_at_detail_does_not_show_scheduled_copy(self):
+        self.client.login(username="teacher", password="pass")
+        self.draft.publish_at = timezone.now() + timedelta(days=1)
+        self.draft.save(update_fields=["publish_at"])
+        url = reverse("homeworks:detail", kwargs={"homework_id": self.draft.id})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Draft — not visible to students")
+        self.assertNotContains(response, "Scheduled to publish")
+        self.assertNotContains(response, "Scheduled — not visible to students")
+
+    def test_scheduled_detail_shows_scheduled_badge(self):
+        self.client.login(username="teacher", password="pass")
+        self.draft.homework_type = HomeworkType.SCHEDULED
+        self.draft.publish_at = timezone.now() + timedelta(days=1)
+        self.draft.save(update_fields=["homework_type", "publish_at"])
+        url = reverse("homeworks:detail", kwargs={"homework_id": self.draft.id})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Scheduled — not visible to students")
+        self.assertContains(response, "Publishes")
+        self.assertNotContains(response, "Draft — not visible to students")
+
 
 # ---------------------------------------------------------------------------
 # publish_now action

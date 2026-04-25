@@ -121,6 +121,23 @@ class HomeworkEditViewTestCase(TestCase):
         self.assertEqual(response.context["data"].form.instance.id, self.homework.id)
         self.assertEqual(len(response.context["data"].section_forms.forms), 2)
 
+    def test_edit_view_get_with_publish_at_unchecks_publish_now(self):
+        """Editing homework with publish_at should not default to publish now."""
+        self.homework.publish_at = timezone.make_aware(
+            datetime.datetime(2030, 1, 15, 10, 30)
+        )
+        self.homework.save(update_fields=["publish_at"])
+        self.client.login(username="teacher", password="password")
+        url = reverse("homeworks:edit", kwargs={"homework_id": self.homework.id})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["data"].publish_now_checked)
+        self.assertContains(response, 'id="publish-now-toggle" name="publish_now"', html=False)
+        self.assertNotContains(response, 'id="publish-now-toggle" name="publish_now" checked', html=False)
+        self.assertContains(response, 'value="2030-01-15T10:30"', html=False)
+
     def test_edit_view_get_teacher_no_access(self):
         """Test teacher without ownership can't access the edit view."""
         # Login as other teacher

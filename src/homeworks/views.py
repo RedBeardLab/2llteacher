@@ -72,6 +72,7 @@ class HomeworkListItem:
     is_hidden: bool = False
     is_accessible_to_students: bool = True
     is_draft: bool = False
+    is_scheduled: bool = False
     publish_at: datetime | None = None
     sections: list[SectionData] | None = None
     completed_percentage: int = 0
@@ -286,6 +287,7 @@ class HomeworkListView(View):
                     is_hidden=hw.is_hidden,
                     is_accessible_to_students=hw.is_accessible_to_students,
                     is_draft=hw.is_draft,
+                    is_scheduled=hw.is_scheduled,
                     publish_at=hw.publish_at,  # type: ignore[assignment]
                     sections=sections,
                     completed_percentage=completed_percentage,
@@ -324,6 +326,7 @@ class HomeworkDetailData:
     is_hidden: bool = False
     is_accessible_to_students: bool = True
     is_draft: bool = False
+    is_scheduled: bool = False
     publish_at: datetime | None = None
     llm_config: Dict[str, Any] | None = None
 
@@ -340,6 +343,7 @@ class HomeworkFormData:
     errors: Dict[str, Any] | None = None
     course_name: str = ""
     course_id: UUID | None = None
+    publish_now_checked: bool = True
 
 
 class HomeworkEditView(View):
@@ -465,6 +469,7 @@ class HomeworkEditView(View):
             user_type="teacher",
             action="edit",
             is_submitted=False,
+            publish_now_checked=homework.publish_at is None,
         )
 
     def _process_form_submission(
@@ -860,6 +865,7 @@ class HomeworkDetailView(View):
             is_hidden=homework.is_hidden,
             is_accessible_to_students=homework.is_accessible_to_students,
             is_draft=homework.is_draft,
+            is_scheduled=homework.is_scheduled,
             publish_at=homework.publish_at,  # type: ignore[assignment]
             llm_config={"id": homework_detail.llm_config}
             if homework_detail.llm_config

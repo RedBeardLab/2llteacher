@@ -135,7 +135,7 @@
           </div>
           <div class="card-body">
             <div class="form-check form-switch mb-3">
-              <input class="form-check-input" type="checkbox" id="publish-now-toggle" name="publish_now" checked>
+              <input class="form-check-input" type="checkbox" id="publish-now-toggle" name="publish_now" {% if data.publish_now_checked %}checked{% endif %}>
               <label class="form-check-label" for="publish-now-toggle">
                 Publish immediately when saved
               </label>

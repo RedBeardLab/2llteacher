@@ -87,6 +87,11 @@ class Homework(models.Model):
         return self.homework_type == HomeworkType.DRAFT
 
     @property
+    def is_scheduled(self) -> bool:
+        """True when the homework is scheduled to publish automatically."""
+        return self.homework_type == HomeworkType.SCHEDULED
+
+    @property
     def is_accessible_to_students(self) -> bool:
         """False if the teacher has hidden it or the expiry date has passed.
         is_hidden is the single source of truth — this never reads homework_type."""

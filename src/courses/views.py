@@ -282,6 +282,7 @@ class HomeworkItem:
     description: str
     due_date: str  # Formatted due date
     is_draft: bool = False
+    is_scheduled: bool = False
     is_overdue: bool = False
     is_hidden: bool = False
     is_accessible_to_students: bool = True
@@ -433,6 +434,7 @@ class CourseDetailView(View):
                     description=hw.description,
                     due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p"),
                     is_draft=hw.is_draft,
+                    is_scheduled=hw.is_scheduled,
                     is_overdue=hw.is_overdue,
                     is_hidden=hw.is_hidden,
                     is_accessible_to_students=hw.is_accessible_to_students,
