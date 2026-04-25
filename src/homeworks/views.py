@@ -6,6 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Dict, Any, assert_type, cast
 from uuid import UUID
 from django.forms import formset_factory
@@ -34,9 +35,25 @@ from .services import (
     SectionStatus,
     SectionData,
 )
-from .forms import HomeworkEditForm, SectionForm, SectionFormSet
+from .forms import (
+    HomeworkCreateForm,
+    HomeworkEditForm,
+    SectionForm,
+    SectionFormSet,
+    normalize_section_formset_orders,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _mark_invalid_fields(form) -> None:
+    """Add Bootstrap is-invalid CSS class to any form widget that has errors."""
+    for field_name in form.errors:
+        if field_name in form.fields:
+            widget = form.fields[field_name].widget
+            css = widget.attrs.get("class", "")
+            if "is-invalid" not in css:
+                widget.attrs["class"] = f"{css} is-invalid".strip()
 
 
 @dataclass
@@ -46,11 +63,17 @@ class HomeworkListItem:
     id: UUID
     title: str
     description: str
-    due_date: Any  # datetime
+    due_date: datetime
     section_count: int
-    created_at: Any  # datetime
+    created_at: datetime
     is_overdue: bool
     roles: list[str]  # ['teacher', 'student', 'teacher_assistant']
+    expires_at: datetime | None = None
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
+    is_draft: bool = False
+    is_scheduled: bool = False
+    publish_at: datetime | None = None
     sections: list[SectionData] | None = None
     completed_percentage: int = 0
     in_progress_percentage: int = 0
@@ -111,6 +134,12 @@ class HomeworkListView(View):
         """
         from django.db.models import Q
 
+        # Auto-publish any scheduled homework before building the list
+        try:
+            HomeworkService.auto_publish_due_scheduled()
+        except Exception:
+            pass  # Never break the page load
+
         # Determine user type
         teacher_profile = getattr(user, "teacher_profile", None)
         student_profile = getattr(user, "student_profile", None)
@@ -149,9 +178,12 @@ class HomeworkListView(View):
             enrolled_courses = student_profile.enrolled_courses.filter(
                 courseenrollment__is_active=True
             )
-            student_homework_objects = Homework.objects.filter(
-                course__in=enrolled_courses
-            ).prefetch_related("sections")
+            student_homework_objects = (
+                Homework.objects.filter(course__in=enrolled_courses)
+                .filter(is_hidden=False)
+                .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()))
+                .prefetch_related("sections")
+            )
 
             for hw in student_homework_objects:
                 if hw.id not in homework_dict:
@@ -246,11 +278,17 @@ class HomeworkListView(View):
                     id=hw.id,
                     title=hw.title,
                     description=hw.description,
-                    due_date=hw.due_date,
+                    due_date=hw.due_date,  # type: ignore[assignment]
                     section_count=hw.section_count,
-                    created_at=hw.created_at,
+                    created_at=hw.created_at,  # type: ignore[assignment]
                     is_overdue=hw.is_overdue,
                     roles=hw_data.roles,
+                    expires_at=hw.expires_at,  # type: ignore[assignment]
+                    is_hidden=hw.is_hidden,
+                    is_accessible_to_students=hw.is_accessible_to_students,
+                    is_draft=hw.is_draft,
+                    is_scheduled=hw.is_scheduled,
+                    publish_at=hw.publish_at,  # type: ignore[assignment]
                     sections=sections,
                     completed_percentage=completed_percentage,
                     in_progress_percentage=in_progress_percentage,
@@ -274,29 +312,38 @@ class HomeworkDetailData:
     id: UUID
     title: str
     description: str
-    due_date: Any  # datetime
+    due_date: datetime | None
     created_by: UUID
     created_by_name: str
-    created_at: Any  # datetime
+    created_at: datetime
     sections: list[SectionData]
     is_overdue: bool
     user_roles: list[
         str
     ]  # All roles this user has for this homework: ['teacher', 'student', 'teacher_assistant']
     can_edit: bool
+    expires_at: datetime | None = None
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
+    is_draft: bool = False
+    is_scheduled: bool = False
+    publish_at: datetime | None = None
     llm_config: Dict[str, Any] | None = None
 
 
 @dataclass
 class HomeworkFormData:
-    """Data structure for the homework form view."""
+    """Data structure for the homework form view (create and edit)."""
 
-    form: "HomeworkEditForm"
+    form: HomeworkCreateForm | HomeworkEditForm
     section_forms: "SectionFormSet"
     user_type: str
     action: str  # 'create' or 'edit'
     is_submitted: bool = False
     errors: Dict[str, Any] | None = None
+    course_name: str = ""
+    course_id: UUID | None = None
+    publish_now_checked: bool = True
 
 
 class HomeworkEditView(View):
@@ -373,6 +420,11 @@ class HomeworkEditView(View):
 
         if data.is_submitted:
             messages.success(request, "Homework updated successfully!")
+            if getattr(data.form, "expires_at_adjusted", False):
+                messages.warning(
+                    request,
+                    "Note: the expiry date is set before the due date. Students will lose access before the homework is officially due.",
+                )
             return redirect("homeworks:detail", homework_id=homework_id)
 
         return render(request, "homeworks/form.html", {"data": data})
@@ -417,13 +469,56 @@ class HomeworkEditView(View):
             user_type="teacher",
             action="edit",
             is_submitted=False,
+            publish_now_checked=homework.publish_at is None,
         )
 
     def _process_form_submission(
         self, request: TeacherRequest, homework: Homework
     ) -> HomeworkFormData:
-        """Process the form submission for updating a homework."""
-        # Create forms from POST data with homework instance
+        """Process the form submission for updating a homework.
+
+        The submit button name determines the publish action:
+          name="save_draft"  → keep/set as draft
+          name="publish"     → publish immediately or on schedule
+        """
+        is_draft_save = "save_draft" in request.POST
+
+        # Draft save: bypass all validation, update only the raw text fields
+        if is_draft_save:
+            from .models import HomeworkType
+            from django.utils.dateparse import parse_datetime
+
+            homework.title = request.POST.get("title") or homework.title
+            homework.description = request.POST.get("description") or homework.description
+            update_fields = [
+                "title",
+                "description",
+                "homework_type",
+                "is_hidden",
+                "updated_at",
+            ]
+            if "publish_now" in request.POST:
+                homework.publish_at = None
+                update_fields.append("publish_at")
+            elif "publish_at" in request.POST:
+                publish_at_value = request.POST.get("publish_at")
+                publish_at = parse_datetime(publish_at_value) if publish_at_value else None
+                if publish_at and timezone.is_naive(publish_at):
+                    publish_at = timezone.make_aware(publish_at)
+                homework.publish_at = publish_at
+                update_fields.append("publish_at")
+            homework.homework_type = HomeworkType.DRAFT
+            homework.is_hidden = True
+            homework.save(update_fields=update_fields)
+            return HomeworkFormData(
+                form=HomeworkEditForm(instance=homework),
+                section_forms=None,  # type: ignore[arg-type]
+                user_type="teacher",
+                action="edit",
+                is_submitted=True,
+            )
+
+        # Publish path: run full validation
         form = HomeworkEditForm(request.POST, instance=homework)
 
         # Create formset for sections
@@ -436,8 +531,23 @@ class HomeworkEditView(View):
 
         # Check form validity
         if form.is_valid() and section_formset.is_valid():
-            # Save basic homework data
-            homework = form.save()
+            from .models import HomeworkType
+
+            publish_now = "publish_now" in request.POST
+            homework_instance = form.save(commit=False)
+
+            if publish_now:
+                homework_instance.homework_type = HomeworkType.PUBLISHED
+                homework_instance.is_hidden = False
+                homework_instance.publish_at = None
+            elif form.cleaned_data.get("publish_at"):
+                homework_instance.homework_type = HomeworkType.SCHEDULED
+                homework_instance.is_hidden = True
+                homework_instance.publish_at = form.cleaned_data["publish_at"]
+            # else: preserve existing homework_type / is_hidden / publish_at
+
+            homework_instance.save()
+            homework = homework_instance
 
             # Process sections
             sections_to_update = []
@@ -452,39 +562,40 @@ class HomeworkEditView(View):
                     # Section marked for deletion
                     if section_form.cleaned_data.get("id"):
                         sections_to_delete.append(section_form.cleaned_data["id"])
-                else:
-                    # Get section data
-                    section_data = {
-                        "title": section_form.cleaned_data["title"],
-                        "content": section_form.cleaned_data["content"],
-                        "order": section_form.cleaned_data["order"],
-                        "solution": section_form.cleaned_data["solution"],
-                        "section_type": section_form.cleaned_data.get(
-                            "section_type", "conversation"
-                        ),
-                    }
 
-                    if section_form.cleaned_data.get("id"):
-                        # Existing section to update
-                        section_data["id"] = section_form.cleaned_data["id"]
-                        sections_to_update.append(section_data)
-                    else:
-                        # New section to create
-                        sections_to_create.append(
-                            SectionCreateData(
-                                title=section_data["title"],
-                                content=section_data["content"],
-                                order=section_data["order"],
-                                solution=section_data["solution"],
-                                section_type=section_data["section_type"],
-                            )
+            for section_form in normalize_section_formset_orders(section_formset):
+                # Get section data
+                section_data = {
+                    "title": section_form.cleaned_data["title"],
+                    "content": section_form.cleaned_data["content"],
+                    "order": section_form.cleaned_data["order"],
+                    "solution": section_form.cleaned_data["solution"],
+                    "section_type": section_form.cleaned_data.get(
+                        "section_type", "conversation"
+                    ),
+                }
+
+                if section_form.cleaned_data.get("id"):
+                    # Existing section to update
+                    section_data["id"] = section_form.cleaned_data["id"]
+                    sections_to_update.append(section_data)
+                else:
+                    # New section to create
+                    sections_to_create.append(
+                        SectionCreateData(
+                            title=section_data["title"],
+                            content=section_data["content"],
+                            order=section_data["order"],
+                            solution=section_data["solution"],
+                            section_type=section_data["section_type"],
                         )
+                    )
 
             # Create update data
             update_data = HomeworkUpdateData(
                 title=homework.title,
                 description=homework.description,
-                due_date=homework.due_date,
+                due_date=homework.due_date,  # type: ignore[assignment]
                 llm_config=homework.llm_config.id if homework.llm_config else None,
                 sections_to_update=sections_to_update,
                 sections_to_create=sections_to_create,
@@ -553,14 +664,41 @@ class HomeworkDetailView(View):
         return render(request, "homeworks/detail.html", {"data": data})
 
     def post(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
-        """Handle POST requests for homework actions (like deletion)."""
-        # Check if this is a delete action
+        """Handle POST requests for homework actions (like deletion or publishing)."""
         action = request.POST.get("action")
 
         if action == "delete":
             return self._handle_delete(request, homework_id)
 
+        if action == "publish_now":
+            return self._handle_publish_now(request, homework_id)
+
         # If no valid action, redirect to detail view
+        return redirect("homeworks:detail", homework_id=homework_id)
+
+    def _handle_publish_now(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
+        """Immediately publish a draft homework from the detail page."""
+        teacher_profile = getattr(request.user, "teacher_profile", None)
+        if not teacher_profile:
+            return HttpResponseForbidden("Only teachers can publish homeworks.")
+
+        try:
+            homework = Homework.objects.get(id=homework_id)
+        except Homework.DoesNotExist:
+            messages.error(request, "Homework not found.")
+            return redirect("homeworks:list")
+
+        # Check permission — must own or teach the course
+        can_edit = homework.created_by == teacher_profile
+        if not can_edit and homework.course:
+            teacher_courses = teacher_profile.courses.all()
+            can_edit = homework.course in teacher_courses
+
+        if not can_edit:
+            return HttpResponseForbidden("You don't have permission to publish this homework.")
+
+        HomeworkService.publish_homework(homework_id)
+        messages.success(request, f"'{homework.title}' has been published.")
         return redirect("homeworks:detail", homework_id=homework_id)
 
     def _handle_delete(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
@@ -720,9 +858,15 @@ class HomeworkDetailView(View):
             created_by_name=created_by_name,
             created_at=homework_detail.created_at,
             sections=sections,
-            is_overdue=homework_detail.due_date < timezone.now(),
+            is_overdue=homework_detail.due_date is not None and homework_detail.due_date < timezone.now(),
             user_roles=user_roles,
             can_edit=can_edit,
+            expires_at=homework.expires_at,  # type: ignore[assignment]
+            is_hidden=homework.is_hidden,
+            is_accessible_to_students=homework.is_accessible_to_students,
+            is_draft=homework.is_draft,
+            is_scheduled=homework.is_scheduled,
+            publish_at=homework.publish_at,  # type: ignore[assignment]
             llm_config={"id": homework_detail.llm_config}
             if homework_detail.llm_config
             else None,
