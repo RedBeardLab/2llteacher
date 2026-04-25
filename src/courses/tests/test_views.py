@@ -995,6 +995,11 @@ class CourseHomeworkCreateViewTests(TestCase):
         )
         self.assertContains(response, 'id="id_sections-0-section_type"', html=False)
         self.assertContains(response, "Add Another Section")
+        self.assertContains(
+            response,
+            'name="sections-__INDEX__-title" class="form-control" placeholder="Section Title" disabled',
+            html=False,
+        )
 
     def test_get_homework_create_form_llm_config_filtered_by_course(self):
         """Test that the homework create form's LLM config field is filtered by course."""
@@ -1060,6 +1065,51 @@ class CourseHomeworkCreateViewTests(TestCase):
         self.assertEqual(homework.sections.count(), 1)
         section = homework.sections.first()
         self.assertEqual(section.title, "Section 1")
+
+    def test_create_homework_normalizes_blank_and_duplicate_section_order(self):
+        """Section order is assigned by the backend, not trusted from POST."""
+        self.client.login(username="testteacher", password="password123")
+
+        from django.utils import timezone
+        from datetime import timedelta
+
+        due_date = timezone.now() + timedelta(days=7)
+
+        homework_data = {
+            "title": "Normalized Order Homework",
+            "description": "Homework description",
+            "due_date": due_date.strftime("%Y-%m-%dT%H:%M"),
+            "llm_config": self.llm_config.id,
+            "sections-TOTAL_FORMS": "2",
+            "sections-INITIAL_FORMS": "0",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-title": "First Section",
+            "sections-0-content": "First content",
+            "sections-0-order": "",
+            "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
+            "sections-1-title": "Second Section",
+            "sections-1-content": "Second content",
+            "sections-1-order": "1",
+            "sections-1-solution": "",
+            "sections-1-section_type": "conversation",
+        }
+
+        response = self.client.post(
+            reverse("courses:homework-create", kwargs={"course_id": self.course.id}),
+            homework_data,
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        from homeworks.models import Homework
+
+        homework = Homework.objects.get(title="Normalized Order Homework")
+        self.assertEqual(
+            list(homework.sections.order_by("order").values_list("title", "order")),
+            [("First Section", 1), ("Second Section", 2)],
+        )
 
     def test_create_homework_requires_teacher(self):
         """Test that creating homework requires teacher access."""

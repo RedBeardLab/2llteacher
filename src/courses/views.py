@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, List, Optional, cast
+from typing import Any, cast
 from uuid import UUID
 from django.views import View
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
@@ -14,9 +14,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-
-if TYPE_CHECKING:
-    from homeworks.forms import HomeworkCreateForm, SectionFormSet
 
 from llteacher.permissions.decorators import (
     student_required,
@@ -577,7 +574,11 @@ class CourseHomeworkCreateView(View):
         self, request: TeacherRequest, course: Course
     ) -> HomeworkFormData:
         """Prepare data for the form view."""
-        from homeworks.forms import HomeworkCreateForm, SectionForm, SectionFormSet
+        from homeworks.forms import (
+            HomeworkCreateForm,
+            SectionForm,
+            SectionFormSet,
+        )
         from django.forms import formset_factory
 
         form = HomeworkCreateForm(initial={"course": course}, course=course)
@@ -602,7 +603,12 @@ class CourseHomeworkCreateView(View):
         self, request: TeacherRequest, course: Course
     ) -> HomeworkFormData:
         """Process the form submission."""
-        from homeworks.forms import HomeworkCreateForm, SectionForm, SectionFormSet
+        from homeworks.forms import (
+            HomeworkCreateForm,
+            SectionForm,
+            SectionFormSet,
+            normalize_section_formset_orders,
+        )
         from homeworks.services import (
             HomeworkService,
             HomeworkCreateData,
@@ -639,22 +645,19 @@ class CourseHomeworkCreateView(View):
 
             # Extract sections data from formset
             section_data = []
-            for section_form in section_formset.forms:
-                if section_form.cleaned_data and not section_form.cleaned_data.get(
-                    "DELETE", False
-                ):
-                    # Extract data from form
-                    section_data.append(
-                        SectionCreateData(
-                            title=section_form.cleaned_data["title"],
-                            content=section_form.cleaned_data["content"],
-                            order=section_form.cleaned_data["order"],
-                            solution=section_form.cleaned_data["solution"],
-                            section_type=section_form.cleaned_data.get(
-                                "section_type", "conversation"
-                            ),
-                        )
+            for section_form in normalize_section_formset_orders(section_formset):
+                # Extract data from form
+                section_data.append(
+                    SectionCreateData(
+                        title=section_form.cleaned_data["title"],
+                        content=section_form.cleaned_data["content"],
+                        order=section_form.cleaned_data["order"],
+                        solution=section_form.cleaned_data["solution"],
+                        section_type=section_form.cleaned_data.get(
+                            "section_type", "conversation"
+                        ),
                     )
+                )
 
             # Add sections to homework data
             homework_data.sections = section_data

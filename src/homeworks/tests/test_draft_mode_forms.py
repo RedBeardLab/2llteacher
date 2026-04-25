@@ -5,7 +5,7 @@ Covers:
 - HomeworkCreateForm: publish_at validation (past rejected, future accepted, publish_now bypasses)
 - HomeworkCreateForm: due_date validation (today allowed, past rejected)
 - HomeworkEditForm: publish_at not restricted on edit; requires when publishing scheduled
-- SectionFormSet: order uniqueness, sequential order, draft bypass
+- SectionFormSet: section presence and draft bypass; section order normalization
 """
 
 from datetime import timedelta
@@ -17,7 +17,13 @@ from django.utils import timezone
 from accounts.models import Teacher
 from courses.models import Course
 from django.contrib.auth import get_user_model
-from homeworks.forms import HomeworkCreateForm, HomeworkEditForm, SectionForm, SectionFormSet
+from homeworks.forms import (
+    HomeworkCreateForm,
+    HomeworkEditForm,
+    SectionForm,
+    SectionFormSet,
+    normalize_section_formset_orders,
+)
 from homeworks.models import Homework, HomeworkType
 
 User = get_user_model()
@@ -208,20 +214,35 @@ class SectionFormSetOrderTests(TestCase):
         fs = _make_formset([self._section(1), self._section(2), self._section(3)])
         self.assertTrue(fs.is_valid(), fs.errors)
 
-    def test_duplicate_order_rejected(self):
+    def test_duplicate_order_is_allowed_and_normalized(self):
         fs = _make_formset([self._section(1), self._section(1)])
-        self.assertFalse(fs.is_valid())
-        self.assertTrue(any("multiple times" in str(e) for e in fs.non_form_errors()))
+        self.assertTrue(fs.is_valid(), fs.errors)
+        forms = normalize_section_formset_orders(fs)
+        self.assertEqual([form.cleaned_data["order"] for form in forms], [1, 2])
 
-    def test_gap_in_order_rejected(self):
+    def test_gap_in_order_is_allowed_and_normalized(self):
         fs = _make_formset([self._section(1), self._section(3)])
-        self.assertFalse(fs.is_valid())
-        self.assertTrue(any("sequential" in str(e) for e in fs.non_form_errors()))
+        self.assertTrue(fs.is_valid(), fs.errors)
+        forms = normalize_section_formset_orders(fs)
+        self.assertEqual([form.cleaned_data["order"] for form in forms], [1, 2])
 
-    def test_order_not_starting_at_1_rejected(self):
+    def test_order_not_starting_at_1_is_allowed_and_normalized(self):
         fs = _make_formset([self._section(2), self._section(3)])
-        self.assertFalse(fs.is_valid())
-        self.assertTrue(any("start with order 1" in str(e) for e in fs.non_form_errors()))
+        self.assertTrue(fs.is_valid(), fs.errors)
+        forms = normalize_section_formset_orders(fs)
+        self.assertEqual([form.cleaned_data["order"] for form in forms], [1, 2])
+
+    def test_blank_order_is_allowed_and_normalized(self):
+        fs = _make_formset([self._section(""), self._section("")])
+        self.assertTrue(fs.is_valid(), fs.errors)
+        forms = normalize_section_formset_orders(fs)
+        self.assertEqual([form.cleaned_data["order"] for form in forms], [1, 2])
+
+    def test_malformed_order_is_allowed_and_normalized(self):
+        fs = _make_formset([self._section("__NUM__"), self._section("not-an-int")])
+        self.assertTrue(fs.is_valid(), fs.errors)
+        forms = normalize_section_formset_orders(fs)
+        self.assertEqual([form.cleaned_data["order"] for form in forms], [1, 2])
 
     def test_empty_formset_rejected_for_publish(self):
         FS = formset_factory(SectionForm, extra=0, formset=SectionFormSet)

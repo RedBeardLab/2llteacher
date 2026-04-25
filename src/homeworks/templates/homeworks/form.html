@@ -265,23 +265,23 @@
             <a class="delete-section" onclick="deleteSection(this)"><i class="bi bi-trash"></i> Remove</a>
           </div>
         </div>
-        <input type="hidden" name="sections-__INDEX__-id" value="">
-        <input type="hidden" name="sections-__INDEX__-order" value="__NUM__">
+        <input type="hidden" name="sections-__INDEX__-id" value="" disabled>
+        <input type="hidden" name="sections-__INDEX__-order" value="__NUM__" disabled>
         <div class="mb-3">
           <label class="form-label">Section Title</label>
-          <input type="text" name="sections-__INDEX__-title" class="form-control" placeholder="Section Title">
+          <input type="text" name="sections-__INDEX__-title" class="form-control" placeholder="Section Title" disabled>
         </div>
         <div class="mb-3">
           <label class="form-label">Section Content</label>
-          <textarea name="sections-__INDEX__-content" class="form-control" rows="5" placeholder="Section content..."></textarea>
+          <textarea name="sections-__INDEX__-content" class="form-control" rows="5" placeholder="Section content..." disabled></textarea>
         </div>
         <div class="mb-3">
           <label class="form-label">Solution (Optional)</label>
-          <textarea name="sections-__INDEX__-solution" class="form-control" rows="3" placeholder="Optional solution..."></textarea>
+          <textarea name="sections-__INDEX__-solution" class="form-control" rows="3" placeholder="Optional solution..." disabled></textarea>
         </div>
         <div class="mb-3">
           <label class="form-label">Section Type</label>
-          <select name="sections-__INDEX__-section_type" class="form-select">
+          <select name="sections-__INDEX__-section_type" class="form-select" disabled>
             <option value="conversation">Conversation (Interactive)</option>
             <option value="non_interactive">Non-Interactive Question</option>
           </select>
@@ -348,11 +348,15 @@
       const wrapper = document.createElement('div');
       wrapper.innerHTML = newHtml;
       const newSection = wrapper.firstElementChild;
+      enableSectionFields(newSection);
 
       sectionContainer.appendChild(newSection);
       totalFormsField.value = newIndex + 1;
+      reindexSectionForms();
       updateSectionHeaders();
     });
+
+    reindexSectionForms();
   });
 
   function moveSection(btn, direction) {
@@ -369,23 +373,67 @@
 
     updateSectionOrders();
     updateSectionHeaders();
+    reindexSectionForms();
   }
 
   function updateSectionOrders() {
     const container = document.getElementById('section-container');
     const sections = container.querySelectorAll(':scope > .section-form');
-    sections.forEach((section, index) => {
+    let visibleOrder = 1;
+    sections.forEach((section) => {
       const orderInput = section.querySelector('input[name$="-order"]');
-      if (orderInput) orderInput.value = index + 1;
+      if (orderInput && section.style.display !== 'none') {
+        orderInput.value = visibleOrder;
+        visibleOrder += 1;
+      }
     });
+  }
+
+  function enableSectionFields(section) {
+    section.querySelectorAll('input, select, textarea').forEach((field) => {
+      field.disabled = false;
+    });
+  }
+
+  function reindexSectionForms() {
+    const totalFormsField = document.getElementById('id_sections-TOTAL_FORMS');
+    const container = document.getElementById('section-container');
+    const sections = Array.from(container.querySelectorAll(':scope > .section-form'));
+    let visibleOrder = 1;
+
+    sections.forEach((section, index) => {
+      section.dataset.sectionIndex = index;
+
+      section.querySelectorAll('[name]').forEach((field) => {
+        field.name = field.name.replace(/sections-\d+-/, 'sections-' + index + '-');
+      });
+      section.querySelectorAll('[id]').forEach((field) => {
+        field.id = field.id.replace(/id_sections-\d+-/, 'id_sections-' + index + '-');
+      });
+      section.querySelectorAll('label[for]').forEach((label) => {
+        label.htmlFor = label.htmlFor.replace(/id_sections-\d+-/, 'id_sections-' + index + '-');
+      });
+
+      const orderInput = section.querySelector('input[name$="-order"]');
+      if (orderInput && section.style.display !== 'none') {
+        orderInput.value = visibleOrder;
+        visibleOrder += 1;
+      }
+    });
+
+    totalFormsField.value = sections.length;
   }
 
   function updateSectionHeaders() {
     const container = document.getElementById('section-container');
     const sections = container.querySelectorAll(':scope > .section-form');
-    sections.forEach((section, index) => {
+    let visibleOrder = 1;
+    sections.forEach((section) => {
       const header = section.querySelector('.section-header h5');
-      if (header) header.textContent = 'Section ' + (index + 1);
+      if (header && section.style.display !== 'none') {
+        header.textContent = 'Section ' + visibleOrder;
+        visibleOrder += 1;
+      }
     });
   }
 
@@ -396,10 +444,11 @@
     if (deleteInput) {
       deleteInput.checked = true;
       section.style.display = 'none';
+      reindexSectionForms();
+      updateSectionHeaders();
     } else {
-      const totalFormsField = document.getElementById('id_sections-TOTAL_FORMS');
       section.remove();
-      totalFormsField.value = parseInt(totalFormsField.value) - 1;
+      reindexSectionForms();
       updateSectionOrders();
       updateSectionHeaders();
     }

@@ -6,6 +6,7 @@ following the testable-first architecture.
 """
 
 from django import forms
+from django.forms import BaseFormSet
 from django.conf import settings
 from django.utils import timezone
 
@@ -47,9 +48,8 @@ class SectionForm(forms.Form):
             }
         )
     )
-    order = forms.IntegerField(
-        min_value=1,
-        max_value=20,
+    order = forms.CharField(
+        required=False,
         widget=forms.HiddenInput(),
     )
     solution = forms.CharField(
@@ -298,10 +298,9 @@ class SectionFormSet(forms.BaseFormSet):
     def clean(self):
         """Validate the formset as a whole.
 
-        Checks that:
-        1. At least one section exists (skipped for drafts)
-        2. No duplicate orders
-        3. Orders are sequential
+        Checks that at least one section exists (skipped for drafts). Section order is
+        normalized by the backend before saving, so the submitted hidden order field is
+        not validated as canonical user input.
         """
         if any(self.errors):
             return
@@ -316,24 +315,17 @@ class SectionFormSet(forms.BaseFormSet):
         ):
             raise forms.ValidationError("At least one section is required.")
 
-        orders = []
-        for form in self.forms:
-            if form.cleaned_data and not form.cleaned_data.get("DELETE", False):
-                order = form.cleaned_data.get("order")
-                if order in orders:
-                    raise forms.ValidationError(
-                        f"Section {order} appears multiple times."
-                    )
-                orders.append(order)
 
-        # Check for gaps in order
-        if orders:
-            orders.sort()
-            if orders[0] != 1:
-                raise forms.ValidationError("Sections must start with order 1.")
 
-            for i in range(len(orders) - 1):
-                if orders[i + 1] - orders[i] > 1:
-                    raise forms.ValidationError(
-                        f"Section order is not sequential. Missing section after {orders[i]}."
-                    )
+def normalize_section_formset_orders(section_formset: BaseFormSet) -> list[forms.Form]:
+    """Assign canonical 1-based order to active section forms."""
+    active_forms: list[forms.Form] = []
+    for form in section_formset.forms:
+        cleaned_data = getattr(form, "cleaned_data", None)
+        if cleaned_data and not cleaned_data.get("DELETE", False):
+            active_forms.append(form)
+
+    for order, form in enumerate(active_forms, start=1):
+        form.cleaned_data["order"] = order
+
+    return active_forms

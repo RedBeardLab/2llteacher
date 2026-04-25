@@ -395,6 +395,41 @@ class TestHomeworkServiceUpdate(HomeworkServiceTestCase):
         self.assertEqual(sections[2].content, new_section.content)
         self.assertEqual(sections[2].order, new_section.order)
 
+    def test_update_homework_swaps_section_order(self):
+        """Test reordering existing sections without transient uniqueness errors."""
+        update_data = HomeworkUpdateData(
+            sections_to_update=[
+                {
+                    "id": self.sections[0].id,
+                    "title": self.sections[0].title,
+                    "content": self.sections[0].content,
+                    "order": 2,
+                    "solution": self.sections[0].solution.content,
+                    "section_type": self.sections[0].section_type,
+                },
+                {
+                    "id": self.sections[1].id,
+                    "title": self.sections[1].title,
+                    "content": self.sections[1].content,
+                    "order": 1,
+                    "solution": self.sections[1].solution.content,
+                    "section_type": self.sections[1].section_type,
+                },
+            ]
+        )
+
+        result = HomeworkService.update_homework(self.homework_id, update_data)
+
+        self.assertTrue(result.success, result.error)
+        sections = list(
+            Section.objects.filter(homework_id=self.homework_id).order_by("order")
+        )
+        self.assertEqual(
+            [section.id for section in sections],
+            [self.sections[1].id, self.sections[0].id],
+        )
+        self.assertEqual([section.order for section in sections], [1, 2])
+
     def test_update_homework_delete_section(self):
         """Test deleting a section from an existing homework."""
         update_data = HomeworkUpdateData(sections_to_delete=[self.sections[0].id])

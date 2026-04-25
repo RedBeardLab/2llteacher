@@ -981,6 +981,31 @@ class HomeworkService:
                         except Section.DoesNotExist:
                             pass  # Skip if section doesn't exist
 
+                # Free existing order slots before applying final order values. This
+                # avoids transient uniqueness conflicts when sections swap positions.
+                sections_to_reorder: dict[UUID, Section] = {}
+                if data.sections_to_update and (
+                    data.sections_to_create
+                    or any("order" in update for update in data.sections_to_update)
+                ):
+                    update_ids = [
+                        section_update.get("id")
+                        for section_update in data.sections_to_update
+                        if section_update.get("id")
+                    ]
+                    sections_to_reorder = {
+                        section.id: section
+                        for section in Section.objects.select_for_update().filter(
+                            id__in=update_ids,
+                            homework=homework,
+                        )
+                    }
+                    for index, section in enumerate(
+                        sections_to_reorder.values(), start=1
+                    ):
+                        section.order = 1000 + index
+                        section.save(update_fields=["order", "updated_at"])
+
                 # Create new sections if requested
                 if data.sections_to_create:
                     for section_data in data.sections_to_create:
@@ -1007,9 +1032,11 @@ class HomeworkService:
                 if data.sections_to_update:
                     for section_update in data.sections_to_update:
                         try:
-                            section = Section.objects.get(
-                                id=section_update.get("id"), homework=homework
-                            )
+                            section = sections_to_reorder.get(section_update.get("id"))
+                            if section is None:
+                                section = Section.objects.get(
+                                    id=section_update.get("id"), homework=homework
+                                )
 
                             # Update section fields
                             if "title" in section_update:

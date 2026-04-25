@@ -35,7 +35,13 @@ from .services import (
     SectionStatus,
     SectionData,
 )
-from .forms import HomeworkCreateForm, HomeworkEditForm, SectionForm, SectionFormSet
+from .forms import (
+    HomeworkCreateForm,
+    HomeworkEditForm,
+    SectionForm,
+    SectionFormSet,
+    normalize_section_formset_orders,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -535,33 +541,34 @@ class HomeworkEditView(View):
                     # Section marked for deletion
                     if section_form.cleaned_data.get("id"):
                         sections_to_delete.append(section_form.cleaned_data["id"])
-                else:
-                    # Get section data
-                    section_data = {
-                        "title": section_form.cleaned_data["title"],
-                        "content": section_form.cleaned_data["content"],
-                        "order": section_form.cleaned_data["order"],
-                        "solution": section_form.cleaned_data["solution"],
-                        "section_type": section_form.cleaned_data.get(
-                            "section_type", "conversation"
-                        ),
-                    }
 
-                    if section_form.cleaned_data.get("id"):
-                        # Existing section to update
-                        section_data["id"] = section_form.cleaned_data["id"]
-                        sections_to_update.append(section_data)
-                    else:
-                        # New section to create
-                        sections_to_create.append(
-                            SectionCreateData(
-                                title=section_data["title"],
-                                content=section_data["content"],
-                                order=section_data["order"],
-                                solution=section_data["solution"],
-                                section_type=section_data["section_type"],
-                            )
+            for section_form in normalize_section_formset_orders(section_formset):
+                # Get section data
+                section_data = {
+                    "title": section_form.cleaned_data["title"],
+                    "content": section_form.cleaned_data["content"],
+                    "order": section_form.cleaned_data["order"],
+                    "solution": section_form.cleaned_data["solution"],
+                    "section_type": section_form.cleaned_data.get(
+                        "section_type", "conversation"
+                    ),
+                }
+
+                if section_form.cleaned_data.get("id"):
+                    # Existing section to update
+                    section_data["id"] = section_form.cleaned_data["id"]
+                    sections_to_update.append(section_data)
+                else:
+                    # New section to create
+                    sections_to_create.append(
+                        SectionCreateData(
+                            title=section_data["title"],
+                            content=section_data["content"],
+                            order=section_data["order"],
+                            solution=section_data["solution"],
+                            section_type=section_data["section_type"],
                         )
+                    )
 
             # Create update data
             update_data = HomeworkUpdateData(
