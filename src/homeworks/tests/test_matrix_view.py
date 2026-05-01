@@ -16,7 +16,7 @@ from datetime import timedelta
 from accounts.models import Teacher, Student
 from homeworks.models import Homework, Section
 from homeworks.services import HomeworkService
-from conversations.models import Conversation, Submission
+from conversations.models import Conversation, Submission, SectionAnswer
 from llm.models import LLMConfig
 from courses.models import Course, CourseEnrollment, CourseTeacher
 
@@ -453,3 +453,168 @@ class HomeworkMatrixViewTest(TestCase):
         # Verify only enrolled students are shown
         self.assertIn(self.student1.id, student_ids)
         self.assertIn(self.student2.id, student_ids)
+
+    def test_non_interactive_section_answered_shows_submitted(self):
+        """Non-interactive sections answered via SectionAnswer count as submitted."""
+        ni_section = Section.objects.create(
+            homework=self.homework1,
+            title="Non-interactive Q",
+            content="What is 2+2?",
+            order=3,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+        SectionAnswer.objects.create(
+            user=self.student1_user, section=ni_section, answer="4"
+        )
+
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
+
+        student1_row = next(
+            row
+            for row in matrix_data.student_rows
+            if row.student_id == self.student1.id
+        )
+        hw1_cell = next(
+            cell
+            for cell in student1_row.homework_cells
+            if cell.homework_id == self.homework1.id
+        )
+
+        self.assertEqual(hw1_cell.answer_count, 1)
+        self.assertEqual(hw1_cell.submitted_sections, 1)
+        self.assertEqual(hw1_cell.total_sections, 3)
+        self.assertEqual(hw1_cell.status.value, "in_progress")
+
+    def test_non_interactive_section_answered_renders_in_view(self):
+        """Matrix view renders answer info for answered non-interactive sections."""
+        ni_section = Section.objects.create(
+            homework=self.homework1,
+            title="Non-interactive Q",
+            content="What is 2+2?",
+            order=3,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+        SectionAnswer.objects.create(
+            user=self.student1_user, section=ni_section, answer="4"
+        )
+
+        self.client.login(username="teacher", password="password123")
+        response = self.client.get(self.matrix_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "1/3")
+
+    def test_non_interactive_section_not_answered_shows_not_started(self):
+        """Non-interactive sections with no answers show as not started."""
+        Section.objects.create(
+            homework=self.homework1,
+            title="Non-interactive Q",
+            content="What is 2+2?",
+            order=3,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
+
+        student1_row = next(
+            row
+            for row in matrix_data.student_rows
+            if row.student_id == self.student1.id
+        )
+        hw1_cell = next(
+            cell
+            for cell in student1_row.homework_cells
+            if cell.homework_id == self.homework1.id
+        )
+
+        self.assertEqual(hw1_cell.answer_count, 0)
+        self.assertEqual(hw1_cell.submitted_sections, 0)
+        self.assertEqual(hw1_cell.status.value, "not_started")
+
+    def test_matrix_with_mixed_sections_full_completion(self):
+        """Full completion with both conversational and non-interactive sections."""
+        ni_section = Section.objects.create(
+            homework=self.homework1,
+            title="Non-interactive Q",
+            content="What is 2+2?",
+            order=3,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+        SectionAnswer.objects.create(
+            user=self.student1_user, section=ni_section, answer="4"
+        )
+
+        for section in [self.section1_1, self.section1_2]:
+            conv = Conversation.objects.create(user=self.student1_user, section=section)
+            Submission.objects.create(conversation=conv, submitted_at=timezone.now())
+
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
+
+        student1_row = next(
+            row
+            for row in matrix_data.student_rows
+            if row.student_id == self.student1.id
+        )
+        hw1_cell = next(
+            cell
+            for cell in student1_row.homework_cells
+            if cell.homework_id == self.homework1.id
+        )
+
+        self.assertEqual(hw1_cell.submitted_sections, 3)
+        self.assertEqual(hw1_cell.total_sections, 3)
+        self.assertEqual(hw1_cell.completion_percentage, 100)
+        self.assertEqual(hw1_cell.status.value, "submitted")
+
+    def test_non_interactive_only_homework_fully_answered(self):
+        """Homework with only non-interactive sections fully answered shows submitted."""
+        ni_hw = Homework.objects.create(
+            title="Non-interactive HW",
+            description="Only non-interactive sections",
+            due_date=timezone.now() + timedelta(days=7),
+            created_by=self.teacher,
+            course=self.course,
+        )
+
+        section_a = Section.objects.create(
+            homework=ni_hw,
+            title="Q1",
+            content="Question 1",
+            order=1,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+        section_b = Section.objects.create(
+            homework=ni_hw,
+            title="Q2",
+            content="Question 2",
+            order=2,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+        SectionAnswer.objects.create(
+            user=self.student1_user, section=section_a, answer="Answer 1"
+        )
+        SectionAnswer.objects.create(
+            user=self.student1_user, section=section_b, answer="Answer 2"
+        )
+
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
+
+        student1_row = next(
+            row
+            for row in matrix_data.student_rows
+            if row.student_id == self.student1.id
+        )
+        ni_hw_cell = next(
+            cell for cell in student1_row.homework_cells if cell.homework_id == ni_hw.id
+        )
+
+        self.assertEqual(ni_hw_cell.submitted_sections, 2)
+        self.assertEqual(ni_hw_cell.total_sections, 2)
+        self.assertEqual(ni_hw_cell.completion_percentage, 100)
+        self.assertEqual(ni_hw_cell.status.value, "submitted")
+        self.assertEqual(ni_hw_cell.answer_count, 2)
+        self.assertEqual(ni_hw_cell.total_conversations, 0)

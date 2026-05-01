@@ -155,6 +155,10 @@
                             <div class="conversations-count">
                                 <small>{{ cell.total_conversations }} conv.</small>
                             </div>
+                            {% elif cell.answer_count > 0 %}
+                            <div class="conversations-count">
+                                <small>{{ cell.answer_count }} answers</small>
+                            </div>
                             {% endif %}
                         </div>
                     </td>

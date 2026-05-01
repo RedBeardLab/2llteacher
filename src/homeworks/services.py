@@ -230,6 +230,7 @@ class HomeworkMatrixCell:
     completion_percentage: int
     last_activity: datetime | None
     total_conversations: int
+    answer_count: int = 0
 
 
 @dataclass
@@ -774,9 +775,9 @@ class HomeworkService:
         Returns:
             HomeworkMatrixData with matrix information for the course, or None if error
         """
-        from .models import Homework
+        from .models import Homework, Section as SectionModel
         from accounts.models import Student
-        from conversations.models import Conversation, Submission
+        from conversations.models import Conversation, Submission, SectionAnswer
         from courses.models import Course
 
         try:
@@ -799,6 +800,18 @@ class HomeworkService:
                 (hw.id, hw.title, hw.due_date) for hw in homeworks
             ]
 
+            # Build per-homework section type info
+            homework_sections: dict[UUID, list[SectionModel]] = {}
+            non_interactive_count: dict[UUID, int] = {}
+            for hw in homeworks:
+                sections = list(hw.sections.all())
+                homework_sections[hw.id] = sections
+                non_interactive_count[hw.id] = sum(
+                    1
+                    for s in sections
+                    if s.section_type == SectionModel.SECTION_TYPE_NON_INTERACTIVE
+                )
+
             conversations = (
                 Conversation.objects.filter(
                     section__homework__in=homeworks, is_deleted=False
@@ -810,6 +823,12 @@ class HomeworkService:
             submissions = Submission.objects.filter(
                 conversation__section__homework__in=homeworks
             ).select_related("conversation__section__homework")
+
+            # Get SectionAnswer records for non-interactive sections
+            all_homework_sections = SectionModel.objects.filter(homework__in=homeworks)
+            section_answers = SectionAnswer.objects.filter(
+                section__in=all_homework_sections
+            ).select_related("user__student_profile", "section__homework")
 
             student_homework_conversations: dict[
                 tuple[UUID, UUID], list[Conversation]
@@ -824,6 +843,23 @@ class HomeworkService:
                     student_homework_conversations[key] = []
                 student_homework_conversations[key].append(conv)
 
+            # Group answered non-interactive sections by (student_id, homework_id)
+            # Track: count of distinct answered non-interactive sections + latest answer timestamp
+            student_homework_answers: dict[tuple[UUID, UUID], set[UUID]] = {}
+            student_homework_answer_last_activity: dict[
+                tuple[UUID, UUID], datetime
+            ] = {}
+            for answer in section_answers:
+                student_id = answer.user.student_profile.id
+                homework_id = answer.section.homework.id
+                key = (student_id, homework_id)
+                if key not in student_homework_answers:
+                    student_homework_answers[key] = set()
+                    student_homework_answer_last_activity[key] = answer.submitted_at
+                student_homework_answers[key].add(answer.section.id)
+                if answer.submitted_at > student_homework_answer_last_activity[key]:
+                    student_homework_answer_last_activity[key] = answer.submitted_at
+
             student_rows = []
             total_submissions = 0
 
@@ -836,18 +872,43 @@ class HomeworkService:
                         (student.id, homework.id), []
                     )
 
-                    submitted_sections = 0
+                    total_sections = homework.section_count
+
+                    submitted_conversation_sections = 0
                     total_conversations = len(convs)
                     last_activity = None
 
                     for conv in convs:
                         if conv.id in submission_map:
-                            submitted_sections += 1
-                            student_total_submissions += 1
+                            submitted_conversation_sections += 1
                         if last_activity is None or conv.updated_at > last_activity:
                             last_activity = conv.updated_at
 
-                    total_sections = homework.section_count
+                    # Count answered non-interactive sections
+                    answered_section_ids = student_homework_answers.get(
+                        (student.id, homework.id), set()
+                    )
+                    answered_ni_count = len(answered_section_ids)
+
+                    # Check if any non-interactive progress exists (answers without distinct sections)
+                    has_ni_progress = answered_ni_count > 0
+
+                    submitted_sections = (
+                        submitted_conversation_sections + answered_ni_count
+                    )
+                    student_total_submissions += (
+                        submitted_conversation_sections + answered_ni_count
+                    )
+
+                    # Update last_activity with SectionAnswer timestamps
+                    answer_last_activity = student_homework_answer_last_activity.get(
+                        (student.id, homework.id)
+                    )
+                    if answer_last_activity and (
+                        last_activity is None or answer_last_activity > last_activity
+                    ):
+                        last_activity = answer_last_activity
+
                     completion_percentage = (
                         round((submitted_sections / total_sections) * 100)
                         if total_sections > 0
@@ -856,7 +917,7 @@ class HomeworkService:
 
                     if submitted_sections == total_sections and total_sections > 0:
                         status = SectionStatus.SUBMITTED
-                    elif submitted_sections > 0:
+                    elif submitted_conversation_sections > 0 or has_ni_progress:
                         if homework.is_overdue:
                             status = SectionStatus.IN_PROGRESS_OVERDUE
                         else:
@@ -882,6 +943,7 @@ class HomeworkService:
                             completion_percentage=completion_percentage,
                             last_activity=last_activity,
                             total_conversations=total_conversations,
+                            answer_count=answered_ni_count,
                         )
                     )
 
