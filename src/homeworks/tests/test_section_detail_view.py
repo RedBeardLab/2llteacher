@@ -238,7 +238,6 @@ class SectionDetailViewNonInteractiveTestCase(TestCase):
     """Test SectionDetailView behaviour for non-interactive sections."""
 
     def setUp(self):
-
         self.client = Client()
 
         self.teacher_user = User.objects.create_user(
