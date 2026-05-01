@@ -167,11 +167,80 @@ class ConversationSubmitViewTests(TestCase):
         self.assertEqual(args[0], self.student_user)
         self.assertEqual(args[1].id, self.conversation.id)
 
-        # Check redirect to section detail
+        # Check redirect to homework detail (no next section)
+        self.assertEqual(response.status_code, 302)
+        expected_url = reverse(
+            "homeworks:detail",
+            kwargs={"homework_id": self.homework.id},
+        )
+        self.assertEqual(response["Location"], expected_url)
+
+    @patch("conversations.services.SubmissionService.submit_section")
+    def test_submit_redirects_to_next_interactive_section(self, mock_submit_section):
+        """Test that submitting redirects to the next interactive section."""
+        Section.objects.create(
+            homework=self.homework,
+            title="Section 2",
+            content="Content 2",
+            order=2,
+        )
+
+        self.client.login(username="studentuser", password="password123")
+
+        mock_result = MagicMock(
+            success=True,
+            submission_id=UUID("12345678-1234-5678-1234-567812345678"),
+            conversation_id=self.conversation.id,
+            section_id=self.section.id,
+            is_new=True,
+        )
+        mock_submit_section.return_value = mock_result
+
+        response = self.client.post(self.submit_url)
+
         self.assertEqual(response.status_code, 302)
         expected_url = reverse(
             "homeworks:section_detail",
-            kwargs={"homework_id": self.homework.id, "section_id": self.section.id},
+            kwargs={
+                "homework_id": self.homework.id,
+                "section_id": Section.objects.get(order=2).id,
+            },
+        )
+        self.assertEqual(response["Location"], expected_url)
+
+    @patch("conversations.services.SubmissionService.submit_section")
+    def test_submit_redirects_to_next_non_interactive_section(
+        self, mock_submit_section
+    ):
+        """Test that submitting redirects to the next non-interactive section."""
+        Section.objects.create(
+            homework=self.homework,
+            title="Non-interactive Q",
+            content="What is 2+2?",
+            order=2,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+
+        self.client.login(username="studentuser", password="password123")
+
+        mock_result = MagicMock(
+            success=True,
+            submission_id=UUID("12345678-1234-5678-1234-567812345678"),
+            conversation_id=self.conversation.id,
+            section_id=self.section.id,
+            is_new=True,
+        )
+        mock_submit_section.return_value = mock_result
+
+        response = self.client.post(self.submit_url)
+
+        self.assertEqual(response.status_code, 302)
+        expected_url = reverse(
+            "homeworks:section_answer",
+            kwargs={
+                "homework_id": self.homework.id,
+                "section_id": Section.objects.get(order=2).id,
+            },
         )
         self.assertEqual(response["Location"], expected_url)
 
@@ -255,11 +324,11 @@ class ConversationSubmitViewTests(TestCase):
         # Check that the service was called
         mock_submit_section.assert_called_once()
 
-        # Check redirect to section detail
+        # Check redirect to homework detail (no next section)
         self.assertEqual(response.status_code, 302)
         expected_url = reverse(
-            "homeworks:section_detail",
-            kwargs={"homework_id": self.homework.id, "section_id": self.section.id},
+            "homeworks:detail",
+            kwargs={"homework_id": self.homework.id},
         )
         self.assertEqual(response["Location"], expected_url)
 
@@ -282,3 +351,33 @@ class ConversationSubmitViewTests(TestCase):
 
         # Check that access is forbidden
         self.assertEqual(response.status_code, 403)
+
+    def test_submit_last_section_redirects_to_homework_detail(self):
+        """Test that submitting the last section redirects to homework detail."""
+        Section.objects.create(
+            homework=self.homework,
+            title="Section 2",
+            content="Content 2",
+            order=2,
+        )
+
+        conv2 = Conversation.objects.create(
+            user=self.student_user,
+            section=Section.objects.get(order=2),
+        )
+
+        self.client.login(username="studentuser", password="password123")
+
+        submit_url = reverse(
+            "conversations:submit_conversation",
+            kwargs={"conversation_id": conv2.id},
+        )
+
+        response = self.client.post(submit_url)
+
+        self.assertEqual(response.status_code, 302)
+        expected_url = reverse(
+            "homeworks:detail",
+            kwargs={"homework_id": self.homework.id},
+        )
+        self.assertEqual(response["Location"], expected_url)

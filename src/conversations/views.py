@@ -616,17 +616,37 @@ class ConversationSubmitView(View):
         result = SubmissionService.submit_section(request.user, conversation)
 
         if result.success:
-            # Redirect to section detail with success message
+            next_section = (
+                Section.objects.filter(
+                    homework=conversation.section.homework,
+                    order__gt=conversation.section.order,
+                )
+                .order_by("order")
+                .first()
+            )
+
             messages.success(
                 request,
                 f"Conversation submitted successfully for section '{conversation.section.title}'."
                 + (" (Updated existing submission)" if not result.is_new else ""),
             )
-            return redirect(
-                "homeworks:section_detail",
-                homework_id=conversation.section.homework.id,
-                section_id=conversation.section.id,
-            )
+
+            if next_section is None:
+                return redirect(
+                    "homeworks:detail", homework_id=conversation.section.homework.id
+                )
+            elif next_section.section_type == Section.SECTION_TYPE_NON_INTERACTIVE:
+                return redirect(
+                    "homeworks:section_answer",
+                    homework_id=conversation.section.homework.id,
+                    section_id=next_section.id,
+                )
+            else:
+                return redirect(
+                    "homeworks:section_detail",
+                    homework_id=conversation.section.homework.id,
+                    section_id=next_section.id,
+                )
         else:
             # Show error message and redirect back to conversation
             messages.error(request, result.error or "Failed to submit conversation.")
