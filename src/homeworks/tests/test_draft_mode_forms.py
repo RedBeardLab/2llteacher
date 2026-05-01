@@ -109,7 +109,7 @@ class HomeworkCreateFormPublishAtTests(DraftModeFormSetUpMixin):
     def test_invalid_with_past_publish_at(self):
         data = {
             **self.base_post,
-            "publish_at": (timezone.now() - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"),
+            "publish_at": (timezone.localtime(timezone.now()) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"),
         }
         form = HomeworkCreateForm(data)
         self.assertFalse(form.is_valid())
@@ -125,7 +125,7 @@ class HomeworkCreateFormDueDateTests(DraftModeFormSetUpMixin):
         self.assertTrue(form.is_valid(), form.errors)
 
     def test_due_date_yesterday_is_invalid(self):
-        yesterday = timezone.now() - timedelta(days=1)
+        yesterday = timezone.localtime(timezone.now()) - timedelta(days=1)
         data = {**self.base_post, "due_date": yesterday.strftime("%Y-%m-%dT%H:%M")}
         form = HomeworkCreateForm(data)
         self.assertFalse(form.is_valid())

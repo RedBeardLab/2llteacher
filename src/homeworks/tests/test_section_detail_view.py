@@ -6,8 +6,10 @@ with its conversations and submission information.
 """
 
 import uuid
+from datetime import timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User, Teacher, Student
 from homeworks.models import Homework, Section, SectionSolution
@@ -59,7 +61,7 @@ class SectionDetailViewTestCase(TestCase):
             description="Test Description",
             created_by=self.teacher,
             course=self.course,
-            due_date=datetime.datetime(2030, 1, 1),
+            due_date=timezone.now() + timedelta(days=365),
         )
 
         # Create section without solution
@@ -266,7 +268,7 @@ class SectionDetailViewNonInteractiveTestCase(TestCase):
             description="",
             created_by=self.teacher,
             course=self.course,
-            due_date=datetime.datetime(2030, 1, 1),
+            due_date=timezone.now() + timedelta(days=365),
         )
 
         self.ni_section = Section.objects.create(

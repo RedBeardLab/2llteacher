@@ -2,10 +2,12 @@
 Tests for the ConversationDeleteAndRestartView.
 """
 
+from datetime import timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
+from django.utils import timezone
 from unittest.mock import patch, MagicMock
 
 from accounts.models import Student, Teacher
@@ -46,7 +48,7 @@ class ConversationDeleteAndRestartViewTests(TestCase):
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
-            due_date="2024-12-31",
+            due_date=timezone.now() + timedelta(days=365),
             created_by=self.teacher_profile,
             course=self.course,
         )

@@ -1366,7 +1366,7 @@ class CourseHomeworkCreateViewTests(TestCase):
         from django.utils import timezone
         from datetime import timedelta
 
-        past_date = timezone.now() - timedelta(days=1)
+        past_date = timezone.localtime(timezone.now()) - timedelta(days=1)
 
         homework_data = {
             "title": "Past Due Homework",

@@ -6,6 +6,7 @@ existing homework assignments and their sections.
 """
 
 import uuid
+from datetime import timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
@@ -78,7 +79,7 @@ class HomeworkEditViewTestCase(TestCase):
             description="Test Description",
             created_by=self.teacher,
             course=self.course,
-            due_date=datetime.datetime(2030, 1, 1),
+            due_date=timezone.now() + timedelta(days=365),
         )
 
         # Create section without solution
@@ -394,7 +395,7 @@ class HomeworkEditSectionTypeTests(TestCase):
             description="",
             created_by=self.teacher,
             course=self.course,
-            due_date=datetime.datetime(2030, 1, 1),
+            due_date=timezone.now() + timedelta(days=365),
         )
 
         self.conv_section = Section.objects.create(
@@ -498,7 +499,7 @@ class HomeworkEditIdentityTests(TestCase):
             description="desc",
             created_by=self.teacher,
             course=self.course,
-            due_date=datetime.datetime(2030, 1, 1),
+            due_date=timezone.now() + timedelta(days=365),
         )
         self.section_one = Section.objects.create(
             homework=self.homework,
@@ -661,7 +662,7 @@ class HomeworkEditFormLLMConfigFilteringTest(TestCase):
             description="",
             created_by=self.teacher,
             course=self.course1,
-            due_date=datetime.datetime(2030, 1, 1),
+            due_date=timezone.now() + timedelta(days=365),
         )
 
         self.url = reverse("homeworks:edit", kwargs={"homework_id": self.homework.id})

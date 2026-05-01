@@ -5,9 +5,11 @@ This module contains tests for the LLM views following
 the testing-first architecture approach.
 """
 
+from datetime import timedelta
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from unittest.mock import patch
 import json
 
@@ -456,7 +458,7 @@ class TestLLMGenerateAPIView(LLMViewsTestCase):
             description="Test homework description",
             created_by=self.teacher,
             course=self.course,
-            due_date="2024-12-31 23:59:59",
+            due_date=timezone.now() + timedelta(days=365),
             llm_config=self.llm_config,
         )
 

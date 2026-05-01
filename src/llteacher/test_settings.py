@@ -84,5 +84,7 @@ templates = cast(list[dict[str, Any]], TEMPLATES)  # noqa: F405
 templates[0]["OPTIONS"]["debug"] = False
 
 # Use faster timezone for tests
-USE_TZ = False
-TIME_ZONE = "UTC"
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "America/Los_Angeles"
+USE_I18N = True
+USE_TZ = True
