@@ -791,6 +791,7 @@ class HomeworkService:
 
             enrolled_students = (
                 Student.objects.filter(enrolled_courses=course)
+                .exclude(user__teacher_assistant_profile__courses=course)
                 .select_related("user")
                 .order_by("user__first_name", "user__last_name", "user__username")
                 .distinct()

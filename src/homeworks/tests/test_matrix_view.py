@@ -13,12 +13,17 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
 
-from accounts.models import Teacher, Student
+from accounts.models import Teacher, Student, TeacherAssistant
 from homeworks.models import Homework, Section
 from homeworks.services import HomeworkService
 from conversations.models import Conversation, Submission, SectionAnswer
 from llm.models import LLMConfig
-from courses.models import Course, CourseEnrollment, CourseTeacher
+from courses.models import (
+    Course,
+    CourseEnrollment,
+    CourseTeacher,
+    CourseTeacherAssistant,
+)
 
 User = get_user_model()
 
@@ -618,3 +623,30 @@ class HomeworkMatrixViewTest(TestCase):
         self.assertEqual(ni_hw_cell.status.value, "submitted")
         self.assertEqual(ni_hw_cell.answer_count, 2)
         self.assertEqual(ni_hw_cell.total_conversations, 0)
+
+    def test_ta_not_shown_in_matrix(self):
+        """Teacher assistants should not appear in the matrix."""
+        ta_user = User.objects.create_user(
+            username="tauser",
+            email="ta@example.com",
+            password="password123",
+            first_name="TA",
+            last_name="User",
+        )
+        ta_student = Student.objects.create(user=ta_user)
+        ta_profile = TeacherAssistant.objects.create(user=ta_user)
+
+        CourseEnrollment.objects.create(course=self.course, student=ta_student)
+        CourseTeacherAssistant.objects.create(
+            course=self.course, teacher_assistant=ta_profile
+        )
+
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
+
+        student_ids = [row.student_id for row in matrix_data.student_rows]
+        self.assertNotIn(
+            ta_student.id,
+            student_ids,
+            "TA with student profile should not appear in matrix",
+        )
+        self.assertEqual(matrix_data.total_students, 2)
