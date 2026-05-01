@@ -237,6 +237,61 @@ body {
         border-color: #404040;
     }
 
+    /* Accordion */
+    .accordion-item {
+        background-color: #2d2d2d;
+        border-color: #404040;
+        color: #e0e0e0;
+    }
+
+    .accordion-button {
+        background-color: #363636;
+        color: #e0e0e0;
+    }
+
+    .accordion-button:not(.collapsed) {
+        background-color: #404040;
+        color: #fff;
+    }
+
+    .accordion-button::after {
+        filter: invert(0.8);
+    }
+
+    .accordion-body {
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+    }
+
+    /* Badges */
+    .badge.bg-warning.text-dark {
+        background-color: #b8860b !important;
+        color: #fff !important;
+    }
+
+    .badge.bg-info.text-dark {
+        background-color: #1a6b8a !important;
+        color: #fff !important;
+    }
+
+    /* Light-danger custom class (submissions page) */
+    .bg-light-danger {
+        background-color: #4d1a1a !important;
+        color: #ff9999 !important;
+    }
+
+    /* Pre elements with bg-white */
+    pre.bg-white {
+        background-color: #1a1a1a !important;
+        color: #e0e0e0;
+    }
+
+    /* Rapid text growth event header */
+    .rapid-text-growth-event-header.bg-warning {
+        background-color: #8a6b0b !important;
+        color: #fff !important;
+    }
+
     /* Text muted */
     .text-muted {
         color: #a0a0a0 !important;
