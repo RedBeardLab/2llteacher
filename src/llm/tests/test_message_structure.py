@@ -5,8 +5,10 @@ This module tests that conversation context (section content, homework info)
 is not redundantly repeated in every message to the LLM.
 """
 
+from datetime import timedelta
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from unittest.mock import patch, MagicMock
 
 from llm.models import LLMConfig
@@ -48,7 +50,6 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
 
         # Create course first
         from courses.models import Course
-        from datetime import datetime
 
         self.course = Course.objects.create(
             name="Test Course",
@@ -62,7 +63,7 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
             description="Learn Python fundamentals",
             created_by=self.teacher,
             course=self.course,
-            due_date=datetime(2024, 12, 31),
+            due_date=timezone.now() + timedelta(days=365),
             llm_config=self.llm_config,
         )
 

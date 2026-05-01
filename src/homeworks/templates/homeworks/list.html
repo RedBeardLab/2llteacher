@@ -39,6 +39,15 @@
                     <div>
                         {% if 'teacher' in homework.roles %}
                             <span class="badge bg-primary">Teaching</span>
+                            {% if homework.is_scheduled %}
+                            <span class="badge bg-info text-dark"><i class="bi bi-clock"></i> Scheduled</span>
+                            {% elif homework.is_draft %}
+                            <span class="badge bg-warning text-dark"><i class="bi bi-pencil-square"></i> Draft</span>
+                            {% elif homework.is_hidden %}
+                            <span class="badge bg-secondary">Hidden</span>
+                            {% elif not homework.is_accessible_to_students %}
+                            <span class="badge bg-danger">Expired</span>
+                            {% endif %}
                         {% endif %}
                         {% if 'student' in homework.roles %}
                             {% if homework.is_submitted %}

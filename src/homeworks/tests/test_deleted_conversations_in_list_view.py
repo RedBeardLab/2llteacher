@@ -55,7 +55,8 @@ class DeletedConversationsListViewTests(TestCase):
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test Description",
-            due_date="2030-12-31",  # Future date to avoid overdue status
+            due_date=timezone.now()
+            + timedelta(days=365),  # Future date to avoid overdue status
             created_by=self.teacher_profile,
             course=self.course,
         )

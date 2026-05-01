@@ -4,9 +4,11 @@ Tests for enhanced streaming with intelligent retry logic.
 Simplified version focusing on core functionality with minimal mocking.
 """
 
+from datetime import timedelta
 from unittest.mock import patch, MagicMock
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from homeworks.models import Homework, Section
 from conversations.models import Conversation
@@ -54,7 +56,6 @@ class EnhancedStreamingTest(TestCase):
 
         # Create course first
         from courses.models import Course
-        from datetime import datetime
 
         self.course = Course.objects.create(
             name="Test Course",
@@ -68,7 +69,7 @@ class EnhancedStreamingTest(TestCase):
             description="Test description",
             created_by=self.teacher,
             course=self.course,
-            due_date=datetime(2024, 12, 31),
+            due_date=timezone.now() + timedelta(days=365),
         )
 
         self.section = Section.objects.create(

@@ -8,6 +8,8 @@ import json
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from datetime import timedelta
+from django.utils import timezone
 from unittest.mock import patch
 
 from homeworks.models import Homework, Section
@@ -47,14 +49,13 @@ class StreamingLLMTest(TestCase):
         )
 
         # Create homework and section
-        from datetime import datetime
 
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test description",
             created_by=self.teacher,
             course=self.course,
-            due_date=datetime(2024, 12, 31),
+            due_date=timezone.now() + timedelta(days=365),
         )
 
         self.section = Section.objects.create(

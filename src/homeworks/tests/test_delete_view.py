@@ -2,10 +2,12 @@
 Tests for homework deletion functionality.
 """
 
+from datetime import timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
+from django.utils import timezone
 from uuid import uuid4
 
 from accounts.models import Teacher, Student
@@ -66,7 +68,7 @@ class HomeworkDeleteViewTest(TestCase):
         self.homework = Homework.objects.create(
             title="Test Homework",
             description="Test description",
-            due_date="2024-12-31 23:59:59",
+            due_date=timezone.now() + timedelta(days=365),
             created_by=self.teacher,
             course=self.course,
             llm_config=self.llm_config,

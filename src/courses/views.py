@@ -6,7 +6,7 @@ following the testable-first architecture with typed data contracts.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Optional, cast
+from typing import Any, assert_type, cast
 from uuid import UUID
 from django.views import View
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
@@ -14,9 +14,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-
-if TYPE_CHECKING:
-    from homeworks.forms import HomeworkCreateForm, SectionFormSet
 
 from llteacher.permissions.decorators import (
     student_required,
@@ -284,6 +281,14 @@ class HomeworkItem:
     title: str
     description: str
     due_date: str  # Formatted due date
+    is_draft: bool = False
+    is_scheduled: bool = False
+    is_overdue: bool = False
+    is_hidden: bool = False
+    is_accessible_to_students: bool = True
+    expires_at: Any = None
+    publish_at: Any = None
+    section_count: int = 0
 
 
 @dataclass
@@ -407,17 +412,39 @@ class CourseDetailView(View):
             CourseDetailData with course info, homeworks, and optionally students/TAs
         """
         from homeworks.models import Homework
+        from homeworks.services import HomeworkService
 
-        course_homeworks = Homework.objects.filter(course=course).order_by("due_date")
+        # Auto-publish any scheduled homework before building the list
+        try:
+            HomeworkService.auto_publish_due_scheduled()
+        except Exception:
+            pass
+
+        is_student_view = (
+            CourseRole.STUDENT in user_roles
+            and CourseRole.TEACHER not in user_roles
+            and CourseRole.TEACHER_ASSISTANT not in user_roles
+        )
+        hw_qs = Homework.objects.filter(course=course).order_by("due_date")
+        if is_student_view:
+            hw_qs = hw_qs.filter(is_hidden=False)
 
         homeworks = []
-        for hw in course_homeworks:
+        for hw in hw_qs:
             homeworks.append(
                 HomeworkItem(
                     id=hw.id,
                     title=hw.title,
                     description=hw.description,
                     due_date=hw.due_date.strftime("%B %d, %Y at %I:%M %p"),
+                    is_draft=hw.is_draft,
+                    is_scheduled=hw.is_scheduled,
+                    is_overdue=hw.is_overdue,
+                    is_hidden=hw.is_hidden,
+                    is_accessible_to_students=hw.is_accessible_to_students,
+                    expires_at=hw.expires_at,
+                    publish_at=hw.publish_at,
+                    section_count=hw.section_count,
                 )
             )
 
@@ -495,17 +522,7 @@ class CourseDetailView(View):
         )
 
 
-@dataclass
-class HomeworkFormData:
-    """Data structure for homework form view."""
-
-    form: "HomeworkCreateForm"
-    section_forms: "SectionFormSet"
-    course_name: str
-    course_id: UUID
-    action: str  # 'create'
-    is_submitted: bool
-    available_llm_configs: Optional[List[dict]] = None
+from homeworks.views import HomeworkFormData  # noqa: E402
 
 
 class CourseHomeworkCreateView(View):
@@ -563,7 +580,11 @@ class CourseHomeworkCreateView(View):
         self, request: TeacherRequest, course: Course
     ) -> HomeworkFormData:
         """Prepare data for the form view."""
-        from homeworks.forms import HomeworkCreateForm, SectionForm, SectionFormSet
+        from homeworks.forms import (
+            HomeworkCreateForm,
+            SectionForm,
+            SectionFormSet,
+        )
         from django.forms import formset_factory
 
         form = HomeworkCreateForm(initial={"course": course}, course=course)
@@ -577,6 +598,7 @@ class CourseHomeworkCreateView(View):
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
+            user_type="teacher",
             course_name=course.name,
             course_id=course.id,
             action="create",
@@ -587,29 +609,47 @@ class CourseHomeworkCreateView(View):
         self, request: TeacherRequest, course: Course
     ) -> HomeworkFormData:
         """Process the form submission."""
-        from homeworks.forms import HomeworkCreateForm, SectionForm, SectionFormSet
+        from homeworks.forms import (
+            HomeworkCreateForm,
+            SectionForm,
+            SectionFormSet,
+            normalize_section_formset_orders,
+        )
         from homeworks.services import (
             HomeworkService,
             HomeworkCreateData,
             SectionCreateData,
         )
+        from homeworks.models import HomeworkType
         from django.forms import formset_factory
+
+        is_draft_save = "save_draft" in request.POST
+        publish_now = "publish_now" in request.POST
 
         # Create a mutable copy of POST data and inject course
         post_data = request.POST.copy()
         post_data["course"] = str(course.id)
 
         # Create forms from POST data
-        form = HomeworkCreateForm(post_data)
+        form = HomeworkCreateForm(post_data, is_draft_save=is_draft_save)
 
         SectionFormset = cast(
             type[SectionFormSet],
             formset_factory(SectionForm, extra=0, formset=SectionFormSet),
         )
         section_formset = SectionFormset(request.POST, prefix="sections")
+        assert_type(section_formset, SectionFormSet)
+        section_formset.is_draft_save = is_draft_save
 
-        # Check form validity
         if form.is_valid() and section_formset.is_valid():
+            publish_at = None if publish_now else form.cleaned_data.get("publish_at")
+            if is_draft_save:
+                homework_type = HomeworkType.DRAFT
+            elif publish_at:
+                homework_type = HomeworkType.SCHEDULED
+            else:
+                homework_type = HomeworkType.PUBLISHED
+
             # Extract homework data from form
             homework_data = HomeworkCreateData(
                 title=form.cleaned_data["title"],
@@ -620,26 +660,25 @@ class CourseHomeworkCreateView(View):
                 llm_config=form.cleaned_data["llm_config"].id
                 if form.cleaned_data["llm_config"]
                 else None,
+                homework_type=homework_type,
+                publish_at=publish_at,
             )
 
             # Extract sections data from formset
             section_data = []
-            for section_form in section_formset.forms:
-                if section_form.cleaned_data and not section_form.cleaned_data.get(
-                    "DELETE", False
-                ):
-                    # Extract data from form
-                    section_data.append(
-                        SectionCreateData(
-                            title=section_form.cleaned_data["title"],
-                            content=section_form.cleaned_data["content"],
-                            order=section_form.cleaned_data["order"],
-                            solution=section_form.cleaned_data["solution"],
-                            section_type=section_form.cleaned_data.get(
-                                "section_type", "conversation"
-                            ),
-                        )
+            for section_form in normalize_section_formset_orders(section_formset):
+                # Extract data from form
+                section_data.append(
+                    SectionCreateData(
+                        title=section_form.cleaned_data["title"],
+                        content=section_form.cleaned_data["content"],
+                        order=section_form.cleaned_data["order"],
+                        solution=section_form.cleaned_data["solution"],
+                        section_type=section_form.cleaned_data.get(
+                            "section_type", "conversation"
+                        ),
                     )
+                )
 
             # Add sections to homework data
             homework_data.sections = section_data
@@ -654,6 +693,7 @@ class CourseHomeworkCreateView(View):
                 return HomeworkFormData(
                     form=form,
                     section_forms=section_formset,
+                    user_type="teacher",
                     course_name=course.name,
                     course_id=course.id,
                     action="create",
@@ -666,6 +706,7 @@ class CourseHomeworkCreateView(View):
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
+            user_type="teacher",
             course_name=course.name,
             course_id=course.id,
             action="create",

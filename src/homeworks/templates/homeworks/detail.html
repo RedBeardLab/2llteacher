@@ -32,6 +32,27 @@
             {% endif %}
             <span class="text-muted">Due: {{ data.due_date|date:"F d, Y" }}</span>
 
+            {% if 'teacher' in data.user_roles %}
+            <div class="mt-2">
+                {% if data.is_scheduled %}
+                <span class="badge bg-info text-dark fs-6"><i class="bi bi-clock"></i> Scheduled — not visible to students</span>
+                {% if data.publish_at %}
+                <br><small class="text-muted">Publishes {{ data.publish_at|date:"F d, Y H:i" }}</small>
+                {% endif %}
+                {% elif data.is_draft %}
+                <span class="badge bg-warning text-dark fs-6"><i class="bi bi-pencil-square"></i> Draft — not visible to students</span>
+                {% elif data.is_hidden %}
+                <span class="badge bg-secondary fs-6"><i class="bi bi-eye-slash"></i> Hidden from students</span>
+                {% elif not data.is_accessible_to_students %}
+                <span class="badge bg-danger fs-6"><i class="bi bi-clock-history"></i> Expired — students cannot access</span>
+                {% elif data.expires_at %}
+                <span class="badge bg-primary fs-6"><i class="bi bi-calendar-x"></i> Expires {{ data.expires_at|date:"F d, Y" }}</span>
+                {% else %}
+                <span class="badge bg-success fs-6"><i class="bi bi-eye"></i> Visible to students</span>
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% if data.can_edit or 'teacher' in data.user_roles or 'teacher_assistant' in data.user_roles %}
             <div class="mt-2">
                 {% if data.can_edit %}
