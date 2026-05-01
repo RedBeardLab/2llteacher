@@ -239,6 +239,7 @@ class HomeworkListView(View):
                             solution_content=section_progress.solution_content,
                             created_at=section_progress.created_at,
                             updated_at=section_progress.updated_at,
+                            section_type=section_progress.section_type,
                             status=section_progress.status,
                             conversation_id=section_progress.conversation_id,
                         )

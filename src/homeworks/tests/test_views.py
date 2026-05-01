@@ -336,6 +336,78 @@ class HomeworkListViewTests(TestCase):
         self.assertFalse(data.homeworks[0].is_submitted)
         self.assertEqual(data.homeworks[0].completed_percentage, 0)
 
+    def test_non_interactive_section_links_to_section_answer_in_list(self):
+        """Test that non-interactive sections link to section_answer, not conversations:start."""
+        sections_data = [
+            MagicMock(
+                id=self.section1.id,
+                title=self.section1.title,
+                content=self.section1.content,
+                order=self.section1.order,
+                solution_content=None,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                section_type="non_interactive",
+                status="not_started",
+                conversation_id=None,
+            ),
+            MagicMock(
+                id=self.section2.id,
+                title=self.section2.title,
+                content=self.section2.content,
+                order=self.section2.order,
+                solution_content=None,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                section_type="conversation",
+                status="not_started",
+                conversation_id=None,
+            ),
+        ]
+
+        with patch(
+            "homeworks.services.HomeworkService.get_student_homework_progress"
+        ) as mock_get_progress:
+            mock_progress = MagicMock()
+            mock_progress.sections_progress = sections_data
+            mock_get_progress.return_value = mock_progress
+
+            self.client.login(username="teststudent", password="password123")
+            response = self.client.get(reverse("homeworks:list"))
+
+        self.assertEqual(response.status_code, 200)
+
+        expected_answer_url = reverse(
+            "homeworks:section_answer",
+            kwargs={
+                "homework_id": self.homework.id,
+                "section_id": self.section1.id,
+            },
+        )
+        self.assertContains(
+            response,
+            expected_answer_url,
+            msg_prefix="Non-interactive section should link to section_answer",
+        )
+
+        expected_start_url = reverse(
+            "conversations:start", kwargs={"section_id": self.section2.id}
+        )
+        self.assertContains(
+            response,
+            expected_start_url,
+            msg_prefix="Interactive section should link to conversations:start",
+        )
+
+        unexpected_start_url = reverse(
+            "conversations:start", kwargs={"section_id": self.section1.id}
+        )
+        self.assertNotContains(
+            response,
+            unexpected_start_url,
+            msg_prefix="Non-interactive section should NOT link to conversations:start",
+        )
+
 
 class HomeworkDetailViewTATests(TestCase):
     """Tests for TA access to homework detail view."""
