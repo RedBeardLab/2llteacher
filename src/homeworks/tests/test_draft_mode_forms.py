@@ -78,6 +78,7 @@ class DraftModeFormSetUpMixin(TestCase):
 # HomeworkCreateForm
 # ---------------------------------------------------------------------------
 
+
 class HomeworkCreateFormPublishAtTests(DraftModeFormSetUpMixin):
     def test_valid_with_no_publish_at_and_no_submit_button(self):
         """No publish button in POST — publish_at is optional."""
@@ -101,7 +102,9 @@ class HomeworkCreateFormPublishAtTests(DraftModeFormSetUpMixin):
         data = {
             **self.base_post,
             "publish": "1",
-            "publish_at": (timezone.now() + timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M"),
+            "publish_at": (timezone.now() + timedelta(hours=3)).strftime(
+                "%Y-%m-%dT%H:%M"
+            ),
         }
         form = HomeworkCreateForm(data)
         self.assertTrue(form.is_valid(), form.errors)
@@ -109,7 +112,9 @@ class HomeworkCreateFormPublishAtTests(DraftModeFormSetUpMixin):
     def test_invalid_with_past_publish_at(self):
         data = {
             **self.base_post,
-            "publish_at": (timezone.localtime(timezone.now()) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"),
+            "publish_at": (
+                timezone.localtime(timezone.now()) - timedelta(hours=1)
+            ).strftime("%Y-%m-%dT%H:%M"),
         }
         form = HomeworkCreateForm(data)
         self.assertFalse(form.is_valid())
@@ -147,6 +152,7 @@ class HomeworkCreateFormDueDateTests(DraftModeFormSetUpMixin):
 # ---------------------------------------------------------------------------
 # HomeworkEditForm
 # ---------------------------------------------------------------------------
+
 
 class HomeworkEditFormTests(DraftModeFormSetUpMixin):
     def setUp(self):
@@ -205,6 +211,7 @@ class HomeworkEditFormTests(DraftModeFormSetUpMixin):
 # ---------------------------------------------------------------------------
 # SectionFormSet
 # ---------------------------------------------------------------------------
+
 
 class SectionFormSetOrderTests(TestCase):
     def _section(self, order, title="T", content="C"):

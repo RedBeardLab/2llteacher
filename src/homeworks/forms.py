@@ -316,7 +316,6 @@ class SectionFormSet(forms.BaseFormSet):
             raise forms.ValidationError("At least one section is required.")
 
 
-
 def normalize_section_formset_orders(section_formset: BaseFormSet) -> list[forms.Form]:
     """Assign canonical 1-based order to active section forms."""
     active_forms: list[forms.Form] = []

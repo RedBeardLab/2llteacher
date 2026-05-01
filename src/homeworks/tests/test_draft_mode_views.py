@@ -28,6 +28,7 @@ User = get_user_model()
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_section_post(sections, prefix="sections"):
     data = {
         f"{prefix}-TOTAL_FORMS": str(len(sections)),
@@ -60,7 +61,9 @@ class DraftViewsSetUpMixin(TestCase):
 
         # Course
         self.course = Course.objects.create(name="Course", code="C1")
-        CourseTeacher.objects.create(course=self.course, teacher=self.teacher, role="owner")
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
         CourseEnrollment.objects.create(
             course=self.course, student=self.student, is_active=True
         )
@@ -85,8 +88,8 @@ class DraftViewsSetUpMixin(TestCase):
 # List view
 # ---------------------------------------------------------------------------
 
-class DraftHomeworkListTests(DraftViewsSetUpMixin):
 
+class DraftHomeworkListTests(DraftViewsSetUpMixin):
     def test_student_cannot_see_draft_in_list(self):
         self.client.login(username="student", password="pass")
         response = self.client.get(reverse("homeworks:list"))
@@ -105,20 +108,25 @@ class DraftHomeworkListTests(DraftViewsSetUpMixin):
         self.client.login(username="teacher", password="pass")
         response = self.client.get(reverse("homeworks:list"))
         item = next(
-            hw for hw in response.context["data"].homeworks
+            hw
+            for hw in response.context["data"].homeworks
             if str(hw.id) == str(self.draft.id)
         )
         self.assertTrue(item.is_draft)
 
     def test_auto_publish_called_on_student_list_load(self):
         self.client.login(username="student", password="pass")
-        with patch("homeworks.views.HomeworkService.auto_publish_due_scheduled") as mock_ap:
+        with patch(
+            "homeworks.views.HomeworkService.auto_publish_due_scheduled"
+        ) as mock_ap:
             self.client.get(reverse("homeworks:list"))
         mock_ap.assert_called_once()
 
     def test_auto_publish_called_on_teacher_list_load(self):
         self.client.login(username="teacher", password="pass")
-        with patch("homeworks.views.HomeworkService.auto_publish_due_scheduled") as mock_ap:
+        with patch(
+            "homeworks.views.HomeworkService.auto_publish_due_scheduled"
+        ) as mock_ap:
             self.client.get(reverse("homeworks:list"))
         mock_ap.assert_called_once()
 
@@ -127,8 +135,8 @@ class DraftHomeworkListTests(DraftViewsSetUpMixin):
 # Detail view
 # ---------------------------------------------------------------------------
 
-class DraftHomeworkDetailTests(DraftViewsSetUpMixin):
 
+class DraftHomeworkDetailTests(DraftViewsSetUpMixin):
     def test_student_cannot_access_draft_detail(self):
         """Detail view returns redirect (None data) for student on a hidden homework."""
         self.client.login(username="student", password="pass")
@@ -189,8 +197,8 @@ class DraftHomeworkDetailTests(DraftViewsSetUpMixin):
 # publish_now action
 # ---------------------------------------------------------------------------
 
-class PublishNowActionTests(DraftViewsSetUpMixin):
 
+class PublishNowActionTests(DraftViewsSetUpMixin):
     def test_publish_now_makes_homework_visible(self):
         self.client.login(username="teacher", password="pass")
         url = reverse("homeworks:detail", kwargs={"homework_id": self.draft.id})
@@ -222,8 +230,8 @@ class PublishNowActionTests(DraftViewsSetUpMixin):
 # Edit view — save_draft path
 # ---------------------------------------------------------------------------
 
-class EditViewDraftSaveTests(DraftViewsSetUpMixin):
 
+class EditViewDraftSaveTests(DraftViewsSetUpMixin):
     def _edit_url(self):
         return reverse("homeworks:edit", kwargs={"homework_id": self.draft.id})
 
@@ -299,8 +307,8 @@ class EditViewDraftSaveTests(DraftViewsSetUpMixin):
 # Scheduled homework stays hidden
 # ---------------------------------------------------------------------------
 
-class ScheduledHomeworkTests(DraftViewsSetUpMixin):
 
+class ScheduledHomeworkTests(DraftViewsSetUpMixin):
     def test_scheduled_homework_not_visible_to_student_before_publish_at(self):
         """Scheduled homework with publish_at in the future is hidden from students."""
         self.draft.homework_type = HomeworkType.SCHEDULED

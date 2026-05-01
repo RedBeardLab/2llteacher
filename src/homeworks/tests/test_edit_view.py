@@ -135,8 +135,12 @@ class HomeworkEditViewTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context["data"].publish_now_checked)
-        self.assertContains(response, 'id="publish-now-toggle" name="publish_now"', html=False)
-        self.assertNotContains(response, 'id="publish-now-toggle" name="publish_now" checked', html=False)
+        self.assertContains(
+            response, 'id="publish-now-toggle" name="publish_now"', html=False
+        )
+        self.assertNotContains(
+            response, 'id="publish-now-toggle" name="publish_now" checked', html=False
+        )
         self.assertContains(response, 'value="2030-01-15T10:30"', html=False)
 
     def test_edit_view_get_teacher_no_access(self):
@@ -593,7 +597,11 @@ class HomeworkEditIdentityTests(TestCase):
 
         response = self.client.post(
             self.url,
-            {"title": "Draft Identity Homework", "description": "draft", "save_draft": "1"},
+            {
+                "title": "Draft Identity Homework",
+                "description": "draft",
+                "save_draft": "1",
+            },
         )
 
         self.assertEqual(response.status_code, 302)

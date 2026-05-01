@@ -420,7 +420,11 @@ class CourseDetailView(View):
         except Exception:
             pass
 
-        is_student_view = CourseRole.STUDENT in user_roles and CourseRole.TEACHER not in user_roles and CourseRole.TEACHER_ASSISTANT not in user_roles
+        is_student_view = (
+            CourseRole.STUDENT in user_roles
+            and CourseRole.TEACHER not in user_roles
+            and CourseRole.TEACHER_ASSISTANT not in user_roles
+        )
         hw_qs = Homework.objects.filter(course=course).order_by("due_date")
         if is_student_view:
             hw_qs = hw_qs.filter(is_hidden=False)

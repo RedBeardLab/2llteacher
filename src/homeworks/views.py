@@ -489,7 +489,9 @@ class HomeworkEditView(View):
             from django.utils.dateparse import parse_datetime
 
             homework.title = request.POST.get("title") or homework.title
-            homework.description = request.POST.get("description") or homework.description
+            homework.description = (
+                request.POST.get("description") or homework.description
+            )
             update_fields = [
                 "title",
                 "description",
@@ -502,7 +504,9 @@ class HomeworkEditView(View):
                 update_fields.append("publish_at")
             elif "publish_at" in request.POST:
                 publish_at_value = request.POST.get("publish_at")
-                publish_at = parse_datetime(publish_at_value) if publish_at_value else None
+                publish_at = (
+                    parse_datetime(publish_at_value) if publish_at_value else None
+                )
                 if publish_at and timezone.is_naive(publish_at):
                     publish_at = timezone.make_aware(publish_at)
                 homework.publish_at = publish_at
@@ -676,7 +680,9 @@ class HomeworkDetailView(View):
         # If no valid action, redirect to detail view
         return redirect("homeworks:detail", homework_id=homework_id)
 
-    def _handle_publish_now(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
+    def _handle_publish_now(
+        self, request: HttpRequest, homework_id: UUID
+    ) -> HttpResponse:
         """Immediately publish a draft homework from the detail page."""
         teacher_profile = getattr(request.user, "teacher_profile", None)
         if not teacher_profile:
@@ -695,7 +701,9 @@ class HomeworkDetailView(View):
             can_edit = homework.course in teacher_courses
 
         if not can_edit:
-            return HttpResponseForbidden("You don't have permission to publish this homework.")
+            return HttpResponseForbidden(
+                "You don't have permission to publish this homework."
+            )
 
         HomeworkService.publish_homework(homework_id)
         messages.success(request, f"'{homework.title}' has been published.")
@@ -858,7 +866,8 @@ class HomeworkDetailView(View):
             created_by_name=created_by_name,
             created_at=homework_detail.created_at,
             sections=sections,
-            is_overdue=homework_detail.due_date is not None and homework_detail.due_date < timezone.now(),
+            is_overdue=homework_detail.due_date is not None
+            and homework_detail.due_date < timezone.now(),
             user_roles=user_roles,
             can_edit=can_edit,
             expires_at=homework.expires_at,  # type: ignore[assignment]
