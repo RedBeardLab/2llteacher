@@ -53,7 +53,6 @@ class SectionDetailViewTestCase(TestCase):
         )
 
         # Create homework with timezone-naive datetime and course (direct FK relationship)
-        import datetime
 
         # Use a naive datetime object for the test
         self.homework = Homework.objects.create(
@@ -239,7 +238,6 @@ class SectionDetailViewNonInteractiveTestCase(TestCase):
     """Test SectionDetailView behaviour for non-interactive sections."""
 
     def setUp(self):
-        import datetime
 
         self.client = Client()
 

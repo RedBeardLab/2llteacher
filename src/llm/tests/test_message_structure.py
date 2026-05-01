@@ -50,7 +50,6 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
 
         # Create course first
         from courses.models import Course
-        from datetime import datetime
 
         self.course = Course.objects.create(
             name="Test Course",

@@ -49,7 +49,6 @@ class StreamingLLMTest(TestCase):
         )
 
         # Create homework and section
-        from datetime import datetime
 
         self.homework = Homework.objects.create(
             title="Test Homework",
