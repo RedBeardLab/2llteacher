@@ -1035,11 +1035,11 @@ class HomeworkService:
                 if data.sections_to_update:
                     for section_update in data.sections_to_update:
                         try:
-                            section = sections_to_reorder.get(section_update.get("id"))
-                            if section is None:
-                                section = Section.objects.get(
-                                    id=section_update.get("id"), homework=homework
-                                )
+                            section = sections_to_reorder.get(
+                                section_update.get("id")
+                            ) or Section.objects.get(
+                                id=section_update.get("id"), homework=homework
+                            )
 
                             # Update section fields
                             if "title" in section_update:
