@@ -1220,7 +1220,9 @@ class CourseHomeworkCreateViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
         homework = Homework.objects.get(title="Homework With Three Widgets")
-        widgets = list(HomeworkProgressWidget.objects.filter(homework=homework).order_by("order"))
+        widgets = list(
+            HomeworkProgressWidget.objects.filter(homework=homework).order_by("order")
+        )
         self.assertEqual(len(widgets), 3)
         self.assertEqual(widgets[0].order, 1)
         self.assertEqual(widgets[1].order, 2)

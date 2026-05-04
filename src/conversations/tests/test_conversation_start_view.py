@@ -242,5 +242,7 @@ class ConversationStartViewTests(TestCase):
         response = self.client.get(self.start_url)
         # This currently returns 200 (no pre-widget check exists) — SHOULD redirect
         self.assertEqual(
-            response.status_code, 302, "Student should be redirected, not allowed to start"
+            response.status_code,
+            302,
+            "Student should be redirected, not allowed to start",
         )

@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("conversations", "0004_sectionanswer"),
         ("homeworks", "0008_homeworkprogresswidget"),

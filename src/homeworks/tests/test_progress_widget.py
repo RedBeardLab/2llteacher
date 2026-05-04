@@ -46,7 +46,9 @@ class HomeworkProgressWidgetModelTest(TestCase):
         )
         self.assertEqual(widget.homework, self.homework)
         self.assertEqual(widget.pre_prompt, "How much do you know about this topic?")
-        self.assertEqual(widget.post_prompt, "How much do you now know about this topic?")
+        self.assertEqual(
+            widget.post_prompt, "How much do you now know about this topic?"
+        )
         self.assertEqual(widget.order, 1)
         self.assertIsInstance(widget.id, uuid.UUID)
 
@@ -259,7 +261,9 @@ class HomeworkProgressWidgetResponseModelTest(TestCase):
         )
         self.assertEqual(response.pre_value, 10)
 
-        user2 = self.User.objects.create_user(username="student_range", password="pass123")
+        user2 = self.User.objects.create_user(
+            username="student_range", password="pass123"
+        )
         response2 = self.WidgetResponse.objects.create(
             user=user2,
             widget=self.widget,
@@ -647,9 +651,7 @@ class HomeworkServiceWidgetMethodsTest(TestCase):
         )
         self.assertTrue(result)
 
-        response = self.WidgetResponse.objects.get(
-            user=self.user, widget=self.widget1
-        )
+        response = self.WidgetResponse.objects.get(user=self.user, widget=self.widget1)
         self.assertEqual(response.pre_value, 7)
         self.assertIsNotNone(response.pre_submitted_at)
 
@@ -666,9 +668,7 @@ class HomeworkServiceWidgetMethodsTest(TestCase):
         )
         self.assertTrue(result)
 
-        response = self.WidgetResponse.objects.get(
-            user=self.user, widget=self.widget1
-        )
+        response = self.WidgetResponse.objects.get(user=self.user, widget=self.widget1)
         self.assertEqual(response.post_value, 9)
         self.assertIsNotNone(response.post_submitted_at)
 
@@ -709,8 +709,16 @@ class HomeworkServiceUpdateWidgetsTest(TestCase):
             sections_to_create=[],
             sections_to_delete=[],
             widgets_to_create=[
-                {"pre_prompt": "Pre prompt 1", "post_prompt": "Post prompt 1", "order": 1},
-                {"pre_prompt": "Pre prompt 2", "post_prompt": "Post prompt 2", "order": 2},
+                {
+                    "pre_prompt": "Pre prompt 1",
+                    "post_prompt": "Post prompt 1",
+                    "order": 1,
+                },
+                {
+                    "pre_prompt": "Pre prompt 2",
+                    "post_prompt": "Post prompt 2",
+                    "order": 2,
+                },
             ],
         )
 
@@ -782,6 +790,4 @@ class HomeworkServiceUpdateWidgetsTest(TestCase):
         result = HomeworkService.update_homework(self.homework.id, update_data)
         self.assertTrue(result.success)
 
-        self.assertFalse(
-            HomeworkProgressWidget.objects.filter(id=widget_id).exists()
-        )
+        self.assertFalse(HomeworkProgressWidget.objects.filter(id=widget_id).exists())

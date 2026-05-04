@@ -714,7 +714,9 @@ class HomeworkEditWidgetTests(TestCase):
 
         self.client = Client()
         self.teacher_user = User.objects.create_user(
-            username="widget_edit_teacher", email="widget_edit@example.com", password="password"
+            username="widget_edit_teacher",
+            email="widget_edit@example.com",
+            password="password",
         )
         self.teacher = Teacher.objects.create(user=self.teacher_user)
         self.course = Course.objects.create(
@@ -790,7 +792,9 @@ class HomeworkEditWidgetTests(TestCase):
         mock_update_homework.assert_called_once()
         update_data = mock_update_homework.call_args[0][1]
         self.assertEqual(len(update_data.widgets_to_create), 1)
-        self.assertEqual(update_data.widgets_to_create[0]["pre_prompt"], "New pre prompt")
+        self.assertEqual(
+            update_data.widgets_to_create[0]["pre_prompt"], "New pre prompt"
+        )
 
     @patch("homeworks.services.HomeworkService.update_homework")
     def test_edit_delete_existing_widget(self, mock_update_homework):

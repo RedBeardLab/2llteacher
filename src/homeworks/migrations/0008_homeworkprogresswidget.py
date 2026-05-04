@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("homeworks", "0007_add_scheduled_homework_type"),
     ]

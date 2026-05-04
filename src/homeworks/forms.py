@@ -351,7 +351,7 @@ class ProgressWidgetForm(forms.Form):
                 "rows": 2,
                 "placeholder": "Prompt shown after completing homework...",
             }
-        )
+        ),
     )
     order = forms.CharField(required=False, widget=forms.HiddenInput())
     DELETE = forms.BooleanField(required=False, widget=forms.HiddenInput())

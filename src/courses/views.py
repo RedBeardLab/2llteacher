@@ -705,12 +705,20 @@ class CourseHomeworkCreateView(View):
             # Extract widgets data from formset
             widgets_data = []
             for widget_form in normalize_progress_widget_formset_orders(widget_formset):
-                if widget_form.cleaned_data.get("pre_prompt") or widget_form.cleaned_data.get("post_prompt"):
-                    widgets_data.append({
-                        "pre_prompt": widget_form.cleaned_data.get("pre_prompt", ""),
-                        "post_prompt": widget_form.cleaned_data.get("post_prompt", ""),
-                        "order": widget_form.cleaned_data.get("order", 1),
-                    })
+                if widget_form.cleaned_data.get(
+                    "pre_prompt"
+                ) or widget_form.cleaned_data.get("post_prompt"):
+                    widgets_data.append(
+                        {
+                            "pre_prompt": widget_form.cleaned_data.get(
+                                "pre_prompt", ""
+                            ),
+                            "post_prompt": widget_form.cleaned_data.get(
+                                "post_prompt", ""
+                            ),
+                            "order": widget_form.cleaned_data.get("order", 1),
+                        }
+                    )
             homework_data.widgets = widgets_data
 
             # Use service to create homework with sections (course already included in data)
