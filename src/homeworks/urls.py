@@ -27,4 +27,9 @@ urlpatterns = [
         views.NonInteractiveSectionAnswerView.as_view(),
         name="section_answer",
     ),
+    path(
+        "<uuid:homework_id>/widgets/answer/",
+        views.WidgetAnswerView.as_view(),
+        name="widget_answer",
+    ),
 ]

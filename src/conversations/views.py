@@ -228,6 +228,20 @@ class ConversationStartView(View):
                 "Conversations are not available for non-interactive sections."
             )
 
+        # Check pre-conditions for students
+        student_profile = getattr(request.user, "student_profile", None)
+        if student_profile:
+            from homeworks.services import HomeworkService
+
+            next_widget = HomeworkService.get_next_unanswered_widget(
+                request.user, section.homework
+            )
+            if next_widget is not None and not next_widget.is_post:
+                return redirect(
+                    "homeworks:widget_answer",
+                    homework_id=section.homework.id,
+                )
+
         # Create view data
         view_data = self._get_view_data(section)
 
@@ -245,6 +259,20 @@ class ConversationStartView(View):
             return HttpResponseForbidden(
                 "Conversations are not available for non-interactive sections."
             )
+
+        # Check pre-conditions for students
+        student_profile = getattr(request.user, "student_profile", None)
+        if student_profile:
+            from homeworks.services import HomeworkService
+
+            next_widget = HomeworkService.get_next_unanswered_widget(
+                request.user, section.homework
+            )
+            if next_widget is not None and not next_widget.is_post:
+                return redirect(
+                    "homeworks:widget_answer",
+                    homework_id=section.homework.id,
+                )
 
         # Start conversation using service
         result = ConversationService.start_conversation(request.user, section)

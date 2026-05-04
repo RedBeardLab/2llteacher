@@ -1,6 +1,6 @@
 import uuid
 from django.db import models
-from django.core.validators import MinLengthValidator
+from django.core.validators import MinLengthValidator, MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
 
@@ -221,3 +221,56 @@ class RapidTextGrowthEvent(models.Model):
         if self.last_message_before_event:
             return self.last_message_before_event.conversation
         return None
+
+
+class HomeworkProgressWidgetResponse(models.Model):
+    """Student's response to a homework progress widget (pre and post values)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="widget_responses"
+    )
+    widget = models.ForeignKey(
+        "homeworks.HomeworkProgressWidget",
+        on_delete=models.CASCADE,
+        related_name="responses",
+    )
+    pre_value = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        help_text="Slider value (0-10) for pre-condition response",
+    )
+    post_value = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        help_text="Slider value (0-10) for post-condition response",
+    )
+    pre_submitted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when pre-condition was answered",
+    )
+    post_submitted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when post-condition was answered",
+    )
+
+    class Meta:
+        db_table = "conversations_progress_widget_response"
+        unique_together = ["user", "widget"]
+        ordering = ["-pre_submitted_at"]
+
+    def __str__(self):
+        pre = self.pre_value if self.pre_value is not None else "N/A"
+        post = self.post_value if self.post_value is not None else "N/A"
+        return f"{self.user.username} - Widget {self.widget.order}: pre={pre}, post={post}"
+
+    def save(self, *args, **kwargs):
+        if self.pre_value is not None and self.pre_submitted_at is None:
+            self.pre_submitted_at = timezone.now()
+        if self.post_value is not None and self.post_submitted_at is None:
+            self.post_submitted_at = timezone.now()
+        super().save(*args, **kwargs)

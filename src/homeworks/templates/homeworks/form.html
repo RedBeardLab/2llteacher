@@ -23,6 +23,23 @@
     cursor: pointer;
     color: #dc3545;
   }
+  .widget-form {
+    background-color: #e8f4ea;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid #c3e6cb;
+  }
+  .widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .delete-widget {
+    cursor: pointer;
+    color: #dc3545;
+  }
   .field-hint {
     font-size: 0.85rem;
     color: #8a9ab0;
@@ -182,6 +199,62 @@
       </div>
     </div>
 
+    <!-- Progress Widgets -->
+    <h2>Progress Widgets</h2>
+    <div class="alert alert-info">
+      <p><i class="bi bi-info-circle"></i> Add optional pre/post assessment widgets to track student knowledge improvement.</p>
+    </div>
+
+    {{ data.widget_forms.management_form }}
+
+    <div id="widget-container">
+      {% for widget_form in data.widget_forms %}
+      <div class="widget-form" data-widget-index="{{ forloop.counter0 }}">
+        <div class="widget-header">
+          <h5>Widget {{ forloop.counter }}</h5>
+          <div class="d-flex gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveWidget(this, 'up')" title="Move up">
+              <i class="bi bi-arrow-up"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveWidget(this, 'down')" title="Move down">
+              <i class="bi bi-arrow-down"></i>
+            </button>
+            <a class="delete-widget" onclick="deleteWidget(this)">
+              <i class="bi bi-trash"></i> Remove
+            </a>
+          </div>
+        </div>
+
+        {{ widget_form.id }}
+        {{ widget_form.order }}
+
+        <div class="mb-3">
+          <label for="{{ widget_form.prefix }}-pre_prompt" class="form-label">Pre-Assessment Prompt</label>
+          {{ widget_form.pre_prompt }}
+          <div class="form-text">Shown before the student starts the homework</div>
+          {% if widget_form.pre_prompt.errors %}
+          <div class="text-danger small mt-1">{{ widget_form.pre_prompt.errors|join:", " }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="{{ widget_form.prefix }}-post_prompt" class="form-label">Post-Assessment Prompt</label>
+          {{ widget_form.post_prompt }}
+          <div class="form-text">Shown after the student completes the homework</div>
+          {% if widget_form.post_prompt.errors %}
+          <div class="text-danger small mt-1">{{ widget_form.post_prompt.errors|join:", " }}</div>
+          {% endif %}
+        </div>
+
+        {{ widget_form.DELETE }}
+      </div>
+      {% endfor %}
+    </div>
+
+    <button type="button" class="btn btn-outline-success mb-4" onclick="addWidget()">
+      <i class="bi bi-plus-circle"></i> Add Widget
+    </button>
+
     <!-- Sections -->
     <h2>Sections</h2>
     <div class="alert alert-info">
@@ -289,6 +362,35 @@
       </div>
     </div>
 
+    <!-- Hidden widget template for "Add Widget" -->
+    <div id="widget-template" style="display:none;">
+      <div class="widget-form">
+        <div class="widget-header">
+          <h5>Widget __NUM__</h5>
+          <div class="d-flex gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveWidget(this, 'up')" title="Move up">
+              <i class="bi bi-arrow-up"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveWidget(this, 'down')" title="Move down">
+              <i class="bi bi-arrow-down"></i>
+            </button>
+            <a class="delete-widget" onclick="deleteWidget(this)"><i class="bi bi-trash"></i> Remove</a>
+          </div>
+        </div>
+        <input type="hidden" name="widgets-__INDEX__-id" value="" disabled>
+        <input type="hidden" name="widgets-__INDEX__-order" value="__NUM__" disabled>
+        <div class="mb-3">
+          <label class="form-label">Pre-Assessment Prompt</label>
+          <textarea name="widgets-__INDEX__-pre_prompt" class="form-control" rows="2" placeholder="Prompt shown before starting homework..." disabled></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Post-Assessment Prompt</label>
+          <textarea name="widgets-__INDEX__-post_prompt" class="form-control" rows="2" placeholder="Prompt shown after completing homework..." disabled></textarea>
+        </div>
+        <input type="hidden" name="widgets-__INDEX__-DELETE" value="">
+      </div>
+    </div>
+
     <div class="mb-4">
       <button type="button" class="btn btn-outline-primary" id="add-section">
         <i class="bi bi-plus-circle"></i> Add Another Section
@@ -357,7 +459,18 @@
       updateSectionHeaders();
     });
 
-    reindexSectionForms();
+    // Initialize widget forms on page load
+    console.log('Initializing widget forms...');
+    const widgetForms = document.querySelectorAll('.widget-form');
+    console.log('Found', widgetForms.length, 'widget forms');
+    widgetForms.forEach(function(widget) {
+      console.log('Enabling fields for widget:', widget);
+      widget.querySelectorAll('input, select, textarea').forEach(function(field) {
+        console.log('Enabling field:', field.name, field.disabled);
+        field.disabled = false;
+      });
+    });
+    reindexWidgetForms();
   });
 
   function moveSection(btn, direction) {
@@ -453,6 +566,130 @@
       updateSectionOrders();
       updateSectionHeaders();
     }
+  }
+
+  function addWidget() {
+    const container = document.getElementById('widget-container');
+    const template = document.getElementById('widget-template');
+    const totalFormsField = document.getElementById('id_widgets-TOTAL_FORMS');
+    const currentCount = container.querySelectorAll(':scope > .widget-form').length;
+    const newIndex = currentCount;
+
+    let html = template.innerHTML.replace(/__INDEX__/g, newIndex);
+    html = html.replace(/__NUM__/g, currentCount + 1);
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    const newWidget = wrapper.firstElementChild;
+    newWidget.dataset.widgetIndex = newIndex;
+    container.appendChild(newWidget);
+
+    totalFormsField.value = currentCount + 1;
+    updateWidgetOrders();
+    updateWidgetHeaders();
+    updateWidgetFields(newWidget);
+    enableWidgetFields(newWidget);
+    reindexWidgetForms();
+  }
+
+  function moveWidget(btn, direction) {
+    const widget = btn.closest('.widget-form');
+    const container = document.getElementById('widget-container');
+    const widgets = Array.from(container.querySelectorAll(':scope > .widget-form'));
+    const idx = widgets.indexOf(widget);
+
+    if (direction === 'up' && idx > 0) {
+      container.insertBefore(widget, widgets[idx - 1]);
+    } else if (direction === 'down' && idx < widgets.length - 1) {
+      container.insertBefore(widgets[idx + 1], widget);
+    }
+
+    reindexWidgetForms();
+    updateWidgetHeaders();
+  }
+
+  function updateWidgetOrders() {
+    const container = document.getElementById('widget-container');
+    const widgets = container.querySelectorAll(':scope > .widget-form');
+    let visibleOrder = 1;
+    widgets.forEach((widget) => {
+      const orderInput = widget.querySelector('input[name$="-order"]');
+      if (orderInput && widget.style.display !== 'none') {
+        orderInput.value = visibleOrder;
+        visibleOrder += 1;
+      }
+    });
+  }
+
+  function enableWidgetFields(widget) {
+    widget.querySelectorAll('input, select, textarea').forEach((field) => {
+      field.disabled = false;
+    });
+  }
+
+  function reindexWidgetForms() {
+    const totalFormsField = document.getElementById('id_widgets-TOTAL_FORMS');
+    const container = document.getElementById('widget-container');
+    const widgets = Array.from(container.querySelectorAll(':scope > .widget-form'));
+    let visibleOrder = 1;
+
+    widgets.forEach((widget, index) => {
+      widget.dataset.widgetIndex = index;
+
+      widget.querySelectorAll('[name]').forEach((field) => {
+        field.name = field.name.replace(/widgets-\d+-/, 'widgets-' + index + '-');
+      });
+      widget.querySelectorAll('[id]').forEach((field) => {
+        field.id = field.id.replace(/id_widgets-\d+-/, 'id_widgets-' + index + '-');
+      });
+      widget.querySelectorAll('label[for]').forEach((label) => {
+        label.htmlFor = label.htmlFor.replace(/id_widgets-\d+-/, 'id_widgets-' + index + '-');
+      });
+
+      const orderInput = widget.querySelector('input[name$="-order"]');
+      if (orderInput && widget.style.display !== 'none') {
+        orderInput.value = visibleOrder;
+        visibleOrder += 1;
+      }
+    });
+
+    totalFormsField.value = widgets.length;
+  }
+
+  function updateWidgetHeaders() {
+    const container = document.getElementById('widget-container');
+    const widgets = container.querySelectorAll(':scope > .widget-form');
+    let visibleOrder = 1;
+    widgets.forEach((widget) => {
+      const header = widget.querySelector('.widget-header h5');
+      if (header && widget.style.display !== 'none') {
+        header.textContent = 'Widget ' + visibleOrder;
+        visibleOrder += 1;
+      }
+    });
+  }
+
+  function deleteWidget(button) {
+    const widget = button.closest('.widget-form');
+    const deleteInput = widget.querySelector('input[type=checkbox][name$="-DELETE"]');
+
+    if (deleteInput) {
+      deleteInput.checked = true;
+      widget.style.display = 'none';
+      reindexWidgetForms();
+      updateWidgetHeaders();
+    } else {
+      widget.remove();
+      reindexWidgetForms();
+      updateWidgetOrders();
+      updateWidgetHeaders();
+    }
+  }
+
+  function updateWidgetFields(widget) {
+    widget.querySelectorAll('[name]').forEach((field) => {
+      field.disabled = false;
+    });
   }
 </script>
 {% endblock %}

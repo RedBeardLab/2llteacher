@@ -1041,6 +1041,10 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-order": "1",
             "sections-0-solution": "Section solution",
             "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         response = self.client.post(
@@ -1065,6 +1069,201 @@ class CourseHomeworkCreateViewTests(TestCase):
         self.assertEqual(homework.sections.count(), 1)
         section = homework.sections.first()
         self.assertEqual(section.title, "Section 1")
+
+    def test_create_homework_with_widgets_creates_widgets(self):
+        """Test that creating homework with widget data creates widgets."""
+        self.client.login(username="testteacher", password="password123")
+
+        from django.utils import timezone
+        from datetime import timedelta
+        from homeworks.models import HomeworkProgressWidget
+
+        due_date = timezone.now() + timedelta(days=7)
+
+        homework_data = {
+            "title": "Homework With Widgets",
+            "description": "Test description",
+            "due_date": due_date.strftime("%Y-%m-%dT%H:%M"),
+            "llm_config": self.llm_config.id,
+            "sections-TOTAL_FORMS": "1",
+            "sections-INITIAL_FORMS": "0",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-title": "Section 1",
+            "sections-0-content": "Content",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "2",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
+            "widgets-0-id": "",
+            "widgets-0-pre_prompt": "Pre prompt 1",
+            "widgets-0-post_prompt": "Post prompt 1",
+            "widgets-0-order": "1",
+            "widgets-1-id": "",
+            "widgets-1-pre_prompt": "Pre prompt 2",
+            "widgets-1-post_prompt": "Post prompt 2",
+            "widgets-1-order": "2",
+        }
+
+        response = self.client.post(
+            reverse("courses:homework-create", kwargs={"course_id": self.course.id}),
+            homework_data,
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        from homeworks.models import Homework, HomeworkProgressWidget
+
+        homework = Homework.objects.get(title="Homework With Widgets")
+        widgets = HomeworkProgressWidget.objects.filter(homework=homework)
+        self.assertEqual(widgets.count(), 2)
+        self.assertEqual(widgets[0].pre_prompt, "Pre prompt 1")
+        self.assertEqual(widgets[1].pre_prompt, "Pre prompt 2")
+
+    def test_create_homework_with_single_widget(self):
+        """Test that creating homework with single widget works."""
+        self.client.login(username="testteacher", password="password123")
+
+        from django.utils import timezone
+        from datetime import timedelta
+        from homeworks.models import Homework, HomeworkProgressWidget
+
+        due_date = timezone.now() + timedelta(days=7)
+
+        homework_data = {
+            "title": "Homework With Single Widget",
+            "description": "Test description",
+            "due_date": due_date.strftime("%Y-%m-%dT%H:%M"),
+            "llm_config": self.llm_config.id,
+            "sections-TOTAL_FORMS": "1",
+            "sections-INITIAL_FORMS": "0",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-title": "Section 1",
+            "sections-0-content": "Content",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "1",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
+            "widgets-0-id": "",
+            "widgets-0-pre_prompt": "Single pre prompt",
+            "widgets-0-post_prompt": "Single post prompt",
+            "widgets-0-order": "1",
+        }
+
+        response = self.client.post(
+            reverse("courses:homework-create", kwargs={"course_id": self.course.id}),
+            homework_data,
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        homework = Homework.objects.get(title="Homework With Single Widget")
+        widgets = HomeworkProgressWidget.objects.filter(homework=homework)
+        self.assertEqual(widgets.count(), 1)
+        self.assertEqual(widgets[0].pre_prompt, "Single pre prompt")
+        self.assertEqual(widgets[0].order, 1)
+
+    def test_create_homework_with_three_widgets(self):
+        """Test that creating homework with 3+ widgets works."""
+        self.client.login(username="testteacher", password="password123")
+
+        from django.utils import timezone
+        from datetime import timedelta
+        from homeworks.models import Homework, HomeworkProgressWidget
+
+        due_date = timezone.now() + timedelta(days=7)
+
+        homework_data = {
+            "title": "Homework With Three Widgets",
+            "description": "Test description",
+            "due_date": due_date.strftime("%Y-%m-%dT%H:%M"),
+            "llm_config": self.llm_config.id,
+            "sections-TOTAL_FORMS": "1",
+            "sections-INITIAL_FORMS": "0",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-title": "Section 1",
+            "sections-0-content": "Content",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "3",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
+            "widgets-0-id": "",
+            "widgets-0-pre_prompt": "Pre 1",
+            "widgets-0-post_prompt": "Post 1",
+            "widgets-0-order": "3",
+            "widgets-1-id": "",
+            "widgets-1-pre_prompt": "Pre 2",
+            "widgets-1-post_prompt": "Post 2",
+            "widgets-1-order": "1",
+            "widgets-2-id": "",
+            "widgets-2-pre_prompt": "Pre 3",
+            "widgets-2-post_prompt": "Post 3",
+            "widgets-2-order": "2",
+        }
+
+        response = self.client.post(
+            reverse("courses:homework-create", kwargs={"course_id": self.course.id}),
+            homework_data,
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        homework = Homework.objects.get(title="Homework With Three Widgets")
+        widgets = list(HomeworkProgressWidget.objects.filter(homework=homework).order_by("order"))
+        self.assertEqual(len(widgets), 3)
+        self.assertEqual(widgets[0].order, 1)
+        self.assertEqual(widgets[1].order, 2)
+        self.assertEqual(widgets[2].order, 3)
+
+    def test_create_homework_with_only_widgets_no_sections_fails_validation(self):
+        """Test that creating homework with widgets but no sections fails validation."""
+        self.client.login(username="testteacher", password="password123")
+
+        from django.utils import timezone
+        from datetime import timedelta
+
+        due_date = timezone.now() + timedelta(days=7)
+
+        homework_data = {
+            "title": "Widgets Only Homework",
+            "description": "Test description",
+            "due_date": due_date.strftime("%Y-%m-%dT%H:%M"),
+            "llm_config": self.llm_config.id,
+            "sections-TOTAL_FORMS": "0",
+            "sections-INITIAL_FORMS": "0",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "widgets-TOTAL_FORMS": "1",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
+            "widgets-0-id": "",
+            "widgets-0-pre_prompt": "Pre prompt",
+            "widgets-0-post_prompt": "Post prompt",
+            "widgets-0-order": "1",
+        }
+
+        response = self.client.post(
+            reverse("courses:homework-create", kwargs={"course_id": self.course.id}),
+            homework_data,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        section_errors = list(data.section_forms.non_form_errors())
+        self.assertEqual(len(section_errors), 1)
+        self.assertEqual(str(section_errors[0]), "At least one section is required.")
 
     def test_create_homework_normalizes_blank_and_duplicate_section_order(self):
         """Section order is assigned by the backend, not trusted from POST."""
@@ -1094,6 +1293,10 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-1-order": "1",
             "sections-1-solution": "",
             "sections-1-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         response = self.client.post(
@@ -1136,6 +1339,10 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-order": "1",
             "sections-0-solution": "",
             "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         response = self.client.post(
@@ -1179,6 +1386,10 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-order": "1",
             "sections-0-solution": "",
             "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         response = self.client.post(
@@ -1224,6 +1435,10 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-order": "1",
             "sections-0-solution": "",
             "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         response = self.client.post(
@@ -1268,6 +1483,10 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-order": "1",
             "sections-0-solution": "",
             "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         response = self.client.post(
@@ -1421,6 +1640,10 @@ class CourseHomeworkCreateViewTests(TestCase):
             "sections-0-order": "1",
             "sections-0-solution": "",
             "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         response = self.client.post(
@@ -1484,6 +1707,10 @@ class CourseHomeworkCreateSectionTypeTests(TestCase):
             "sections-0-content": "Content",
             "sections-0-order": "1",
             "sections-0-solution": "",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
     def test_create_non_interactive_section(self):

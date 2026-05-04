@@ -328,3 +328,112 @@ class SectionDetailViewNonInteractiveTestCase(TestCase):
         self.client.login(username="teacher", password="password")
         response = self.client.get(self.url)
         self.assertContains(response, "Conversations")
+
+
+class SectionDetailViewProgressWidgetTestCase(TestCase):
+    """Test SectionDetailView progress widget pre-conditions."""
+
+    def setUp(self):
+        self.client = Client()
+
+        self.teacher_user = User.objects.create_user(
+            username="teacher", email="teacher@example.com", password="password"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+
+        self.student_user = User.objects.create_user(
+            username="student", email="student@example.com", password="password"
+        )
+        self.student = Student.objects.create(user=self.student_user)
+
+        self.course = Course.objects.create(
+            name="Course", code="C101", description="", is_active=True
+        )
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student, is_active=True
+        )
+
+        self.homework = Homework.objects.create(
+            title="HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=365),
+        )
+
+        self.section = Section.objects.create(
+            homework=self.homework,
+            title="Section 1",
+            content="Content",
+            order=1,
+        )
+
+        self.url = reverse(
+            "homeworks:section_detail",
+            kwargs={"homework_id": self.homework.id, "section_id": self.section.id},
+        )
+
+        # Import the model for creating progress widgets
+        from homeworks.models import HomeworkProgressWidget
+
+        # Create a pre-assessment widget
+        self.pre_widget = HomeworkProgressWidget.objects.create(
+            homework=self.homework,
+            pre_prompt="Rate your knowledge before starting",
+            order=1,
+        )
+
+    def test_student_without_pre_widget_can_access_section(self):
+        """Student can access section when no widgets exist."""
+        # Remove the widget
+        self.pre_widget.delete()
+
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_student_with_answered_pre_widget_can_access_section(self):
+        """Student can access section after answering pre widget."""
+        from conversations.models import HomeworkProgressWidgetResponse
+
+        HomeworkProgressWidgetResponse.objects.create(
+            user=self.student_user,
+            widget=self.pre_widget,
+            pre_value=5,
+        )
+
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_student_without_answered_pre_widget_redirected_to_widget_answer(self):
+        """Student without pre widget answer is redirected to widget answer page."""
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        self.assertRedirects(
+            response,
+            reverse("homeworks:widget_answer", kwargs={"homework_id": self.homework.id}),
+        )
+
+    def test_teacher_can_access_section_regardless_of_widgets(self):
+        """Teacher can always access sections, regardless of widget status."""
+        self.client.login(username="teacher", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_ta_can_access_section_regardless_of_widgets(self):
+        """TA can always access sections, regardless of widget status."""
+        from accounts.models import TeacherAssistant
+
+        ta_user = User.objects.create_user(
+            username="ta", email="ta@example.com", password="password"
+        )
+        ta = TeacherAssistant.objects.create(user=ta_user)
+        self.course.teacher_assistants.add(ta)
+
+        self.client.login(username="ta", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)

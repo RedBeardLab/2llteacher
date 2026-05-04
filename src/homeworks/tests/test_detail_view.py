@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from datetime import timedelta
 import uuid
 
-from homeworks.models import Homework, Section, SectionSolution
+from homeworks.models import Homework, Section, SectionSolution, HomeworkProgressWidget
 from homeworks.views import HomeworkDetailView, HomeworkDetailData
 from accounts.models import Teacher, Student
 from courses.models import Course, CourseEnrollment, CourseTeacher
@@ -191,3 +191,96 @@ class HomeworkDetailViewTests(TestCase):
         # Should redirect to the list view
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse("homeworks:list"))
+
+    def test_widget_progress_not_shown_when_no_widgets_for_student(self):
+        """Test that widget progress section is not shown when homework has no widgets."""
+        # Login as student
+        self.client.login(username="teststudent", password="password123")
+
+        # Get the response
+        response = self.client.get(reverse("homeworks:detail", args=[self.homework.id]))
+
+        self.assertEqual(response.status_code, 200)
+
+        # Widget progress should not be in context or should have empty widgets
+        data = response.context["data"]
+        if data.widget_progress is not None:
+            self.assertEqual(len(data.widget_progress.widgets), 0)
+
+    def test_widget_progress_shown_when_widgets_exist_for_student(self):
+        """Test that widget progress section is shown when homework has widgets."""
+        # Create a widget for the homework
+        HomeworkProgressWidget.objects.create(
+            homework=self.homework,
+            pre_prompt="How much do you know?",
+            post_prompt="How much now?",
+            order=1,
+        )
+
+        # Login as student
+        self.client.login(username="teststudent", password="password123")
+
+        # Get the response
+        response = self.client.get(reverse("homeworks:detail", args=[self.homework.id]))
+
+        self.assertEqual(response.status_code, 200)
+
+        # Widget progress should be in context with widgets
+        data = response.context["data"]
+        self.assertIsNotNone(data.widget_progress)
+        self.assertEqual(len(data.widget_progress.widgets), 1)
+        self.assertFalse(data.widget_progress.all_pre_answered)
+
+    def test_widget_progress_not_shown_for_teacher(self):
+        """Test that widget progress section is not shown for teachers."""
+        # Login as teacher
+        self.client.login(username="testteacher", password="password123")
+
+        # Get the response
+        response = self.client.get(reverse("homeworks:detail", args=[self.homework.id]))
+
+        self.assertEqual(response.status_code, 200)
+
+        # Widget progress should not be shown for teachers
+        data = response.context["data"]
+        self.assertIsNone(data.widget_progress)
+
+    def test_widget_progress_shows_partial_answers(self):
+        """Test that widget progress shows pre answered but post not."""
+        from conversations.models import HomeworkProgressWidgetResponse
+
+        widget1 = HomeworkProgressWidget.objects.create(
+            homework=self.homework,
+            pre_prompt="How much do you know?",
+            post_prompt="How much now?",
+            order=1,
+        )
+        widget2 = HomeworkProgressWidget.objects.create(
+            homework=self.homework,
+            pre_prompt="Topic 2 pre",
+            post_prompt="Topic 2 post",
+            order=2,
+        )
+
+        HomeworkProgressWidgetResponse.objects.create(
+            user=self.student_user,
+            widget=widget1,
+            pre_value=5,
+        )
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(reverse("homeworks:detail", args=[self.homework.id]))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIsNotNone(data.widget_progress)
+        self.assertEqual(len(data.widget_progress.widgets), 2)
+        self.assertFalse(data.widget_progress.all_pre_answered)
+        self.assertFalse(data.widget_progress.all_post_answered)
+
+        widget1_progress = data.widget_progress.widgets[0]
+        self.assertEqual(widget1_progress.pre_value, 5)
+        self.assertIsNone(widget1_progress.post_value)
+
+        widget2_progress = data.widget_progress.widgets[1]
+        self.assertIsNone(widget2_progress.pre_value)

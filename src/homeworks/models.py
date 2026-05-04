@@ -188,3 +188,39 @@ class SectionSolution(models.Model):
         if hasattr(self, "section") and self.section:
             return f"Solution for {self.section}"
         return f"Solution {self.id}"
+
+
+class HomeworkProgressWidget(models.Model):
+    """Progress widget for pre/post homework self-assessment."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    homework = models.ForeignKey(
+        Homework, on_delete=models.CASCADE, related_name="progress_widgets"
+    )
+    pre_prompt = models.TextField(
+        help_text="Prompt shown to student before starting homework"
+    )
+    post_prompt = models.TextField(
+        help_text="Prompt shown to student after completing homework"
+    )
+    order = models.PositiveIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(20)],
+        help_text="Order of the widget (determines opening/closing order)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "homeworks_progress_widget"
+        ordering = ["order"]
+        unique_together = ["homework", "order"]
+
+    def __str__(self):
+        return f"Widget {self.order} for {self.homework.title}"
+
+    def clean(self):
+        """Validate widget data."""
+        from django.core.exceptions import ValidationError
+
+        if self.homework and self.order > 20:
+            raise ValidationError("Maximum 20 widgets allowed per homework.")

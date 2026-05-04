@@ -328,3 +328,57 @@ def normalize_section_formset_orders(section_formset: BaseFormSet) -> list[forms
         form.cleaned_data["order"] = order
 
     return active_forms
+
+
+class ProgressWidgetForm(forms.Form):
+    """Form for creating or editing a progress widget."""
+
+    id = forms.UUIDField(required=False, widget=forms.HiddenInput())
+    pre_prompt = forms.CharField(
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 2,
+                "placeholder": "Prompt shown before starting homework...",
+            }
+        )
+    )
+    post_prompt = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 2,
+                "placeholder": "Prompt shown after completing homework...",
+            }
+        )
+    )
+    order = forms.CharField(required=False, widget=forms.HiddenInput())
+    DELETE = forms.BooleanField(required=False, widget=forms.HiddenInput())
+
+
+class ProgressWidgetFormSet(forms.BaseFormSet):
+    """Formset for managing multiple progress widgets in a homework."""
+
+    is_draft_save: bool = False
+
+    def clean(self):
+        """Validate the formset as a whole."""
+        if any(self.errors):
+            return
+
+
+def normalize_progress_widget_formset_orders(
+    widget_formset: BaseFormSet,
+) -> list[forms.Form]:
+    """Assign canonical 1-based order to active widget forms."""
+    active_forms: list[forms.Form] = []
+    for form in widget_formset.forms:
+        cleaned_data = getattr(form, "cleaned_data", None)
+        if cleaned_data and not cleaned_data.get("DELETE", False):
+            active_forms.append(form)
+
+    for order, form in enumerate(active_forms, start=1):
+        form.cleaned_data["order"] = order
+
+    return active_forms

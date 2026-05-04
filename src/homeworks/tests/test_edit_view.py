@@ -14,7 +14,7 @@ from unittest.mock import patch
 import datetime
 
 from accounts.models import User, Teacher, Student
-from homeworks.models import Homework, Section, SectionSolution
+from homeworks.models import Homework, Section, SectionSolution, HomeworkProgressWidget
 from homeworks.services import HomeworkUpdateResult
 
 
@@ -273,6 +273,10 @@ class HomeworkEditViewTestCase(TestCase):
             "sections-1-order": "2",
             "sections-1-solution": self.section_with_solution.solution.content,
             "sections-1-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         # Submit the form
@@ -324,6 +328,10 @@ class HomeworkEditViewTestCase(TestCase):
             "sections-1-order": "2",
             "sections-1-solution": self.section_with_solution.solution.content,
             "sections-1-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
         # Submit the form
@@ -442,6 +450,10 @@ class HomeworkEditSectionTypeTests(TestCase):
             "sections-1-order": "2",
             "sections-1-solution": "",
             "sections-1-section_type": "non_interactive",
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
 
     def test_edit_get_prepopulates_section_type(self):
@@ -543,6 +555,10 @@ class HomeworkEditIdentityTests(TestCase):
             "sections-1-order": "2",
             "sections-1-solution": "",
             "sections-1-section_type": Section.SECTION_TYPE_NON_INTERACTIVE,
+            "widgets-TOTAL_FORMS": "0",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
         }
         data.update(overrides)
         return data
@@ -687,3 +703,201 @@ class HomeworkEditFormLLMConfigFilteringTest(TestCase):
         self.assertIn(self.llm_config_course1, llm_config_choices)
         self.assertNotIn(self.llm_config_course2, llm_config_choices)
         self.assertNotIn(self.llm_config_inactive, llm_config_choices)
+
+
+class HomeworkEditWidgetTests(TestCase):
+    """Tests for editing homework widgets."""
+
+    def setUp(self):
+        from courses.models import Course, CourseTeacher
+        from llm.models import LLMConfig
+
+        self.client = Client()
+        self.teacher_user = User.objects.create_user(
+            username="widget_edit_teacher", email="widget_edit@example.com", password="password"
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+        self.course = Course.objects.create(
+            name="Widget Edit Course", code="WEC101", description=""
+        )
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+        self.llm_config = LLMConfig.objects.create(
+            name="Test LLM",
+            model_name="gpt-4",
+            api_key="key",
+            base_prompt="prompt",
+            course=self.course,
+        )
+        self.homework = Homework.objects.create(
+            title="Widget Edit Homework",
+            description="Test",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+        self.section = Section.objects.create(
+            homework=self.homework,
+            title="Section 1",
+            content="Content",
+            order=1,
+        )
+        self.url = reverse("homeworks:edit", kwargs={"homework_id": self.homework.id})
+
+    @patch("homeworks.services.HomeworkService.update_homework")
+    def test_edit_add_widget_to_existing_homework(self, mock_update_homework):
+        """Test adding a widget when editing homework with no widgets."""
+        mock_update_homework.return_value = HomeworkUpdateResult(
+            success=True,
+            homework_id=self.homework.id,
+            updated_section_ids=[],
+            created_section_ids=[],
+            deleted_section_ids=[],
+        )
+
+        self.client.login(username="widget_edit_teacher", password="password")
+
+        post_data = {
+            "title": "Widget Edit Homework",
+            "description": "Test",
+            "due_date": (timezone.now() + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M"),
+            "llm_config": str(self.llm_config.id),
+            "sections-TOTAL_FORMS": "1",
+            "sections-INITIAL_FORMS": "1",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-id": str(self.section.id),
+            "sections-0-title": "Section 1",
+            "sections-0-content": "Content",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "1",
+            "widgets-INITIAL_FORMS": "0",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
+            "widgets-0-id": "",
+            "widgets-0-pre_prompt": "New pre prompt",
+            "widgets-0-post_prompt": "New post prompt",
+            "widgets-0-order": "1",
+        }
+
+        response = self.client.post(self.url, post_data)
+
+        self.assertEqual(response.status_code, 302)
+
+        mock_update_homework.assert_called_once()
+        update_data = mock_update_homework.call_args[0][1]
+        self.assertEqual(len(update_data.widgets_to_create), 1)
+        self.assertEqual(update_data.widgets_to_create[0]["pre_prompt"], "New pre prompt")
+
+    @patch("homeworks.services.HomeworkService.update_homework")
+    def test_edit_delete_existing_widget(self, mock_update_homework):
+        """Test deleting a widget when editing homework."""
+        widget = HomeworkProgressWidget.objects.create(
+            homework=self.homework,
+            pre_prompt="To be deleted",
+            post_prompt="To be deleted",
+            order=1,
+        )
+        widget_id = widget.id
+
+        mock_update_homework.return_value = HomeworkUpdateResult(
+            success=True,
+            homework_id=self.homework.id,
+            updated_section_ids=[],
+            created_section_ids=[],
+            deleted_section_ids=[],
+        )
+
+        self.client.login(username="widget_edit_teacher", password="password")
+
+        post_data = {
+            "title": "Widget Edit Homework",
+            "description": "Test",
+            "due_date": (timezone.now() + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M"),
+            "llm_config": str(self.llm_config.id),
+            "sections-TOTAL_FORMS": "1",
+            "sections-INITIAL_FORMS": "1",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-id": str(self.section.id),
+            "sections-0-title": "Section 1",
+            "sections-0-content": "Content",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "1",
+            "widgets-INITIAL_FORMS": "1",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
+            "widgets-0-id": str(widget_id),
+            "widgets-0-pre_prompt": "To be deleted",
+            "widgets-0-post_prompt": "To be deleted",
+            "widgets-0-order": "1",
+            "widgets-0-DELETE": "on",
+        }
+
+        response = self.client.post(self.url, post_data)
+
+        self.assertEqual(response.status_code, 302)
+
+        mock_update_homework.assert_called_once()
+        update_data = mock_update_homework.call_args[0][1]
+        self.assertEqual(len(update_data.widgets_to_delete), 1)
+        self.assertEqual(update_data.widgets_to_delete[0], widget_id)
+
+    @patch("homeworks.services.HomeworkService.update_homework")
+    def test_edit_update_existing_widget(self, mock_update_homework):
+        """Test updating an existing widget's prompts."""
+        widget = HomeworkProgressWidget.objects.create(
+            homework=self.homework,
+            pre_prompt="Original pre",
+            post_prompt="Original post",
+            order=1,
+        )
+
+        mock_update_homework.return_value = HomeworkUpdateResult(
+            success=True,
+            homework_id=self.homework.id,
+            updated_section_ids=[],
+            created_section_ids=[],
+            deleted_section_ids=[],
+        )
+
+        self.client.login(username="widget_edit_teacher", password="password")
+
+        post_data = {
+            "title": "Widget Edit Homework",
+            "description": "Test",
+            "due_date": (timezone.now() + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M"),
+            "llm_config": str(self.llm_config.id),
+            "sections-TOTAL_FORMS": "1",
+            "sections-INITIAL_FORMS": "1",
+            "sections-MIN_NUM_FORMS": "0",
+            "sections-MAX_NUM_FORMS": "1000",
+            "sections-0-id": str(self.section.id),
+            "sections-0-title": "Section 1",
+            "sections-0-content": "Content",
+            "sections-0-order": "1",
+            "sections-0-solution": "",
+            "sections-0-section_type": "conversation",
+            "widgets-TOTAL_FORMS": "1",
+            "widgets-INITIAL_FORMS": "1",
+            "widgets-MIN_NUM_FORMS": "0",
+            "widgets-MAX_NUM_FORMS": "1000",
+            "widgets-0-id": str(widget.id),
+            "widgets-0-pre_prompt": "Updated pre",
+            "widgets-0-post_prompt": "Updated post",
+            "widgets-0-order": "1",
+        }
+
+        response = self.client.post(self.url, post_data)
+
+        self.assertEqual(response.status_code, 302)
+
+        mock_update_homework.assert_called_once()
+        update_data = mock_update_homework.call_args[0][1]
+        self.assertEqual(len(update_data.widgets_to_update), 1)
+        self.assertEqual(update_data.widgets_to_update[0]["pre_prompt"], "Updated pre")

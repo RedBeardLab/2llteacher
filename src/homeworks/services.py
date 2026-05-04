@@ -63,6 +63,7 @@ class HomeworkCreateData:
     llm_config: UUID | None = None
     homework_type: str = "published"
     publish_at: datetime | None = None
+    widgets: list[dict] | None = None
 
 
 @dataclass
@@ -102,6 +103,32 @@ class HomeworkProgressData:
     sections_progress: list[SectionData]
 
 
+@dataclass
+class WidgetData:
+    """Data structure for widget information."""
+
+    id: UUID
+    pre_prompt: str
+    post_prompt: str
+    order: int
+    pre_value: int | None = None
+    post_value: int | None = None
+    pre_submitted_at: datetime | None = None
+    post_submitted_at: datetime | None = None
+    is_post: bool = False  # True if next needed is post, False if pre
+    difference: int | None = None  # Computed: post_value - pre_value
+
+
+@dataclass
+class WidgetProgressData:
+    """Data structure for widget progress."""
+
+    homework_id: UUID
+    widgets: list[WidgetData]
+    all_pre_answered: bool
+    all_post_answered: bool
+
+
 # Missing data contracts that need to be defined
 @dataclass
 class HomeworkDetailData:
@@ -131,6 +158,9 @@ class HomeworkUpdateData:
     sections_to_delete: list[UUID] | None = None
     homework_type: str | None = None
     publish_at: datetime | None = None
+    widgets_to_update: list[Any] | None = None
+    widgets_to_create: list[Any] | None = None
+    widgets_to_delete: list[UUID] | None = None
 
 
 @dataclass
@@ -143,6 +173,9 @@ class HomeworkUpdateResult:
     updated_section_ids: list[UUID] | None = None
     created_section_ids: list[UUID] | None = None
     deleted_section_ids: list[UUID] | None = None
+    updated_widget_ids: list[UUID] | None = None
+    created_widget_ids: list[UUID] | None = None
+    deleted_widget_ids: list[UUID] | None = None
 
 
 # New data contracts for submissions view
@@ -200,6 +233,7 @@ class StudentSubmissionSummary:
     missing_sections: int  # Number of sections with no conversations
     last_activity: datetime | None
     participation_status: ParticipationStatus
+    widget_progress: list[WidgetData] | None = None
 
 
 @dataclass
@@ -345,6 +379,18 @@ class HomeworkService:
                         section.save()
 
                     section_ids.append(section.id)
+
+                # Create widgets if provided
+                if data.widgets:
+                    from .models import HomeworkProgressWidget
+
+                    for widget_data in data.widgets:
+                        HomeworkProgressWidget.objects.create(
+                            homework=homework,
+                            pre_prompt=widget_data.get("pre_prompt", ""),
+                            post_prompt=widget_data.get("post_prompt", ""),
+                            order=widget_data.get("order", 1),
+                        )
 
                 return HomeworkCreateResult(
                     homework_id=homework.id, section_ids=section_ids
@@ -1138,6 +1184,56 @@ class HomeworkService:
                         except Section.DoesNotExist:
                             pass  # Skip if section doesn't exist
 
+                # Initialize tracking lists for widgets
+                updated_widget_ids: List[UUID] = []
+                created_widget_ids: List[UUID] = []
+                deleted_widget_ids: List[UUID] = []
+
+                # Process widgets if provided
+                if data.widgets_to_delete:
+                    from .models import HomeworkProgressWidget
+
+                    for widget_id in data.widgets_to_delete:
+                        try:
+                            widget = HomeworkProgressWidget.objects.get(
+                                id=widget_id, homework=homework
+                            )
+                            widget.delete()
+                            deleted_widget_ids.append(widget_id)
+                        except HomeworkProgressWidget.DoesNotExist:
+                            pass
+
+                if data.widgets_to_create:
+                    from .models import HomeworkProgressWidget
+
+                    for widget_data in data.widgets_to_create:
+                        widget = HomeworkProgressWidget.objects.create(
+                            homework=homework,
+                            pre_prompt=widget_data.get("pre_prompt", ""),
+                            post_prompt=widget_data.get("post_prompt", ""),
+                            order=widget_data.get("order", 1),
+                        )
+                        created_widget_ids.append(widget.id)
+
+                if data.widgets_to_update:
+                    from .models import HomeworkProgressWidget
+
+                    for widget_update in data.widgets_to_update:
+                        try:
+                            widget = HomeworkProgressWidget.objects.get(
+                                id=widget_update.get("id"), homework=homework
+                            )
+                            if "pre_prompt" in widget_update:
+                                widget.pre_prompt = widget_update["pre_prompt"]
+                            if "post_prompt" in widget_update:
+                                widget.post_prompt = widget_update["post_prompt"]
+                            if "order" in widget_update:
+                                widget.order = widget_update["order"]
+                            widget.save()
+                            updated_widget_ids.append(widget.id)
+                        except HomeworkProgressWidget.DoesNotExist:
+                            pass
+
                 # Return success result with tracking information
                 return HomeworkUpdateResult(
                     success=True,
@@ -1439,6 +1535,15 @@ class HomeworkService:
                     participation_status = ParticipationStatus.PARTIAL
                     active_students += 1
 
+                # Get widget progress for this student
+                widget_progress_data = None
+                if homework.progress_widgets.exists():
+                    widget_progress_data = HomeworkService.get_widget_progress(
+                        student.user, homework
+                    )
+                    if widget_progress_data:
+                        widget_progress_data = widget_progress_data.widgets
+
                 # Create student summary
                 student_name = (
                     f"{student.user.first_name} {student.user.last_name}".strip()
@@ -1460,6 +1565,7 @@ class HomeworkService:
                         missing_sections=missing_sections,
                         last_activity=last_activity,
                         participation_status=participation_status,
+                        widget_progress=widget_progress_data,
                     )
                 )
 
@@ -1502,3 +1608,234 @@ class HomeworkService:
             logger.exception("Failed to load submissions for homework %s", homework_id)
             record_exception(e)
             return None
+
+    @staticmethod
+    @traced
+    def can_access_sections(user, homework) -> bool:
+        """
+        Check if all pre-condition widgets are answered for a homework.
+
+        Args:
+            user: User object (student)
+            homework: Homework object
+
+        Returns:
+            True if all pre widgets are answered, False otherwise
+        """
+        from .models import HomeworkProgressWidget
+        from conversations.models import HomeworkProgressWidgetResponse
+
+        widgets = HomeworkProgressWidget.objects.filter(homework=homework).order_by(
+            "order"
+        )
+
+        if not widgets.exists():
+            return True
+
+        for widget in widgets:
+            response = HomeworkProgressWidgetResponse.objects.filter(
+                user=user, widget=widget
+            ).first()
+            if not response or response.pre_value is None:
+                return False
+
+        return True
+
+    @staticmethod
+    @traced
+    def can_submit_homework(user, homework) -> bool:
+        """
+        Check if all post-condition widgets are answered for a homework.
+
+        Args:
+            user: User object (student)
+            homework: Homework object
+
+        Returns:
+            True if all post widgets are answered, False otherwise
+        """
+        from .models import HomeworkProgressWidget
+        from conversations.models import HomeworkProgressWidgetResponse
+
+        widgets = HomeworkProgressWidget.objects.filter(homework=homework).order_by(
+            "order"
+        )
+
+        if not widgets.exists():
+            return True
+
+        for widget in widgets:
+            response = HomeworkProgressWidgetResponse.objects.filter(
+                user=user, widget=widget
+            ).first()
+            if not response or response.post_value is None:
+                return False
+
+        return True
+
+    @staticmethod
+    @traced
+    def get_next_unanswered_widget(user, homework):
+        """
+        Get the next unanswered widget in order (pre first, then post).
+
+        Args:
+            user: User object (student)
+            homework: Homework object
+
+        Returns:
+            WidgetData for next unanswered widget, or None if all answered
+        """
+        from .models import HomeworkProgressWidget
+        from conversations.models import HomeworkProgressWidgetResponse
+
+        widgets = HomeworkProgressWidget.objects.filter(homework=homework).order_by(
+            "order"
+        )
+
+        if not widgets.exists():
+            return None
+
+        for widget in widgets:
+            response = HomeworkProgressWidgetResponse.objects.filter(
+                user=user, widget=widget
+            ).first()
+
+            if not response or response.pre_value is None:
+                return WidgetData(
+                    id=widget.id,
+                    pre_prompt=widget.pre_prompt,
+                    post_prompt=widget.post_prompt,
+                    order=widget.order,
+                    pre_value=None,
+                    post_value=None,
+                    pre_submitted_at=None,
+                    post_submitted_at=None,
+                    is_post=False,
+                )
+
+        for widget in widgets:
+            response = HomeworkProgressWidgetResponse.objects.filter(
+                user=user, widget=widget
+            ).first()
+
+            if not response or response.post_value is None:
+                return WidgetData(
+                    id=widget.id,
+                    pre_prompt=widget.pre_prompt,
+                    post_prompt=widget.post_prompt,
+                    order=widget.order,
+                    pre_value=response.pre_value if response else None,
+                    post_value=None,
+                    pre_submitted_at=response.pre_submitted_at if response else None,
+                    post_submitted_at=None,
+                    is_post=True,
+                )
+
+        return None
+
+    @staticmethod
+    @traced
+    def get_widget_progress(user, homework) -> WidgetProgressData:
+        """
+        Get all widgets with answered status for a student.
+
+        Args:
+            user: User object (student)
+            homework: Homework object
+
+        Returns:
+            WidgetProgressData with all widgets and their status
+        """
+        from .models import HomeworkProgressWidget
+        from conversations.models import HomeworkProgressWidgetResponse
+
+        widgets = HomeworkProgressWidget.objects.filter(homework=homework).order_by(
+            "order"
+        )
+
+        widget_data_list = []
+        all_pre_answered = True
+        all_post_answered = True
+
+        for widget in widgets:
+            response = HomeworkProgressWidgetResponse.objects.filter(
+                user=user, widget=widget
+            ).first()
+
+            pre_answered = response and response.pre_value is not None
+            post_answered = response and response.post_value is not None
+
+            if not pre_answered:
+                all_pre_answered = False
+            if not post_answered:
+                all_post_answered = False
+
+            # Determine is_post: if pre is answered but post is not, it's a post widget
+            is_post = pre_answered and not post_answered
+
+            pre_val = response.pre_value if response else None
+            post_val = response.post_value if response else None
+            diff = post_val - pre_val if pre_val is not None and post_val is not None else None
+
+            widget_data_list.append(
+                WidgetData(
+                    id=widget.id,
+                    pre_prompt=widget.pre_prompt,
+                    post_prompt=widget.post_prompt,
+                    order=widget.order,
+                    pre_value=pre_val,
+                    post_value=post_val,
+                    pre_submitted_at=response.pre_submitted_at if response else None,
+                    post_submitted_at=response.post_submitted_at if response else None,
+                    is_post=is_post,
+                    difference=diff,
+                )
+            )
+
+        return WidgetProgressData(
+            homework_id=homework.id,
+            widgets=widget_data_list,
+            all_pre_answered=all_pre_answered,
+            all_post_answered=all_post_answered,
+        )
+
+    @staticmethod
+    @traced
+    def save_widget_response(user, widget_id, value_type, value) -> bool:
+        """
+        Save a widget response (pre or post).
+
+        Args:
+            user: User object
+            widget_id: UUID of the widget
+            value_type: 'pre' or 'post'
+            value: int value (0-10)
+
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        from .models import HomeworkProgressWidget
+        from conversations.models import HomeworkProgressWidgetResponse
+
+        try:
+            widget = HomeworkProgressWidget.objects.get(id=widget_id)
+
+            response, created = HomeworkProgressWidgetResponse.objects.get_or_create(
+                user=user, widget=widget
+            )
+
+            if value_type == "pre":
+                response.pre_value = value
+            elif value_type == "post":
+                response.post_value = value
+
+            response.save()
+            return True
+        except HomeworkProgressWidget.DoesNotExist:
+            logger.warning("Widget not found: %s", widget_id)
+            return False
+        except Exception as e:
+            logger.exception("Failed to save widget response: %s", e)
+            record_exception(e)
+            return False

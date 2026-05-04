@@ -584,6 +584,8 @@ class CourseHomeworkCreateView(View):
             HomeworkCreateForm,
             SectionForm,
             SectionFormSet,
+            ProgressWidgetForm,
+            ProgressWidgetFormSet,
         )
         from django.forms import formset_factory
 
@@ -595,9 +597,16 @@ class CourseHomeworkCreateView(View):
         )
         section_formset = SectionFormset(prefix="sections")
 
+        WidgetFormset = cast(
+            type[ProgressWidgetFormSet],
+            formset_factory(ProgressWidgetForm, extra=0, formset=ProgressWidgetFormSet),
+        )
+        widget_formset = WidgetFormset(prefix="widgets")
+
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
+            widget_forms=widget_formset,
             user_type="teacher",
             course_name=course.name,
             course_id=course.id,
@@ -614,6 +623,9 @@ class CourseHomeworkCreateView(View):
             SectionForm,
             SectionFormSet,
             normalize_section_formset_orders,
+            ProgressWidgetForm,
+            ProgressWidgetFormSet,
+            normalize_progress_widget_formset_orders,
         )
         from homeworks.services import (
             HomeworkService,
@@ -641,7 +653,14 @@ class CourseHomeworkCreateView(View):
         assert_type(section_formset, SectionFormSet)
         section_formset.is_draft_save = is_draft_save
 
-        if form.is_valid() and section_formset.is_valid():
+        WidgetFormset = cast(
+            type[ProgressWidgetFormSet],
+            formset_factory(ProgressWidgetForm, extra=0, formset=ProgressWidgetFormSet),
+        )
+        widget_formset = WidgetFormset(request.POST, prefix="widgets")
+        assert_type(widget_formset, ProgressWidgetFormSet)
+
+        if form.is_valid() and section_formset.is_valid() and widget_formset.is_valid():
             publish_at = None if publish_now else form.cleaned_data.get("publish_at")
             if is_draft_save:
                 homework_type = HomeworkType.DRAFT
@@ -683,6 +702,17 @@ class CourseHomeworkCreateView(View):
             # Add sections to homework data
             homework_data.sections = section_data
 
+            # Extract widgets data from formset
+            widgets_data = []
+            for widget_form in normalize_progress_widget_formset_orders(widget_formset):
+                if widget_form.cleaned_data.get("pre_prompt") or widget_form.cleaned_data.get("post_prompt"):
+                    widgets_data.append({
+                        "pre_prompt": widget_form.cleaned_data.get("pre_prompt", ""),
+                        "post_prompt": widget_form.cleaned_data.get("post_prompt", ""),
+                        "order": widget_form.cleaned_data.get("order", 1),
+                    })
+            homework_data.widgets = widgets_data
+
             # Use service to create homework with sections (course already included in data)
             result = HomeworkService.create_homework_with_sections(
                 homework_data, request.user.teacher_profile
@@ -693,6 +723,7 @@ class CourseHomeworkCreateView(View):
                 return HomeworkFormData(
                     form=form,
                     section_forms=section_formset,
+                    widget_forms=widget_formset,
                     user_type="teacher",
                     course_name=course.name,
                     course_id=course.id,
@@ -706,6 +737,7 @@ class CourseHomeworkCreateView(View):
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
+            widget_forms=widget_formset,
             user_type="teacher",
             course_name=course.name,
             course_id=course.id,

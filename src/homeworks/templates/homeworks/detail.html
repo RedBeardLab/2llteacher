@@ -86,21 +86,67 @@
         </div>
     </div>
 
-    <!-- Sections -->
-    <h2>Sections</h2>
+    <!-- Sections (including pre/post widgets for students) -->
     <div class="accordion mb-4" id="sectionAccordion">
-        {% for section in data.sections %}
+        {% if 'student' in data.user_roles and data.widget_progress and data.widget_progress.widgets %}
+        {% for widget in data.widget_progress.widgets %}
         <div class="accordion-item">
-            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
-                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" 
-                        data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" 
-                        aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" 
-                        aria-controls="collapse{{ forloop.counter }}">
-                    Section {{ section.order }}: {{ section.title }}
+            <h2 class="accordion-header" id="pre-heading-{{ forloop.counter }}">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#pre-collapse-{{ forloop.counter }}"
+                        aria-expanded="false" aria-controls="pre-collapse-{{ forloop.counter }}">
+                    Pre-section {{ widget.order }}: {{ widget.pre_prompt|truncatechars:50 }}
+                    <span class="ms-2">
+                        {% if widget.pre_value is not null %}
+                        <span class="badge bg-success ms-2">{{ widget.pre_value }}</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark ms-2">Not answered</span>
+                        {% endif %}
+                    </span>
                 </button>
             </h2>
-            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" 
-                 aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#sectionAccordion">
+            <div id="pre-collapse-{{ forloop.counter }}" class="accordion-collapse collapse"
+                 aria-labelledby="pre-heading-{{ forloop.counter }}" data-bs-parent="#sectionAccordion">
+                <div class="accordion-body">
+                    {% if widget.pre_value is not null %}
+                    <p><strong>{{ widget.pre_prompt }}</strong></p>
+                    <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Answered: {{ widget.pre_value }}</span>
+                    {% else %}
+                    <form method="post" action="{% url 'homeworks:widget_answer' data.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="widget_id" value="{{ widget.id }}">
+                        <input type="hidden" name="value_type" value="pre">
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <div class="mb-2">
+                            <p><strong>{{ widget.pre_prompt }}</strong></p>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="range" name="value" min="0" max="10" step="1" value="5" class="flex-grow-1"
+                                       oninput="this.nextElementSibling.textContent = this.value">
+                                <span style="font-weight: bold; font-size: 1.2em; min-width: 2em;">5</span>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Assessment</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% for section in data.sections %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="sec-heading-{{ forloop.counter }}">
+                <button class="accordion-button {% if forloop.first and data.widget_progress.widgets|length == 0 %} {% else %}collapsed{% endif %}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#sec-collapse-{{ forloop.counter }}"
+                        aria-expanded="false" aria-controls="sec-collapse-{{ forloop.counter }}">
+                    Section {{ section.order }}: {{ section.title }}
+                    {% if data.widget_progress and not data.widget_progress.all_pre_answered %}
+                    <span class="badge bg-secondary ms-2"><i class="bi bi-lock"></i> Locked</span>
+                    {% endif %}
+                </button>
+            </h2>
+            <div id="sec-collapse-{{ forloop.counter }}" class="accordion-collapse collapse"
+                 aria-labelledby="sec-heading-{{ forloop.counter }}" data-bs-parent="#sectionAccordion">
                 <div class="accordion-body">
                     <div class="mb-3">
                         <zero-md src="data:text/markdown;charset=utf-8,{{ section.content|urlencode }}">
@@ -109,10 +155,17 @@
                         </template>
                     </zero-md>
                     </div>
-                    
+
                     {% if 'student' in data.user_roles %}
                     <div class="mb-3">
-                        {% if section.section_type == 'non_interactive' %}
+                        {% if data.widget_progress and not data.widget_progress.all_pre_answered %}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="badge bg-secondary fs-6">
+                                <i class="bi bi-lock"></i> Locked
+                            </span>
+                            <span class="text-muted">Complete the pre-assessment first.</span>
+                        </div>
+                        {% elif section.section_type == 'non_interactive' %}
                             {% if section.status == 'submitted' %}
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="badge bg-success fs-6">
@@ -197,6 +250,68 @@
             </div>
         </div>
         {% endfor %}
+        {% if 'student' in data.user_roles and data.widget_progress and data.widget_progress.widgets %}
+        {% for widget in data.widget_progress.widgets %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="post-heading-{{ forloop.counter }}">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#post-collapse-{{ forloop.counter }}"
+                        aria-expanded="false" aria-controls="post-collapse-{{ forloop.counter }}">
+                    Post-section {{ widget.order }}: {{ widget.post_prompt|truncatechars:50 }}
+                    <span class="ms-2">
+                        {% if widget.post_value is not null %}
+                        <span class="badge bg-success ms-2">{{ widget.post_value }}</span>
+                        {% if widget.difference is not null %}
+                        <span class="badge {% if widget.difference > 0 %}bg-success{% elif widget.difference < 0 %}bg-danger{% else %}bg-secondary{% endif %} ms-1">{{ widget.difference }}</span>
+                        {% endif %}
+                        {% elif data.widget_progress.all_pre_answered %}
+                        <span class="badge bg-warning text-dark ms-2">Pending</span>
+                        {% else %}
+                        <span class="badge bg-secondary ms-2"><i class="bi bi-lock"></i> Locked</span>
+                        {% endif %}
+                    </span>
+                </button>
+            </h2>
+            <div id="post-collapse-{{ forloop.counter }}" class="accordion-collapse collapse"
+                 aria-labelledby="post-heading-{{ forloop.counter }}" data-bs-parent="#sectionAccordion">
+                <div class="accordion-body">
+                    {% if widget.post_value is not null %}
+                    <p><strong>{{ widget.post_prompt }}</strong></p>
+                    <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Answered: {{ widget.post_value }}</span>
+                    {% if widget.difference is not null %}
+                    <span class="ms-2 badge {% if widget.difference > 0 %}bg-success{% elif widget.difference < 0 %}bg-danger{% else %}bg-secondary{% endif %} fs-6">Change: {{ widget.difference }}</span>
+                    {% endif %}
+                    {% elif data.widget_progress.all_pre_answered %}
+                    <form method="post" action="{% url 'homeworks:widget_answer' data.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="widget_id" value="{{ widget.id }}">
+                        <input type="hidden" name="value_type" value="post">
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <div class="mb-2">
+                            <p><strong>{{ widget.post_prompt }}</strong></p>
+                            <div class="mb-3">
+                                <small class="text-muted">Your pre-assessment:</small>
+                                <div class="d-flex align-items-center gap-3">
+                                    <input type="range" min="0" max="10" step="1" value="{{ widget.pre_value }}" disabled class="flex-grow-1" oninput="this.nextElementSibling.textContent = this.value">
+                                    <span style="font-weight: bold; font-size: 1.2em; min-width: 2em;">{{ widget.pre_value }}</span>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="range" name="value" min="0" max="10" step="1" value="5" class="flex-grow-1"
+                                       oninput="this.nextElementSibling.textContent = this.value">
+                                <span style="font-weight: bold; font-size: 1.2em; min-width: 2em;">5</span>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success">Save Assessment</button>
+                    </form>
+                    {% else %}
+                    <span class="text-muted">Complete the pre-assessment first.</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
     </div>
 
     <!-- Action Buttons -->

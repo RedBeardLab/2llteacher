@@ -118,12 +118,12 @@
                     <div class="d-flex flex-column gap-1">
                         <small class="text-muted">Sections Started:</small>
                         <span class="fw-bold">{{ student.sections_started }} / {{ data.total_sections }}</span>
-                        
+
                         {% if student.missing_sections > 0 %}
                         <small class="text-danger mt-1">Missing Sections:</small>
                         <span class="fw-bold text-danger">{{ student.missing_sections }}</span>
                         {% endif %}
-                        
+
                         {% if student.has_interactions %}
                         <small class="text-muted mt-2">Last Activity:</small>
                         <span class="fw-bold">{{ student.last_activity|date:"M d, Y H:i" }}</span>
@@ -132,6 +132,37 @@
                 </div>
                 <div class="col-md-9">
                     <h6 class="mb-2">Section Progress (ordered by section number):</h6>
+
+                    <!-- Widget Progress -->
+                    {% if student.widget_progress %}
+                    <div class="widget-block mb-3 p-3 border rounded bg-light">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">
+                                <i class="bi bi-clipboard-check"></i> Assessments
+                            </h6>
+                        </div>
+                        <div class="row">
+                            {% for widget in student.widget_progress %}
+                            <div class="col-md-6 mb-2">
+                                <div class="p-2 bg-white border rounded">
+                                    <div class="small text-muted mb-1">{{ widget.pre_prompt|truncatechars:30 }}</div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-bold">{{ widget.pre_value }}</span>
+                                        <span>→</span>
+                                        <span class="fw-bold">{% if widget.post_value is not null %}{{ widget.post_value }}{% else %}-{% endif %}</span>
+                                        {% if widget.difference is not null %}
+                                        <span class="badge {% if widget.difference > 0 %}bg-success{% elif widget.difference < 0 %}bg-danger{% else %}bg-secondary{% endif %}">
+                                            {{ widget.difference }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <div class="section-progress-list">
                         {% for section_status in student.section_statuses %}
                         <div class="section-block mb-3 p-3 border rounded 

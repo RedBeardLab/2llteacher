@@ -34,6 +34,7 @@ from .services import (
     SectionCreateData,
     SectionStatus,
     SectionData,
+    WidgetData,
 )
 from .forms import (
     HomeworkCreateForm,
@@ -41,6 +42,9 @@ from .forms import (
     SectionForm,
     SectionFormSet,
     normalize_section_formset_orders,
+    ProgressWidgetForm,
+    ProgressWidgetFormSet,
+    normalize_progress_widget_formset_orders,
 )
 
 logger = logging.getLogger(__name__)
@@ -323,6 +327,7 @@ class HomeworkDetailData:
         str
     ]  # All roles this user has for this homework: ['teacher', 'student', 'teacher_assistant']
     can_edit: bool
+    widget_progress: "WidgetProgressData | None" = None
     expires_at: datetime | None = None
     is_hidden: bool = False
     is_accessible_to_students: bool = True
@@ -340,6 +345,7 @@ class HomeworkFormData:
     section_forms: "SectionFormSet"
     user_type: str
     action: str  # 'create' or 'edit'
+    widget_forms: "ProgressWidgetFormSet | None" = None
     is_submitted: bool = False
     errors: Dict[str, Any] | None = None
     course_name: str = ""
@@ -463,10 +469,33 @@ class HomeworkEditView(View):
         )
         assert_type(section_formset, SectionFormSet)
 
+        # Get existing widgets for this homework
+        widgets = homework.progress_widgets.all().order_by("order")
+        initial_widget_data = []
+        for widget in widgets:
+            widget_data = {
+                "id": widget.id,
+                "pre_prompt": widget.pre_prompt,
+                "post_prompt": widget.post_prompt,
+                "order": widget.order,
+            }
+            initial_widget_data.append(widget_data)
+
+        # Create widget formset with initial data
+        WidgetFormset = cast(
+            type[ProgressWidgetFormSet],
+            formset_factory(ProgressWidgetForm, extra=0, formset=ProgressWidgetFormSet),
+        )
+        widget_formset = WidgetFormset(
+            prefix="widgets", initial=initial_widget_data
+        )
+        assert_type(widget_formset, ProgressWidgetFormSet)
+
         # Return form data
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
+            widget_forms=widget_formset,
             user_type="teacher",
             action="edit",
             is_submitted=False,
@@ -534,8 +563,16 @@ class HomeworkEditView(View):
         section_formset = SectionFormset(request.POST, prefix="sections")
         assert_type(section_formset, SectionFormSet)
 
+        # Create formset for widgets
+        WidgetFormset = cast(
+            type[ProgressWidgetFormSet],
+            formset_factory(ProgressWidgetForm, extra=0, formset=ProgressWidgetFormSet),
+        )
+        widget_formset = WidgetFormset(request.POST, prefix="widgets")
+        assert_type(widget_formset, ProgressWidgetFormSet)
+
         # Check form validity
-        if form.is_valid() and section_formset.is_valid():
+        if form.is_valid() and section_formset.is_valid() and widget_formset.is_valid():
             from .models import HomeworkType
 
             publish_now = "publish_now" in request.POST
@@ -596,6 +633,32 @@ class HomeworkEditView(View):
                         )
                     )
 
+            # Process widgets
+            widgets_to_update = []
+            widgets_to_create = []
+            widgets_to_delete = []
+
+            for widget_form in widget_formset:
+                if not widget_form.cleaned_data:
+                    continue
+
+                if widget_form.cleaned_data.get("DELETE", False):
+                    if widget_form.cleaned_data.get("id"):
+                        widgets_to_delete.append(widget_form.cleaned_data["id"])
+
+            for widget_form in normalize_progress_widget_formset_orders(widget_formset):
+                widget_data = {
+                    "pre_prompt": widget_form.cleaned_data["pre_prompt"],
+                    "post_prompt": widget_form.cleaned_data["post_prompt"],
+                    "order": widget_form.cleaned_data["order"],
+                }
+
+                if widget_form.cleaned_data.get("id"):
+                    widget_data["id"] = widget_form.cleaned_data["id"]
+                    widgets_to_update.append(widget_data)
+                else:
+                    widgets_to_create.append(widget_data)
+
             # Create update data
             update_data = HomeworkUpdateData(
                 title=homework.title,
@@ -605,6 +668,9 @@ class HomeworkEditView(View):
                 sections_to_update=sections_to_update,
                 sections_to_create=sections_to_create,
                 sections_to_delete=sections_to_delete,
+                widgets_to_update=widgets_to_update,
+                widgets_to_create=widgets_to_create,
+                widgets_to_delete=widgets_to_delete,
             )
 
             # Update homework using service
@@ -615,6 +681,7 @@ class HomeworkEditView(View):
                 return HomeworkFormData(
                     form=form,
                     section_forms=section_formset,
+                    widget_forms=widget_formset,
                     user_type="teacher",
                     action="edit",
                     is_submitted=True,
@@ -631,11 +698,16 @@ class HomeworkEditView(View):
             errors["sections"] = section_formset.errors
         if section_formset.non_form_errors():
             errors["formset"] = [section_formset.non_form_errors()]
+        if widget_formset.errors:
+            errors["widgets"] = widget_formset.errors
+        if widget_formset.non_form_errors():
+            errors.setdefault("formset", []).append(widget_formset.non_form_errors())
 
         # Return form data with errors
         return HomeworkFormData(
             form=form,
             section_forms=section_formset,
+            widget_forms=widget_formset,
             user_type="teacher",
             action="edit",
             is_submitted=False,
@@ -857,6 +929,11 @@ class HomeworkDetailView(View):
             else "Unknown Teacher"
         )
 
+        # Get widget progress for students
+        widget_progress = None
+        if "student" in user_roles:
+            widget_progress = HomeworkService.get_widget_progress(user, homework)
+
         # Create and return the view data
         return HomeworkDetailData(
             id=homework_detail.id,
@@ -871,6 +948,7 @@ class HomeworkDetailView(View):
             and homework_detail.due_date < timezone.now(),
             user_roles=user_roles,
             can_edit=can_edit,
+            widget_progress=widget_progress,
             expires_at=homework.expires_at,  # type: ignore[assignment]
             is_hidden=homework.is_hidden,
             is_accessible_to_students=homework.is_accessible_to_students,
@@ -961,6 +1039,16 @@ class SectionDetailView(View):
             else:
                 return HttpResponseForbidden(
                     "Access denied. This homework is not assigned to a course."
+                )
+
+            # Check pre-conditions: student must answer all pre-assessment widgets
+            next_widget = HomeworkService.get_next_unanswered_widget(
+                request.user, homework
+            )
+            if next_widget is not None and not next_widget.is_post:
+                return redirect(
+                    "homeworks:widget_answer",
+                    homework_id=homework_id,
                 )
 
         # For TAs, check if they're assigned to the course that has this homework
@@ -1292,6 +1380,15 @@ class NonInteractiveSectionAnswerView(View):
         ):
             return HttpResponseForbidden("You are not enrolled in this course.")
 
+        # Check pre-conditions: student must answer all pre-assessment widgets
+        from .services import HomeworkService
+
+        next_widget = HomeworkService.get_next_unanswered_widget(
+            request.user, homework
+        )
+        if next_widget is not None and not next_widget.is_post:
+            return redirect("homeworks:widget_answer", homework_id=homework_id)
+
         answers: list[dict[str, Any]] = [
             {"answer": answer["answer"], "submitted_at": answer["submitted_at"]}
             for answer in SectionAnswer.objects.filter(
@@ -1309,4 +1406,127 @@ class NonInteractiveSectionAnswerView(View):
             section_content=section.content,
             section_order=section.order,
             existing_answers=answers,
+        )
+
+
+@dataclass
+class WidgetAnswerData:
+    """Data for the widget answer page."""
+
+    homework_id: UUID
+    homework_title: str
+    widget_id: UUID
+    prompt: str
+    pre_value: int | None = None
+    is_post: bool = False
+    is_complete: bool = False
+
+
+class WidgetAnswerView(View):
+    """
+    View for answering progress widgets.
+
+    Students answer pre-condition widgets before starting homework
+    and post-condition widgets after completing homework.
+    """
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
+        data = self._get_view_data(request, homework_id)
+        if isinstance(data, HttpResponse):
+            return data
+        return render(request, "homeworks/widget_answer.html", {"data": data})
+
+    def post(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
+        from django import forms as django_forms
+
+        widget_id = request.POST.get("widget_id")
+        value_type = request.POST.get("value_type")
+        value = request.POST.get("value")
+
+        if not widget_id or not value_type or not value:
+            messages.error(request, "Missing required fields.")
+            return redirect("homeworks:widget_answer", homework_id=homework_id)
+
+        try:
+            value = int(value)
+            if value < 0 or value > 10:
+                raise ValueError("Value out of range")
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid value.")
+            return redirect("homeworks:widget_answer", homework_id=homework_id)
+
+        success = HomeworkService.save_widget_response(
+            request.user, UUID(widget_id), value_type, value
+        )
+
+        if success:
+            messages.success(request, "Answer saved!")
+        else:
+            messages.error(request, "Failed to save answer.")
+
+        next_url = request.POST.get("next")
+        if next_url:
+            return redirect(next_url)
+        return redirect("homeworks:widget_answer", homework_id=homework_id)
+
+    def _get_view_data(self, request: HttpRequest, homework_id: UUID):
+        student_profile = getattr(request.user, "student_profile", None)
+        if not student_profile:
+            return HttpResponseForbidden("Only students can answer widgets.")
+
+        try:
+            homework = Homework.objects.get(id=homework_id)
+        except Homework.DoesNotExist:
+            messages.error(request, "Homework not found.")
+            return redirect("homeworks:list")
+
+        if not homework.course or not homework.course.is_student_enrolled(
+            student_profile
+        ):
+            return HttpResponseForbidden("You are not enrolled in this course.")
+
+        widget = HomeworkService.get_next_unanswered_widget(
+            request.user, homework
+        )
+
+        if widget is None:
+            return redirect("homeworks:detail", homework_id=homework_id)
+
+        # If next widget is post, redirect to homework unless all interactive sections are completed
+        if widget.is_post:
+            from conversations.models import Submission
+
+            interactive_sections = homework.sections.filter(
+                section_type=Section.SECTION_TYPE_CONVERSATION
+            )
+            completed_section_ids = set(
+                Submission.objects.filter(
+                    conversation__section__in=interactive_sections,
+                    conversation__user=request.user,
+                ).values_list("conversation__section_id", flat=True)
+            )
+            incomplete_sections = interactive_sections.exclude(
+                id__in=completed_section_ids
+            )
+            if incomplete_sections.exists():
+                return redirect("homeworks:detail", homework_id=homework_id)
+
+        all_pre_done = HomeworkService.can_access_sections(request.user, homework)
+
+        is_post = all_pre_done
+
+        prompt = widget.post_prompt if is_post else widget.pre_prompt
+
+        return WidgetAnswerData(
+            homework_id=homework.id,
+            homework_title=homework.title,
+            widget_id=widget.id,
+            prompt=prompt,
+            pre_value=widget.pre_value,
+            is_post=is_post,
+            is_complete=False,
         )

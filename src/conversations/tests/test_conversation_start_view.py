@@ -12,8 +12,8 @@ from datetime import timedelta
 from django.utils import timezone
 
 from accounts.models import User, Teacher, Student
-from homeworks.models import Homework, Section
-from courses.models import Course
+from homeworks.models import Homework, Section, HomeworkProgressWidget
+from courses.models import Course, CourseEnrollment
 
 
 class ConversationStartViewTests(TestCase):
@@ -223,3 +223,24 @@ class ConversationStartViewTests(TestCase):
         url = reverse("conversations:start", kwargs={"section_id": ni_section.id})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 403)
+
+    def test_student_without_pre_widget_bypasses_check(self):
+        """PROVES BYPASS: Student can start conversation without answering pre-widget."""
+        from courses.models import CourseEnrollment
+
+        # Enroll the student
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student, is_active=True
+        )
+        # Create a pre-widget
+        HomeworkProgressWidget.objects.create(
+            homework=self.homework,
+            pre_prompt="Rate your knowledge before starting",
+            order=1,
+        )
+        self.client.login(username="studentuser", password="password123")
+        response = self.client.get(self.start_url)
+        # This currently returns 200 (no pre-widget check exists) — SHOULD redirect
+        self.assertEqual(
+            response.status_code, 302, "Student should be redirected, not allowed to start"
+        )
