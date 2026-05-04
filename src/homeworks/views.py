@@ -1452,15 +1452,15 @@ class WidgetAnswerView(View):
             return redirect("homeworks:widget_answer", homework_id=homework_id)
 
         try:
-            value = int(value)
-            if value < 0 or value > 10:
+            int_value: int = int(value)
+            if int_value < 0 or int_value > 10:
                 raise ValueError("Value out of range")
         except (ValueError, TypeError):
             messages.error(request, "Invalid value.")
             return redirect("homeworks:widget_answer", homework_id=homework_id)
 
         success = HomeworkService.save_widget_response(
-            request.user, UUID(widget_id), value_type, value
+            request.user, UUID(widget_id), value_type, int_value
         )
 
         if success:
