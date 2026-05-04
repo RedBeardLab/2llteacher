@@ -1,6 +1,10 @@
 import uuid
 from django.db import models
-from django.core.validators import MinLengthValidator, MinValueValidator, MaxValueValidator
+from django.core.validators import (
+    MinLengthValidator,
+    MinValueValidator,
+    MaxValueValidator,
+)
 from django.utils import timezone
 
 
@@ -266,7 +270,9 @@ class HomeworkProgressWidgetResponse(models.Model):
     def __str__(self):
         pre = self.pre_value if self.pre_value is not None else "N/A"
         post = self.post_value if self.post_value is not None else "N/A"
-        return f"{self.user.username} - Widget {self.widget.order}: pre={pre}, post={post}"
+        return (
+            f"{self.user.username} - Widget {self.widget.order}: pre={pre}, post={post}"
+        )
 
     def save(self, *args, **kwargs):
         if self.pre_value is not None and self.pre_submitted_at is None:

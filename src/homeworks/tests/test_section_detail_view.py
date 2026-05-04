@@ -415,7 +415,9 @@ class SectionDetailViewProgressWidgetTestCase(TestCase):
         response = self.client.get(self.url)
         self.assertRedirects(
             response,
-            reverse("homeworks:widget_answer", kwargs={"homework_id": self.homework.id}),
+            reverse(
+                "homeworks:widget_answer", kwargs={"homework_id": self.homework.id}
+            ),
         )
 
     def test_teacher_can_access_section_regardless_of_widgets(self):

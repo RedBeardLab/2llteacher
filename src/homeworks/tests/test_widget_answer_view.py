@@ -8,7 +8,11 @@ from django.utils import timezone
 from datetime import timedelta
 
 from homeworks.models import Homework, HomeworkProgressWidget, Section
-from conversations.models import HomeworkProgressWidgetResponse, Conversation, Submission
+from conversations.models import (
+    HomeworkProgressWidgetResponse,
+    Conversation,
+    Submission,
+)
 from accounts.models import User, Teacher, Student
 from courses.models import Course, CourseEnrollment, CourseTeacher
 
@@ -57,7 +61,9 @@ class WidgetAnswerViewTestCase(TestCase):
             order=1,
         )
 
-        self.url = reverse("homeworks:widget_answer", kwargs={"homework_id": self.homework.id})
+        self.url = reverse(
+            "homeworks:widget_answer", kwargs={"homework_id": self.homework.id}
+        )
 
     def test_student_get_shows_pre_widget(self):
         """Test that student sees pre-assessment widget when not yet answered."""
@@ -78,7 +84,9 @@ class WidgetAnswerViewTestCase(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Post-Assessment")
-        self.assertContains(response, "How much do you now know about this topic? (Post)")
+        self.assertContains(
+            response, "How much do you now know about this topic? (Post)"
+        )
 
     def test_student_get_shows_pre_value_locked_when_post(self):
         """Test that pre value is shown (locked) when answering post widget."""
@@ -175,7 +183,11 @@ class WidgetAnswerViewTestCase(TestCase):
             },
         )
         self.assertEqual(response.status_code, 302)
-        messages = list(response.context["messages"]) if hasattr(response, "context") and response.context else []
+        messages = (
+            list(response.context["messages"])
+            if hasattr(response, "context") and response.context
+            else []
+        )
         # Value should not be saved since 11 is out of range
         response_obj = HomeworkProgressWidgetResponse.objects.filter(
             user=self.student_user, widget=self.widget
@@ -201,7 +213,6 @@ class WidgetAnswerViewTestCase(TestCase):
         response = self.client.get(url)
         # View redirects to list when homework not found
         self.assertEqual(response.status_code, 302)
-
 
     def test_after_pre_answered_redirects_to_homework_not_post(self):
         """After answering all pre, student should go to homework, not post."""
@@ -249,7 +260,9 @@ class WidgetAnswerViewTestCase(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Post-Assessment")
-        self.assertContains(response, "How much do you now know about this topic? (Post)")
+        self.assertContains(
+            response, "How much do you now know about this topic? (Post)"
+        )
 
 
 class WidgetAnswerViewMultipleWidgetsTestCase(TestCase):
@@ -302,7 +315,9 @@ class WidgetAnswerViewMultipleWidgetsTestCase(TestCase):
             order=2,
         )
 
-        self.url = reverse("homeworks:widget_answer", kwargs={"homework_id": self.homework.id})
+        self.url = reverse(
+            "homeworks:widget_answer", kwargs={"homework_id": self.homework.id}
+        )
 
     def test_student_must_answer_all_pre_widgets(self):
         """Test that student must answer all pre widgets before sections."""

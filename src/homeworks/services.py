@@ -1776,7 +1776,11 @@ class HomeworkService:
 
             pre_val = response.pre_value if response else None
             post_val = response.post_value if response else None
-            diff = post_val - pre_val if pre_val is not None and post_val is not None else None
+            diff = (
+                post_val - pre_val
+                if pre_val is not None and post_val is not None
+                else None
+            )
 
             widget_data_list.append(
                 WidgetData(

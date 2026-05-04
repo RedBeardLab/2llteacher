@@ -486,9 +486,7 @@ class HomeworkEditView(View):
             type[ProgressWidgetFormSet],
             formset_factory(ProgressWidgetForm, extra=0, formset=ProgressWidgetFormSet),
         )
-        widget_formset = WidgetFormset(
-            prefix="widgets", initial=initial_widget_data
-        )
+        widget_formset = WidgetFormset(prefix="widgets", initial=initial_widget_data)
         assert_type(widget_formset, ProgressWidgetFormSet)
 
         # Return form data
@@ -1383,9 +1381,7 @@ class NonInteractiveSectionAnswerView(View):
         # Check pre-conditions: student must answer all pre-assessment widgets
         from .services import HomeworkService
 
-        next_widget = HomeworkService.get_next_unanswered_widget(
-            request.user, homework
-        )
+        next_widget = HomeworkService.get_next_unanswered_widget(request.user, homework)
         if next_widget is not None and not next_widget.is_post:
             return redirect("homeworks:widget_answer", homework_id=homework_id)
 
@@ -1489,9 +1485,7 @@ class WidgetAnswerView(View):
         ):
             return HttpResponseForbidden("You are not enrolled in this course.")
 
-        widget = HomeworkService.get_next_unanswered_widget(
-            request.user, homework
-        )
+        widget = HomeworkService.get_next_unanswered_widget(request.user, homework)
 
         if widget is None:
             return redirect("homeworks:detail", homework_id=homework_id)

@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("conversations", "0005_homeworkprogresswidgetresponse"),
     ]
