@@ -1763,8 +1763,8 @@ class HomeworkService:
                 user=user, widget=widget
             ).first()
 
-            pre_answered = response and response.pre_value is not None
-            post_answered = response and response.post_value is not None
+            pre_answered = response is not None and response.pre_value is not None
+            post_answered = response is not None and response.post_value is not None
 
             if not pre_answered:
                 all_pre_answered = False
