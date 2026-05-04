@@ -35,6 +35,7 @@ from .services import (
     SectionStatus,
     SectionData,
     WidgetData,
+    WidgetProgressData,
 )
 from .forms import (
     HomeworkCreateForm,
@@ -699,7 +700,8 @@ class HomeworkEditView(View):
         if widget_formset.errors:
             errors["widgets"] = widget_formset.errors
         if widget_formset.non_form_errors():
-            errors.setdefault("formset", []).append(widget_formset.non_form_errors())
+            formset_errors = cast(list[ErrorList], errors.setdefault("formset", []))
+            formset_errors.append(widget_formset.non_form_errors())
 
         # Return form data with errors
         return HomeworkFormData(
