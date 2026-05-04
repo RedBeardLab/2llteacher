@@ -35,6 +35,7 @@ from .services import (
     SectionStatus,
     SectionData,
     WidgetData,
+    WidgetProgressData,
 )
 from .forms import (
     HomeworkCreateForm,
@@ -327,7 +328,7 @@ class HomeworkDetailData:
         str
     ]  # All roles this user has for this homework: ['teacher', 'student', 'teacher_assistant']
     can_edit: bool
-    widget_progress: "WidgetProgressData | None" = None
+    widget_progress: WidgetProgressData | None = None
     expires_at: datetime | None = None
     is_hidden: bool = False
     is_accessible_to_students: bool = True
@@ -699,7 +700,13 @@ class HomeworkEditView(View):
         if widget_formset.errors:
             errors["widgets"] = widget_formset.errors
         if widget_formset.non_form_errors():
-            errors.setdefault("formset", []).append(widget_formset.non_form_errors())
+            widget_non_form_errors: ErrorList = widget_formset.non_form_errors()
+            if "formset" in errors:
+                existing_val = errors["formset"]
+                if isinstance(existing_val, list):
+                    existing_val.append(widget_non_form_errors)
+            else:
+                errors["formset"] = [widget_non_form_errors]
 
         # Return form data with errors
         return HomeworkFormData(
