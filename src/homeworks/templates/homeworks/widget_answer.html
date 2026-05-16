@@ -20,7 +20,7 @@
                     <p class="d-flex align-items-center gap-2">
                         <span class="text-muted" style="font-size: 0.8em;">0</span>
                         <input type="range" min="0" max="10" step="1" value="{{ data.pre_value }}" disabled oninput="this.nextElementSibling.textContent = this.value">
-                        <span style="font-weight: bold; font-size: 1.2em; margin-left: 10px;">{{ data.pre_value }}</span>
+                        <span style="font-weight: bold; font-size: 1.2em; min-width: 2em;">{{ data.pre_value }}</span>
                         <span class="text-muted" style="font-size: 0.8em;">10</span>
                     </p>
                     {% endif %}
@@ -33,7 +33,7 @@
                         <p class="d-flex align-items-center gap-2">
                             <span class="text-muted" style="font-size: 0.8em;">0</span>
                             <input type="range" name="value" min="0" max="10" step="1" value="5" id="slider" oninput="this.nextElementSibling.textContent = this.value">
-                            <span id="sliderValue" style="font-weight: bold; font-size: 1.2em; margin-left: 10px;">5</span>
+                            <span id="sliderValue" style="font-weight: bold; font-size: 1.2em; min-width: 2em;">5</span>
                             <span class="text-muted" style="font-size: 0.8em;">10</span>
                         </p>
 
