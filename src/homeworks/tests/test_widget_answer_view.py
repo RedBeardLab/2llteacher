@@ -184,6 +184,8 @@ class WidgetAnswerViewTestCase(TestCase):
         self.assertContains(
             response, "How much do you now know about this topic? (Post)"
         )
+        self.assertContains(response, "0")
+        self.assertContains(response, "10")
 
 
 class WidgetAnswerViewMultipleWidgetsTestCase(TestCase):
