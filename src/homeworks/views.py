@@ -694,12 +694,16 @@ class HomeworkEditView(View):
             errors["homework"] = form.errors
         if section_formset.errors:
             errors["sections"] = section_formset.errors
-        if section_formset.non_form_errors():
-            errors["formset"] = [section_formset.non_form_errors()]
         if widget_formset.errors:
             errors["widgets"] = widget_formset.errors
+
+        non_form_errors: list[ErrorList] = []
+        if section_formset.non_form_errors():
+            non_form_errors.append(section_formset.non_form_errors())
         if widget_formset.non_form_errors():
-            errors.setdefault("formset", []).append(widget_formset.non_form_errors())
+            non_form_errors.append(widget_formset.non_form_errors())
+        if non_form_errors:
+            errors["formset"] = non_form_errors
 
         # Return form data with errors
         return HomeworkFormData(
