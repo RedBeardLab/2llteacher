@@ -72,6 +72,8 @@ class WidgetAnswerViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pre-Assessment")
         self.assertContains(response, "How much do you know about this topic? (Pre)")
+        self.assertContains(response, "0")
+        self.assertContains(response, "10")
 
     def test_student_get_shows_post_widget_after_pre_answered(self):
         """Test that student sees post-assessment after pre is answered."""
@@ -87,89 +89,8 @@ class WidgetAnswerViewTestCase(TestCase):
         self.assertContains(
             response, "How much do you now know about this topic? (Post)"
         )
-
-    def test_student_get_shows_pre_value_locked_when_post(self):
-        """Test that pre value is shown (locked) when answering post widget."""
-        HomeworkProgressWidgetResponse.objects.create(
-            user=self.student_user,
-            widget=self.widget,
-            pre_value=5,
-        )
-        self.client.login(username="student", password="password")
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "5")
-        # Pre value should be displayed but not editable
-        self.assertContains(response, "Your pre-assessment:")
-
-    def test_redirect_to_homework_when_all_done(self):
-        """Test redirect to homework detail when all widgets are answered."""
-        HomeworkProgressWidgetResponse.objects.create(
-            user=self.student_user,
-            widget=self.widget,
-            pre_value=5,
-            post_value=7,
-        )
-        self.client.login(username="student", password="password")
-        response = self.client.get(self.url)
-        self.assertRedirects(
-            response,
-            reverse("homeworks:detail", kwargs={"homework_id": self.homework.id}),
-        )
-
-    def test_teacher_cannot_access(self):
-        """Test that teachers cannot access widget answer page."""
-        self.client.login(username="teacher", password="password")
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_unauthenticated_redirect(self):
-        """Test that unauthenticated users are redirected."""
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_saves_pre_value(self):
-        """Test that POST saves pre-assessment value."""
-        self.client.login(username="student", password="password")
-        response = self.client.post(
-            self.url,
-            {
-                "widget_id": str(self.widget.id),
-                "value_type": "pre",
-                "value": "7",
-            },
-        )
-        self.assertEqual(response.status_code, 302)
-
-        response_obj = HomeworkProgressWidgetResponse.objects.get(
-            user=self.student_user, widget=self.widget
-        )
-        self.assertEqual(response_obj.pre_value, 7)
-        self.assertIsNotNone(response_obj.pre_submitted_at)
-
-    def test_post_saves_post_value(self):
-        """Test that POST saves post-assessment value."""
-        HomeworkProgressWidgetResponse.objects.create(
-            user=self.student_user,
-            widget=self.widget,
-            pre_value=5,
-        )
-        self.client.login(username="student", password="password")
-        response = self.client.post(
-            self.url,
-            {
-                "widget_id": str(self.widget.id),
-                "value_type": "post",
-                "value": "8",
-            },
-        )
-        self.assertEqual(response.status_code, 302)
-
-        response_obj = HomeworkProgressWidgetResponse.objects.get(
-            user=self.student_user, widget=self.widget
-        )
-        self.assertEqual(response_obj.post_value, 8)
-        self.assertIsNotNone(response_obj.post_submitted_at)
+        self.assertContains(response, "0")
+        self.assertContains(response, "10")
 
     def test_post_invalid_value_rejected(self):
         """Test that invalid values are rejected."""

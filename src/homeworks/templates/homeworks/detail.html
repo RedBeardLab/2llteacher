@@ -119,10 +119,12 @@
                         <input type="hidden" name="next" value="{{ request.path }}">
                         <div class="mb-2">
                             <p><strong>{{ widget.pre_prompt }}</strong></p>
-                            <div class="d-flex align-items-center gap-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted" style="font-size: 0.8em;">0</span>
                                 <input type="range" name="value" min="0" max="10" step="1" value="5" class="flex-grow-1"
                                        oninput="this.nextElementSibling.textContent = this.value">
                                 <span style="font-weight: bold; font-size: 1.2em; min-width: 2em;">5</span>
+                                <span class="text-muted" style="font-size: 0.8em;">10</span>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-primary">Save Assessment</button>
@@ -291,15 +293,19 @@
                             <p><strong>{{ widget.post_prompt }}</strong></p>
                             <div class="mb-3">
                                 <small class="text-muted">Your pre-assessment:</small>
-                                <div class="d-flex align-items-center gap-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted" style="font-size: 0.8em;">0</span>
                                     <input type="range" min="0" max="10" step="1" value="{{ widget.pre_value }}" disabled class="flex-grow-1" oninput="this.nextElementSibling.textContent = this.value">
                                     <span style="font-weight: bold; font-size: 1.2em; min-width: 2em;">{{ widget.pre_value }}</span>
+                                    <span class="text-muted" style="font-size: 0.8em;">10</span>
                                 </div>
                             </div>
-                            <div class="d-flex align-items-center gap-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted" style="font-size: 0.8em;">0</span>
                                 <input type="range" name="value" min="0" max="10" step="1" value="5" class="flex-grow-1"
                                        oninput="this.nextElementSibling.textContent = this.value">
                                 <span style="font-weight: bold; font-size: 1.2em; min-width: 2em;">5</span>
+                                <span class="text-muted" style="font-size: 0.8em;">10</span>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-success">Save Assessment</button>
