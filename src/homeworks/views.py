@@ -13,7 +13,7 @@ from django.forms import formset_factory
 
 if TYPE_CHECKING:
     from django.forms.utils import ErrorDict, ErrorList
-    from .services import HomeworkProgressData
+    from .services import HomeworkProgressData, WidgetProgressData
 
 from django.views import View
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
