@@ -72,6 +72,8 @@ class WidgetAnswerViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pre-Assessment")
         self.assertContains(response, "How much do you know about this topic? (Pre)")
+        self.assertContains(response, "0")
+        self.assertContains(response, "10")
 
     def test_student_get_shows_post_widget_after_pre_answered(self):
         """Test that student sees post-assessment after pre is answered."""
@@ -101,6 +103,8 @@ class WidgetAnswerViewTestCase(TestCase):
         self.assertContains(response, "5")
         # Pre value should be displayed but not editable
         self.assertContains(response, "Your pre-assessment:")
+        self.assertContains(response, "0")
+        self.assertContains(response, "10")
 
     def test_redirect_to_homework_when_all_done(self):
         """Test redirect to homework detail when all widgets are answered."""
@@ -263,6 +267,8 @@ class WidgetAnswerViewTestCase(TestCase):
         self.assertContains(
             response, "How much do you now know about this topic? (Post)"
         )
+        self.assertContains(response, "0")
+        self.assertContains(response, "10")
 
 
 class WidgetAnswerViewMultipleWidgetsTestCase(TestCase):
