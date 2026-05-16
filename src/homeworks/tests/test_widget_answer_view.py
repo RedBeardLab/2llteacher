@@ -92,6 +92,21 @@ class WidgetAnswerViewTestCase(TestCase):
         self.assertContains(response, "0")
         self.assertContains(response, "10")
 
+    def test_student_get_shows_pre_value_locked_when_post(self):
+        """Test that pre value is shown locked with range labels when in post mode."""
+        HomeworkProgressWidgetResponse.objects.create(
+            user=self.student_user,
+            widget=self.widget,
+            pre_value=7,
+        )
+        self.client.login(username="student", password="password")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Post-Assessment")
+        self.assertContains(response, "0")
+        self.assertContains(response, "10")
+        self.assertContains(response, "7")
+
     def test_post_invalid_value_rejected(self):
         """Test that invalid values are rejected."""
         self.client.login(username="student", password="password")
