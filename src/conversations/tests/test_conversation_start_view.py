@@ -226,7 +226,6 @@ class ConversationStartViewTests(TestCase):
 
     def test_student_without_pre_widget_bypasses_check(self):
         """PROVES BYPASS: Student can start conversation without answering pre-widget."""
-        from courses.models import CourseEnrollment
 
         # Enroll the student
         CourseEnrollment.objects.create(
