@@ -541,6 +541,100 @@ class HomeworkEditView(View):
             homework.homework_type = HomeworkType.DRAFT
             homework.is_hidden = True
             homework.save(update_fields=update_fields)
+
+            # Process sections from POST data (bypass formset validation).
+            # SectionForm requires title/content, but on a draft save the teacher
+            # may have partially-written exercises. We parse raw POST fields to
+            # persist whatever they've entered so far, even if incomplete.
+            sections_total = int(request.POST.get("sections-TOTAL_FORMS", 0))
+            sections_to_update: list[dict[str, Any]] = []
+            sections_to_create: list[SectionCreateData] = []
+            sections_to_delete: list[UUID] = []
+
+            for i in range(sections_total):
+                section_id = request.POST.get(f"sections-{i}-id", "")
+                section_delete = request.POST.get(f"sections-{i}-DELETE", "")
+
+                if section_delete and section_id:
+                    sections_to_delete.append(UUID(section_id))
+                    continue
+
+                section_title = request.POST.get(f"sections-{i}-title", "")
+                section_content = request.POST.get(f"sections-{i}-content", "")
+                section_order = int(request.POST.get(f"sections-{i}-order", i + 1))
+                section_solution = request.POST.get(f"sections-{i}-solution", "")
+                section_type = request.POST.get(
+                    f"sections-{i}-section_type", "conversation"
+                )
+
+                if section_id:
+                    sections_to_update.append(
+                        {
+                            "id": UUID(section_id),
+                            "title": section_title,
+                            "content": section_content,
+                            "order": section_order,
+                            "solution": section_solution,
+                            "section_type": section_type,
+                        }
+                    )
+                else:
+                    sections_to_create.append(
+                        SectionCreateData(
+                            title=section_title,
+                            content=section_content,
+                            order=section_order,
+                            solution=section_solution,
+                            section_type=section_type,
+                        )
+                    )
+
+            # Process widgets from POST data (bypass formset validation)
+            widgets_total = int(request.POST.get("widgets-TOTAL_FORMS", 0))
+            widgets_to_update: list[dict[str, Any]] = []
+            widgets_to_create: list[dict[str, Any]] = []
+            widgets_to_delete: list[UUID] = []
+
+            for i in range(widgets_total):
+                widget_id = request.POST.get(f"widgets-{i}-id", "")
+                widget_delete = request.POST.get(f"widgets-{i}-DELETE", "")
+
+                if widget_delete and widget_id:
+                    widgets_to_delete.append(UUID(widget_id))
+                    continue
+
+                widget_pre_prompt = request.POST.get(f"widgets-{i}-pre_prompt", "")
+                widget_post_prompt = request.POST.get(f"widgets-{i}-post_prompt", "")
+                widget_order = int(request.POST.get(f"widgets-{i}-order", i + 1))
+
+                if widget_id:
+                    widgets_to_update.append(
+                        {
+                            "id": UUID(widget_id),
+                            "pre_prompt": widget_pre_prompt,
+                            "post_prompt": widget_post_prompt,
+                            "order": widget_order,
+                        }
+                    )
+                else:
+                    widgets_to_create.append(
+                        {
+                            "pre_prompt": widget_pre_prompt,
+                            "post_prompt": widget_post_prompt,
+                            "order": widget_order,
+                        }
+                    )
+
+            update_data = HomeworkUpdateData(
+                sections_to_update=sections_to_update or None,
+                sections_to_create=sections_to_create or None,
+                sections_to_delete=sections_to_delete or None,
+                widgets_to_update=widgets_to_update or None,
+                widgets_to_create=widgets_to_create or None,
+                widgets_to_delete=widgets_to_delete or None,
+            )
+            HomeworkService.update_homework(homework.id, update_data)
+
             return HomeworkFormData(
                 form=HomeworkEditForm(instance=homework),
                 section_forms=None,  # type: ignore[arg-type]

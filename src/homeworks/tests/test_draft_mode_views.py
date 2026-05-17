@@ -42,6 +42,9 @@ def _make_section_post(sections, prefix="sections"):
         data[f"{prefix}-{i}-content"] = s.get("content", "")
         data[f"{prefix}-{i}-order"] = str(s.get("order", i + 1))
         data[f"{prefix}-{i}-solution"] = s.get("solution", "")
+        data[f"{prefix}-{i}-section_type"] = s.get("section_type", "conversation")
+        if s.get("DELETE"):
+            data[f"{prefix}-{i}-DELETE"] = "1"
     return data
 
 
@@ -301,6 +304,84 @@ class EditViewDraftSaveTests(DraftViewsSetUpMixin):
         response = self.client.post(self._edit_url(), data)
         # Should redirect, not re-render the form
         self.assertEqual(response.status_code, 302)
+
+    def test_save_draft_creates_new_sections(self):
+        """save_draft should create sections passed in the POST data."""
+        self.client.login(username="teacher", password="pass")
+        section_data = _make_section_post(
+            [
+                {"title": "Exercise 1", "content": "Solve x+2=5", "order": 1},
+                {"title": "Exercise 2", "content": "Solve 2y=10", "order": 2},
+            ]
+        )
+        data = {"title": "T", "description": "D", "save_draft": "1", **section_data}
+        response = self.client.post(self._edit_url(), data)
+        self.assertEqual(response.status_code, 302)
+
+        self.draft.refresh_from_db()
+        sections = list(self.draft.sections.all().order_by("order"))
+        self.assertEqual(len(sections), 2)
+        self.assertEqual(sections[0].title, "Exercise 1")
+        self.assertEqual(sections[0].content, "Solve x+2=5")
+        self.assertEqual(sections[1].title, "Exercise 2")
+        self.assertEqual(sections[1].content, "Solve 2y=10")
+
+    def test_save_draft_updates_existing_sections(self):
+        """save_draft should update existing sections."""
+        from homeworks.models import Section
+
+        section = Section.objects.create(
+            homework=self.draft,
+            title="Old Title",
+            content="Old content",
+            order=1,
+        )
+        self.client.login(username="teacher", password="pass")
+        section_data = _make_section_post(
+            [
+                {
+                    "id": str(section.id),
+                    "title": "New Title",
+                    "content": "New content",
+                    "order": 1,
+                }
+            ]
+        )
+        data = {"title": "T", "description": "D", "save_draft": "1", **section_data}
+        response = self.client.post(self._edit_url(), data)
+        self.assertEqual(response.status_code, 302)
+
+        section.refresh_from_db()
+        self.assertEqual(section.title, "New Title")
+        self.assertEqual(section.content, "New content")
+
+    def test_save_draft_deletes_sections(self):
+        """save_draft should delete sections marked for deletion."""
+        from homeworks.models import Section
+
+        section = Section.objects.create(
+            homework=self.draft,
+            title="Remove Me",
+            content="content",
+            order=1,
+        )
+        self.client.login(username="teacher", password="pass")
+        section_data = _make_section_post(
+            [
+                {
+                    "id": str(section.id),
+                    "title": "Remove Me",
+                    "content": "content",
+                    "order": 1,
+                    "DELETE": "1",
+                }
+            ]
+        )
+        data = {"title": "T", "description": "D", "save_draft": "1", **section_data}
+        response = self.client.post(self._edit_url(), data)
+        self.assertEqual(response.status_code, 302)
+
+        self.assertFalse(Section.objects.filter(id=section.id).exists())
 
 
 # ---------------------------------------------------------------------------
