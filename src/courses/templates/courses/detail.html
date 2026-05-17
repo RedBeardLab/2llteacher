@@ -126,7 +126,9 @@
                                 <span class="badge bg-danger me-1">Expired</span>
                                 {% endif %}
                             {% endif %}
-                            {% if homework.is_overdue and not homework.is_draft %}
+                            {% if homework.is_submitted %}
+                            <span class="badge bg-success me-1">Submitted</span>
+                            {% elif homework.is_overdue and not homework.is_draft %}
                             <span class="badge bg-danger me-1">Overdue</span>
                             {% endif %}
                         </div>
