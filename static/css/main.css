@@ -46,9 +46,18 @@ body {
         border-bottom-color: #404040;
     }
 
+    .card-header.bg-light {
+        background-color: #363636 !important;
+    }
+
     .bg-light {
         background-color: #2d2d2d !important;
         color: #e0e0e0 !important;
+    }
+
+    .bg-white {
+        background-color: #2d2d2d !important;
+        color: #e0e0e0;
     }
 
     /* Forms */

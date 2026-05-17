@@ -436,6 +436,78 @@
         min-width: 120px;
     }
 }
+
+@media (prefers-color-scheme: dark) {
+    .matrix-container {
+        border-color: #404040;
+    }
+
+    .matrix-table thead {
+        background-color: #2d2d2d;
+    }
+
+    .matrix-table thead th {
+        background-color: #2d2d2d;
+        border-bottom-color: #404040;
+    }
+
+    .sticky-cell {
+        background-color: #2d2d2d;
+    }
+
+    .matrix-table thead .sticky-cell {
+        background-color: #363636;
+    }
+
+    .student-cell {
+        border-right-color: #404040;
+    }
+
+    .student-name {
+        color: #e0e0e0;
+    }
+
+    .summary-header {
+        background-color: #363636 !important;
+    }
+
+    .summary-cell {
+        background-color: #2d2d2d;
+        border-left-color: #404040;
+    }
+
+    .status-submitted {
+        background-color: #1a4d2a !important;
+        border-color: #2d7b3d !important;
+    }
+
+    .status-in-progress {
+        background-color: #4d3a1a !important;
+        border-color: #7b5a2d !important;
+    }
+
+    .status-not-started {
+        background-color: #2d2d2d !important;
+        border-color: #404040 !important;
+    }
+
+    .status-overdue {
+        background-color: #4d1a1a !important;
+        border-color: #7b2d2d !important;
+    }
+
+    .legend-box {
+        border-color: #404040;
+    }
+
+    .student-row:hover {
+        background-color: #363636;
+    }
+
+    .student-row:hover .sticky-cell {
+        background-color: #404040;
+    }
+}
 </style>
 
 <script>
