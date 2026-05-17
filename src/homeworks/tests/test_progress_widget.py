@@ -4,7 +4,6 @@ Tests for HomeworkProgressWidget model and related functionality.
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import IntegrityError
 import uuid
@@ -333,7 +332,6 @@ class ProgressWidgetFormTest(TestCase):
     def test_form_with_id(self):
         """Test form with existing widget ID."""
         from homeworks.forms import ProgressWidgetForm
-        from uuid import UUID
 
         widget_id = "12345678-1234-1234-1234-123456789012"
         form = ProgressWidgetForm(

@@ -34,7 +34,6 @@ from .services import (
     SectionCreateData,
     SectionStatus,
     SectionData,
-    WidgetData,
 )
 from .forms import (
     HomeworkCreateForm,
@@ -1441,7 +1440,6 @@ class WidgetAnswerView(View):
         return render(request, "homeworks/widget_answer.html", {"data": data})
 
     def post(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
-        from django import forms as django_forms
 
         widget_id = request.POST.get("widget_id")
         value_type = request.POST.get("value_type")
