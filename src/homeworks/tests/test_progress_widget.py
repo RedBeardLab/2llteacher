@@ -85,13 +85,13 @@ class HomeworkProgressWidgetModelTest(TestCase):
 
     def test_widget_ordering(self):
         """Test widget ordering by order field."""
-        widget1 = HomeworkProgressWidget.objects.create(
+        HomeworkProgressWidget.objects.create(
             homework=self.homework, pre_prompt="Pre 1", post_prompt="Post 1", order=2
         )
-        widget2 = HomeworkProgressWidget.objects.create(
+        HomeworkProgressWidget.objects.create(
             homework=self.homework, pre_prompt="Pre 2", post_prompt="Post 2", order=1
         )
-        widget3 = HomeworkProgressWidget.objects.create(
+        HomeworkProgressWidget.objects.create(
             homework=self.homework, pre_prompt="Pre 3", post_prompt="Post 3", order=3
         )
 
