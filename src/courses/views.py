@@ -286,6 +286,7 @@ class HomeworkItem:
     is_overdue: bool = False
     is_hidden: bool = False
     is_accessible_to_students: bool = True
+    is_submitted: bool = False
     expires_at: Any = None
     publish_at: Any = None
     section_count: int = 0
@@ -412,7 +413,7 @@ class CourseDetailView(View):
             CourseDetailData with course info, homeworks, and optionally students/TAs
         """
         from homeworks.models import Homework
-        from homeworks.services import HomeworkService
+        from homeworks.services import HomeworkService, SectionStatus
 
         # Auto-publish any scheduled homework before building the list
         try:
@@ -431,6 +432,22 @@ class CourseDetailView(View):
 
         homeworks = []
         for hw in hw_qs:
+            is_submitted = False
+            if student_profile is not None:
+                try:
+                    progress = HomeworkService.get_student_homework_progress(
+                        student_profile, hw
+                    )
+                    total = len(progress.sections_progress)
+                    completed = sum(
+                        1
+                        for s in progress.sections_progress
+                        if s.status == SectionStatus.SUBMITTED
+                    )
+                    is_submitted = total > 0 and completed == total
+                except Exception:
+                    pass
+
             homeworks.append(
                 HomeworkItem(
                     id=hw.id,
@@ -442,6 +459,7 @@ class CourseDetailView(View):
                     is_overdue=hw.is_overdue,
                     is_hidden=hw.is_hidden,
                     is_accessible_to_students=hw.is_accessible_to_students,
+                    is_submitted=is_submitted,
                     expires_at=hw.expires_at,
                     publish_at=hw.publish_at,
                     section_count=hw.section_count,

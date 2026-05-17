@@ -18,6 +18,8 @@ from courses.models import (
 from courses.views import CourseListView, CourseListData
 from courses.enums import CourseRole
 from accounts.models import Teacher, Student, TeacherAssistant
+from homeworks.models import Section
+from conversations.models import Conversation, Submission, SectionAnswer
 
 User = get_user_model()
 
@@ -930,6 +932,296 @@ class CourseDetailViewTests(TestCase):
         )
         self.assertIn(CourseRole.STUDENT, response.context["data"].user_roles)
 
+    # ── Dataclass field tests ──────────────────────────────────────────────
+
+    def test_homework_item_has_is_submitted_field_when_submitted(self):
+        """Verify is_submitted=True when all sections are submitted."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Submittable HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+        section = Section.objects.create(
+            homework=hw,
+            title="S1",
+            content="C",
+            order=1,
+        )
+        conv = Conversation.objects.create(user=self.student_user, section=section)
+        Submission.objects.create(conversation=conv)
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        item = next(h for h in response.context["data"].homeworks if h.id == hw.id)
+        self.assertTrue(item.is_submitted)
+
+    def test_homework_item_is_submitted_false_when_not_submitted(self):
+        """Verify is_submitted=False when no sections are submitted."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Unsubmitted HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+        Section.objects.create(
+            homework=hw,
+            title="S1",
+            content="C",
+            order=1,
+        )
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        item = next(h for h in response.context["data"].homeworks if h.id == hw.id)
+        self.assertFalse(item.is_submitted)
+
+    def test_homework_item_is_submitted_true_for_mixed_sections(self):
+        """Verify is_submitted=True when both conversation and non-interactive sections are submitted."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Mixed HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+        conv_section = Section.objects.create(
+            homework=hw,
+            title="Chat",
+            content="Talk",
+            order=1,
+        )
+        ni_section = Section.objects.create(
+            homework=hw,
+            title="Q1",
+            content="What?",
+            order=2,
+            section_type=Section.SECTION_TYPE_NON_INTERACTIVE,
+        )
+        # Submit conversation section
+        conv = Conversation.objects.create(user=self.student_user, section=conv_section)
+        Submission.objects.create(conversation=conv)
+        # Answer non-interactive section
+        SectionAnswer.objects.create(
+            user=self.student_user, section=ni_section, answer="42"
+        )
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        item = next(h for h in response.context["data"].homeworks if h.id == hw.id)
+        self.assertTrue(item.is_submitted)
+
+    def test_homework_item_is_submitted_false_for_partial_completion(self):
+        """Verify is_submitted=False when only some sections are submitted."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Partial HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+        s1 = Section.objects.create(homework=hw, title="S1", content="C", order=1)
+        Section.objects.create(homework=hw, title="S2", content="C", order=2)
+
+        # Only submit first section
+        conv = Conversation.objects.create(user=self.student_user, section=s1)
+        Submission.objects.create(conversation=conv)
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        item = next(h for h in response.context["data"].homeworks if h.id == hw.id)
+        self.assertFalse(item.is_submitted)
+
+    def test_homework_item_is_submitted_false_for_teacher(self):
+        """Verify is_submitted=False for teachers (progress is student-specific)."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Teacher HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+        Section.objects.create(homework=hw, title="S1", content="C", order=1)
+
+        self.client.login(username="testteacher", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        item = next(h for h in response.context["data"].homeworks if h.id == hw.id)
+        self.assertFalse(item.is_submitted)
+
+    def test_homework_item_is_submitted_true_even_when_overdue(self):
+        """Verify is_submitted=True when all sections are submitted even past due date."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Overdue Submitted HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() - timedelta(days=1),
+        )
+        section = Section.objects.create(
+            homework=hw,
+            title="S1",
+            content="C",
+            order=1,
+        )
+        conv = Conversation.objects.create(user=self.student_user, section=section)
+        Submission.objects.create(conversation=conv)
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        item = next(h for h in response.context["data"].homeworks if h.id == hw.id)
+        self.assertTrue(item.is_submitted)
+        self.assertTrue(item.is_overdue)
+
+    # ── Template rendering tests ───────────────────────────────────────────
+
+    def test_student_sees_submitted_badge(self):
+        """Verify 'Submitted' badge is rendered when homework is submitted."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Submitted HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+        section = Section.objects.create(
+            homework=hw,
+            title="S1",
+            content="C",
+            order=1,
+        )
+        conv = Conversation.objects.create(user=self.student_user, section=section)
+        Submission.objects.create(conversation=conv)
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        self.assertIn(b"Submitted", response.content)
+
+    def test_student_sees_overdue_when_not_submitted(self):
+        """Verify 'Overdue' badge is rendered when homework is past due and not submitted."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Overdue HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() - timedelta(days=1),
+        )
+        Section.objects.create(
+            homework=hw,
+            title="S1",
+            content="C",
+            order=1,
+        )
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        self.assertIn(b"Overdue", response.content)
+
+    def test_student_sees_submitted_instead_of_overdue(self):
+        """Verify 'Submitted' badge appears (not 'Overdue') when homework is past due but submitted."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Past Due Submitted HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() - timedelta(days=1),
+        )
+        section = Section.objects.create(
+            homework=hw,
+            title="S1",
+            content="C",
+            order=1,
+        )
+        conv = Conversation.objects.create(user=self.student_user, section=section)
+        Submission.objects.create(conversation=conv)
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        self.assertIn(b"Submitted", response.content)
+        self.assertNotIn(b"Overdue", response.content)
+
+    def test_student_does_not_see_overdue_when_not_due(self):
+        """Verify neither badge appears when homework is not due and not submitted."""
+        from homeworks.models import Homework
+        from django.utils import timezone
+        from datetime import timedelta
+
+        hw = Homework.objects.create(
+            title="Future HW",
+            description="",
+            created_by=self.teacher,
+            course=self.course,
+            due_date=timezone.now() + timedelta(days=7),
+        )
+        Section.objects.create(
+            homework=hw,
+            title="S1",
+            content="C",
+            order=1,
+        )
+
+        self.client.login(username="teststudent", password="password123")
+        response = self.client.get(
+            reverse("courses:detail", kwargs={"course_id": self.course.id})
+        )
+        self.assertNotIn(b"Submitted", response.content)
+        self.assertNotIn(b"Overdue", response.content)
+
 
 class CourseHomeworkCreateViewTests(TestCase):
     """Tests for creating homeworks within a course context."""
@@ -1076,7 +1368,6 @@ class CourseHomeworkCreateViewTests(TestCase):
 
         from django.utils import timezone
         from datetime import timedelta
-        from homeworks.models import HomeworkProgressWidget
 
         due_date = timezone.now() + timedelta(days=7)
 
