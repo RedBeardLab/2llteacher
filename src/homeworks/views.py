@@ -1440,7 +1440,6 @@ class WidgetAnswerView(View):
         return render(request, "homeworks/widget_answer.html", {"data": data})
 
     def post(self, request: HttpRequest, homework_id: UUID) -> HttpResponse:
-
         widget_id = request.POST.get("widget_id")
         value_type = request.POST.get("value_type")
         value = request.POST.get("value")
