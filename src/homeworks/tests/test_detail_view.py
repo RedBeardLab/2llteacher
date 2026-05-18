@@ -255,7 +255,7 @@ class HomeworkDetailViewTests(TestCase):
             post_prompt="How much now?",
             order=1,
         )
-        widget2 = HomeworkProgressWidget.objects.create(
+        HomeworkProgressWidget.objects.create(
             homework=self.homework,
             pre_prompt="Topic 2 pre",
             post_prompt="Topic 2 post",

@@ -187,11 +187,6 @@ class WidgetAnswerViewTestCase(TestCase):
             },
         )
         self.assertEqual(response.status_code, 302)
-        messages = (
-            list(response.context["messages"])
-            if hasattr(response, "context") and response.context
-            else []
-        )
         # Value should not be saved since 11 is out of range
         response_obj = HomeworkProgressWidgetResponse.objects.filter(
             user=self.student_user, widget=self.widget
@@ -203,7 +198,7 @@ class WidgetAnswerViewTestCase(TestCase):
         new_user = User.objects.create_user(
             username="other", email="other@example.com", password="password"
         )
-        other_student = Student.objects.create(user=new_user)
+        Student.objects.create(user=new_user)
 
         self.client.login(username="other", password="password")
         response = self.client.get(self.url)
