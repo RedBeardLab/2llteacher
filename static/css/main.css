@@ -84,13 +84,33 @@ body {
         color: #e0e0e0 !important;
     }
 
+    .form-text {
+        color: #a0a0a0 !important;
+    }
+
+    /* Progress bars */
+    .progress {
+        background-color: #404040;
+    }
+
+    .progress-bar.bg-warning {
+        background-color: #b8860b !important;
+        color: #fff;
+    }
+
     /* Tables */
     .table {
         color: #e0e0e0;
     }
 
+    .table th,
+    .table td {
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+    }
+
     .table-striped > tbody > tr:nth-of-type(odd) > * {
-        background-color: rgba(255, 255, 255, 0.05);
+        background-color: #363636;
     }
 
     .table > :not(caption) > * > * {
@@ -125,6 +145,24 @@ body {
     /* Badges */
     .badge {
         color: #fff;
+    }
+
+    /* Input group */
+    .input-group-text {
+        background-color: #363636;
+        color: #e0e0e0;
+        border-color: #404040;
+    }
+
+    /* Checkboxes and radio buttons */
+    .form-check-input {
+        background-color: #2d2d2d;
+        border-color: #404040;
+    }
+
+    .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
     }
 
     /* Buttons */
