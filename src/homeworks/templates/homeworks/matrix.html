@@ -135,32 +135,32 @@
                         {% elif cell.status.value == 'overdue' %}status-overdue
                         {% else %}status-not-started
                         {% endif %}"
-                        data-homework-id="{{ cell.homework_id }}"
-                        data-student-id="{{ cell.student_id }}"
                         title="{% if cell.last_activity %}Last activity: {{ cell.last_activity|date:'M d, Y H:i' }}{% else %}No activity{% endif %}">
-                        <div class="cell-content">
-                            <div class="completion-badge">
-                                {% if cell.completion_percentage == 100 %}
-                                    <span class="badge bg-success">✓ 100%</span>
-                                {% elif cell.completion_percentage > 0 %}
-                                    <span class="badge bg-warning text-dark">{{ cell.completion_percentage }}%</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">0%</span>
+                        <a href="{% url 'homeworks:submissions' homework_id=cell.homework_id %}" class="cell-link">
+                            <div class="cell-content">
+                                <div class="completion-badge">
+                                    {% if cell.completion_percentage == 100 %}
+                                        <span class="badge bg-success">✓ 100%</span>
+                                    {% elif cell.completion_percentage > 0 %}
+                                        <span class="badge bg-warning text-dark">{{ cell.completion_percentage }}%</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">0%</span>
+                                    {% endif %}
+                                </div>
+                                <div class="sections-count">
+                                    {{ cell.submitted_sections }}/{{ cell.total_sections }}
+                                </div>
+                                {% if cell.total_conversations > 0 %}
+                                <div class="conversations-count">
+                                    <small>{{ cell.total_conversations }} conv.</small>
+                                </div>
+                                {% elif cell.answer_count > 0 %}
+                                <div class="conversations-count">
+                                    <small>{{ cell.answer_count }} answers</small>
+                                </div>
                                 {% endif %}
                             </div>
-                            <div class="sections-count">
-                                {{ cell.submitted_sections }}/{{ cell.total_sections }}
-                            </div>
-                            {% if cell.total_conversations > 0 %}
-                            <div class="conversations-count">
-                                <small>{{ cell.total_conversations }} conv.</small>
-                            </div>
-                            {% elif cell.answer_count > 0 %}
-                            <div class="conversations-count">
-                                <small>{{ cell.answer_count }} answers</small>
-                            </div>
-                            {% endif %}
-                        </div>
+                        </a>
                     </td>
                     {% endfor %}
                     <td class="summary-cell">
@@ -351,9 +351,22 @@
 }
 
 .matrix-cell:hover {
-    box-shadow: inset 0 0 0 2px #0d6efd;
+    outline: 2px solid #0d6efd;
+    outline-offset: -2px;
     transform: scale(1.05);
     z-index: 5;
+}
+
+.cell-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    width: 100%;
+    height: 100%;
+}
+
+.cell-link:hover {
+    color: inherit;
 }
 
 .cell-content {
@@ -553,15 +566,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Cell click to show details (optional - can be enhanced)
-    document.querySelectorAll('.matrix-cell').forEach(cell => {
-        cell.addEventListener('click', function() {
-            const homeworkId = this.dataset.homeworkId;
-            const studentId = this.dataset.studentId;
-            // Could navigate to detailed view or show modal
-            console.log('Clicked cell:', { homeworkId, studentId });
-        });
-    });
 });
 </script>
 {% endblock %}
