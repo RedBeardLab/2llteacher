@@ -1406,7 +1406,7 @@ class CourseHomeworkCreateViewTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
 
-        from homeworks.models import Homework
+        from homeworks.models import Homework, HomeworkProgressWidget
 
         homework = Homework.objects.get(title="Homework With Widgets")
         widgets = HomeworkProgressWidget.objects.filter(homework=homework)
