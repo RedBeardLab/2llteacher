@@ -136,7 +136,7 @@
                         {% else %}status-not-started
                         {% endif %}"
                         title="{% if cell.last_activity %}Last activity: {{ cell.last_activity|date:'M d, Y H:i' }}{% else %}No activity{% endif %}">
-                        <a href="{% url 'homeworks:submissions' homework_id=cell.homework_id %}" class="cell-link">
+                        <a href="{% url 'homeworks:submissions' homework_id=cell.homework_id %}#student-{{ cell.student_id }}" class="cell-link">
                             <div class="cell-content">
                                 <div class="completion-badge">
                                     {% if cell.completion_percentage == 100 %}
