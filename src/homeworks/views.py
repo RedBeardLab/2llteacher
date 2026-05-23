@@ -84,6 +84,22 @@ class HomeworkListItem:
 
 
 @dataclass
+class LatestTeacherFeedbackData:
+    """Light DTO for the student dashboard's "Recent Teacher Feedback" card."""
+
+    feedback: str
+    feedback_type: str
+    feedback_type_display: str
+    teacher_username: str
+    updated_at: datetime
+    section_title: str
+    homework_title: str
+    homework_id: UUID | None
+    section_id: UUID | None
+    conversation_id: UUID | None
+
+
+@dataclass
 class HomeworkListData:
     """Data structure for the homework list view."""
 
@@ -93,6 +109,7 @@ class HomeworkListData:
     ]  # All roles this user has: ['teacher', 'student', 'teacher_assistant']
     total_count: int
     has_progress_data: bool
+    latest_teacher_feedback: LatestTeacherFeedbackData | None = None
 
 
 @dataclass
@@ -300,12 +317,47 @@ class HomeworkListView(View):
                 )
             )
 
+        # Latest teacher feedback (students only) — visible to the logged-in
+        # student exclusively. Safe lookup keyed by student=user.
+        latest_feedback: LatestTeacherFeedbackData | None = None
+        if student_profile:
+            try:
+                from conversations.models import TeacherFeedback  # local import
+
+                fb = (
+                    TeacherFeedback.objects.filter(student=user)
+                    .select_related("teacher", "section", "section__homework", "conversation")
+                    .order_by("-updated_at")
+                    .first()
+                )
+                if fb is not None:
+                    latest_feedback = LatestTeacherFeedbackData(
+                        feedback=fb.feedback,
+                        feedback_type=fb.feedback_type,
+                        feedback_type_display=fb.get_feedback_type_display(),
+                        teacher_username=fb.teacher.username,
+                        updated_at=fb.updated_at,
+                        section_title=fb.section.title if fb.section_id else "",
+                        homework_title=(
+                            fb.section.homework.title
+                            if fb.section_id and fb.section.homework_id
+                            else ""
+                        ),
+                        homework_id=fb.section.homework_id if fb.section_id else None,
+                        section_id=fb.section_id,
+                        conversation_id=fb.conversation_id,
+                    )
+            except Exception:
+                # Never break the dashboard on a feedback lookup failure.
+                latest_feedback = None
+
         # Create and return the view data
         return HomeworkListData(
             homeworks=homeworks,
             user_types=user_types,
             total_count=len(homeworks),
             has_progress_data=has_progress_data,
+            latest_teacher_feedback=latest_feedback,
         )
 
 

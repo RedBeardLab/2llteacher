@@ -13,7 +13,17 @@
     
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
-    
+
+    {% if request.user.is_authenticated %}
+        {% if request.user.teacher_profile %}
+            <link rel="stylesheet" href="{% static 'css/teacher.css' %}">
+        {% elif request.user.student_profile %}
+            <link rel="stylesheet" href="{% static 'css/student.css' %}">
+        {% endif %}
+    {% else %}
+        <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+    {% endif %}
+
     <!-- Custom CSS -->
     {% block extra_css %}{% endblock %}
     
@@ -28,7 +38,7 @@
     </script>
     {% endif %}
 </head>
-<body>
+<body class="{% if request.user.is_authenticated %}{% if request.user.teacher_profile %}teacher-mode{% elif request.user.student_profile %}student-mode{% endif %}{% else %}public-mode{% endif %}">
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">

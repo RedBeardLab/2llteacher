@@ -3,6 +3,121 @@
 {% block title %}Register{% endblock %}
 
 {% block content %}
+{% if not user.is_authenticated %}
+<div class="auth-shell">
+    <header class="auth-topbar">
+        <a href="{% url 'homepage' %}" class="brand">
+            <span class="brand-mark">LL</span>
+            <span class="brand-text">
+                <span class="brand-name">LLTeacher</span>
+                <span class="brand-sub">Interactive homework with AI-guided reasoning.</span>
+            </span>
+        </a>
+        <div class="auth-topbar-links">
+            <a href="{% url 'accounts:login' %}">Log in</a>
+        </div>
+    </header>
+
+    <main class="auth-main">
+        <div class="auth-content">
+            <section class="auth-hero">
+                <div class="eyebrow">Get started</div>
+                <h1>Create your LLTeacher account.</h1>
+                <p>
+                    Set up a free account to access homework assignments, work
+                    through problems with reasoning prompts, and discuss your
+                    explanations with the AI tutor.
+                </p>
+            </section>
+
+            <section class="auth-card">
+                <h2>Create an Account</h2>
+                <p class="auth-tag">It only takes a minute.</p>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="field">
+                        <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.email.errors|join:", " }}
+                        </div>
+                        {% endif %}
+                        <small class="form-text">
+                            Please use your University of Washington email address (@uw.edu)
+                        </small>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="field" style="margin-bottom: 0;">
+                            <label for="{{ form.first_name.id_for_label }}" class="form-label">First Name</label>
+                            {{ form.first_name }}
+                            {% if form.first_name.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.first_name.errors|join:", " }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="field" style="margin-bottom: 0;">
+                            <label for="{{ form.last_name.id_for_label }}" class="form-label">Last Name</label>
+                            {{ form.last_name }}
+                            {% if form.last_name.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.last_name.errors|join:", " }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-top: 14px;">
+                        <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
+                        {{ form.password1 }}
+                        {% if form.password1.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.password1.errors|join:", " }}
+                        </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.password1.help_text }}</div>
+                    </div>
+
+                    <div class="field">
+                        <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
+                        {{ form.password2 }}
+                        {% if form.password2.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.password2.errors|join:", " }}
+                        </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.password2.help_text }}</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </form>
+
+                <div class="auth-foot">
+                    Already have an account? <a href="{% url 'accounts:login' %}">Log in</a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="auth-footer">
+        © 2025 LLTeacher ·
+        <a href="https://github.com/RedBeardLab/2llteacher" target="_blank" rel="noopener noreferrer">Open source on GitHub</a>
+    </footer>
+</div>
+
+{% else %}
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
@@ -13,7 +128,7 @@
                 <div class="card-body">
                     <form method="post">
                         {% csrf_token %}
-                        
+
                         {% if form.non_field_errors %}
                         <div class="alert alert-danger">
                             {% for error in form.non_field_errors %}
@@ -21,8 +136,7 @@
                             {% endfor %}
                         </div>
                         {% endif %}
-                        
-                        <!-- Basic Fields -->
+
                         <div class="mb-3">
                             <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
                             {{ form.email }}
@@ -35,7 +149,7 @@
                                 Please use your University of Washington email address (@uw.edu)
                             </small>
                         </div>
-                        
+
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="{{ form.first_name.id_for_label }}" class="form-label">First Name</label>
@@ -56,8 +170,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        
-                        <!-- Password Fields -->
+
                         <div class="mb-3">
                             <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
                             {{ form.password1 }}
@@ -68,7 +181,7 @@
                             {% endif %}
                             <div class="form-text">{{ form.password1.help_text }}</div>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
                             {{ form.password2 }}
@@ -79,8 +192,7 @@
                             {% endif %}
                             <div class="form-text">{{ form.password2.help_text }}</div>
                         </div>
-                        
-                        <!-- Submit Button -->
+
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary">Register</button>
                         </div>
@@ -93,4 +205,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

@@ -1,0 +1,1391 @@
+/* ============================================================
+   LLTeacher — Student dark modern app shell
+   All rules scoped under body.student-mode so they never leak
+   into teacher / TA / unauthenticated pages.
+   ============================================================ */
+
+body.student-mode {
+    --s-bg:           #0B0F17;
+    --s-sidebar:      #0F1421;
+    --s-surface:      #151B26;
+    --s-surface-2:    #1A2233;
+    --s-surface-3:    #212B3D;
+    --s-border:       #232E42;
+    --s-border-2:     #2E3A52;
+
+    --s-text:         #F9FAFB;
+    --s-text-dim:     #A1A1AA;
+    --s-text-mute:    #71717A;
+
+    --s-blue:         #3B82F6;
+    --s-blue-2:       #60A5FA;
+    --s-blue-soft:    rgba(59, 130, 246, 0.14);
+
+    --s-green:        #22C55E;
+    --s-green-soft:   rgba(34, 197, 94, 0.14);
+
+    --s-amber:        #F59E0B;
+    --s-amber-soft:   rgba(245, 158, 11, 0.14);
+
+    --s-red:          #EF4444;
+    --s-red-soft:     rgba(239, 68, 68, 0.14);
+
+    --s-purple:       #8B5CF6;
+    --s-purple-soft:  rgba(139, 92, 246, 0.14);
+
+    --s-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+    background-color: var(--s-bg);
+    color: var(--s-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   Hide legacy Bootstrap navbar + footer for student pages that
+   use the new shell. Uses :has() — modern Chrome/Safari/Firefox.
+   Pages without .student-shell (e.g. homepage, profile) keep the
+   legacy navbar so students still have navigation there.
+   ============================================================ */
+body.student-mode:has(.student-shell) > nav.navbar,
+body.student-mode:has(.student-shell) > footer.bg-light {
+    display: none !important;
+}
+body.student-mode:has(.student-shell) > .container.mt-3 .alert {
+    border: 0 !important;
+    border-bottom: 1px solid var(--s-border) !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 12px 32px !important;
+    background: var(--s-surface-2);
+    color: var(--s-text);
+    font-size: 13.5px;
+}
+body.student-mode:has(.student-shell) > .container.mt-3 .alert.alert-success {
+    background: var(--s-green-soft, rgba(34,197,94,0.10));
+    color: var(--s-green);
+}
+body.student-mode:has(.student-shell) > .container.mt-3 .alert.alert-warning {
+    background: var(--s-amber-soft, rgba(245,158,11,0.10));
+    color: var(--s-amber);
+}
+body.student-mode:has(.student-shell) > .container.mt-3 .alert.alert-danger,
+body.student-mode:has(.student-shell) > .container.mt-3 .alert.alert-error {
+    background: var(--s-red-soft, rgba(239,68,68,0.10));
+    color: var(--s-red);
+}
+body.student-mode:has(.student-shell) > .container.mt-3 .alert.alert-info {
+    background: var(--s-blue-soft, rgba(59,130,246,0.10));
+    color: var(--s-blue);
+}
+body.student-mode:has(.student-shell) > .container.mt-3 .btn-close {
+    filter: invert(1) opacity(0.7);
+}
+body.student-mode:has(.student-shell) > main.container,
+body.student-mode:has(.student-shell) > .container.mt-3 {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Fallback for browsers without :has() — still show student-shell,
+   navbar will sit on top but doesn't break the page. */
+
+/* ============================================================
+   App shell layout
+   ============================================================ */
+body.student-mode .student-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    min-height: 100vh;
+    background: var(--s-bg);
+}
+
+/* ============================================================
+   Sidebar
+   ============================================================ */
+body.student-mode .student-sidebar {
+    background: var(--s-sidebar);
+    border-right: 1px solid var(--s-border);
+    padding: 22px 14px 18px;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+body.student-mode .student-sidebar .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 8px 22px;
+    text-decoration: none;
+    color: var(--s-text);
+}
+body.student-mode .student-sidebar .brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--s-blue), var(--s-purple));
+    display: grid;
+    place-items: center;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: -0.02em;
+}
+body.student-mode .student-sidebar .brand-name {
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    display: block;
+}
+body.student-mode .student-sidebar .brand-sub {
+    font-size: 11px;
+    color: var(--s-text-mute);
+    display: block;
+    margin-top: 2px;
+}
+
+body.student-mode .student-sidebar .nav-section {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--s-text-mute);
+    padding: 14px 10px 6px;
+}
+body.student-mode .student-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+body.student-mode .student-nav .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    color: var(--s-text-dim);
+    font-size: 14px;
+    text-decoration: none;
+    transition: background 150ms var(--s-ease), color 150ms var(--s-ease);
+}
+body.student-mode .student-nav .nav-item:hover {
+    background: var(--s-surface-2);
+    color: var(--s-text);
+}
+body.student-mode .student-nav .nav-item.active {
+    background: var(--s-surface-3);
+    color: var(--s-text);
+    box-shadow: inset 0 0 0 1px var(--s-border);
+}
+body.student-mode .student-nav .nav-item svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+body.student-mode .sidebar-foot {
+    margin-top: auto;
+    padding: 12px 8px 4px;
+    border-top: 1px solid var(--s-border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+body.student-mode .sidebar-foot .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2a3142, #444c63);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--s-text);
+    flex-shrink: 0;
+}
+body.student-mode .sidebar-foot .who { min-width: 0; flex: 1; }
+body.student-mode .sidebar-foot .who-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--s-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body.student-mode .sidebar-foot .who-role {
+    font-size: 11px;
+    color: var(--s-text-mute);
+}
+body.student-mode .sidebar-foot .sidebar-logout {
+    margin-left: auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    color: var(--s-text-mute);
+    display: grid;
+    place-items: center;
+    transition: background 150ms var(--s-ease), color 150ms var(--s-ease);
+}
+body.student-mode .sidebar-foot .sidebar-logout:hover {
+    background: var(--s-surface-2);
+    color: var(--s-text);
+}
+
+/* ============================================================
+   Main column
+   ============================================================ */
+body.student-mode .student-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+body.student-mode .student-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--s-border);
+    background: rgba(11, 15, 23, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    min-height: 64px;
+}
+body.student-mode .topbar-crumbs {
+    font-size: 13px;
+    color: var(--s-text-mute);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+body.student-mode .topbar-crumbs a {
+    color: var(--s-text-dim);
+    text-decoration: none;
+}
+body.student-mode .topbar-crumbs a:hover { color: var(--s-text); }
+body.student-mode .topbar-crumbs .crumb-now { color: var(--s-text); }
+body.student-mode .topbar-crumbs .sep { color: var(--s-text-mute); }
+
+body.student-mode .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+body.student-mode .topbar-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2a3142, #444c63);
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--s-text);
+}
+
+body.student-mode .student-content {
+    padding: 32px;
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
+}
+@media (max-width: 768px) {
+    body.student-mode .student-content { padding: 20px 18px; }
+}
+
+/* ============================================================
+   Page header
+   ============================================================ */
+body.student-mode .page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    animation: studentFadeUp 380ms var(--s-ease) both;
+}
+body.student-mode .page-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--s-text-mute);
+    margin-bottom: 8px;
+}
+body.student-mode .page-title {
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+    line-height: 1.15;
+    color: var(--s-text);
+}
+body.student-mode .page-sub {
+    color: var(--s-text-dim);
+    font-size: 14.5px;
+    margin: 0;
+    max-width: 640px;
+}
+
+/* ============================================================
+   Generic student cards
+   ============================================================ */
+body.student-mode .student-card {
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-radius: 14px;
+    padding: 22px 24px;
+    color: var(--s-text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    transition: border-color 200ms var(--s-ease), transform 200ms var(--s-ease);
+}
+body.student-mode .student-card .card-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--s-text-mute);
+    margin-bottom: 8px;
+}
+body.student-mode .student-card .card-title {
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    color: var(--s-text);
+}
+
+/* Two-column dashboard grid */
+body.student-mode .student-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+@media (max-width: 1100px) {
+    body.student-mode .student-grid { grid-template-columns: 1fr; }
+}
+body.student-mode .student-grid-main,
+body.student-mode .student-grid-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+}
+body.student-mode .stagger > * {
+    opacity: 0;
+    animation: studentCardIn 420ms var(--s-ease) both;
+}
+body.student-mode .stagger > *:nth-child(1) { animation-delay: 50ms; }
+body.student-mode .stagger > *:nth-child(2) { animation-delay: 110ms; }
+body.student-mode .stagger > *:nth-child(3) { animation-delay: 170ms; }
+body.student-mode .stagger > *:nth-child(4) { animation-delay: 230ms; }
+body.student-mode .stagger > *:nth-child(5) { animation-delay: 290ms; }
+body.student-mode .stagger > *:nth-child(6) { animation-delay: 350ms; }
+
+/* ============================================================
+   Hero card (Continue Working)
+   ============================================================ */
+body.student-mode .student-hero-card {
+    background:
+        linear-gradient(135deg, rgba(59,130,246,0.10), transparent 65%),
+        var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-radius: 18px;
+    padding: 28px 32px;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+        0 1px 2px rgba(0,0,0,0.3),
+        0 18px 50px -28px rgba(59,130,246,0.42);
+    animation: studentSlideIn 440ms var(--s-ease) both;
+}
+body.student-mode .student-hero-card::after {
+    content: "";
+    position: absolute;
+    top: -80px;
+    right: -80px;
+    width: 260px;
+    height: 260px;
+    background: radial-gradient(circle, rgba(139,92,246,0.18), transparent 70%);
+    pointer-events: none;
+}
+body.student-mode .student-hero-card > * { position: relative; }
+/* Render only the first hero card if the template emits several. */
+body.student-mode .student-hero-card ~ .student-hero-card { display: none !important; }
+body.student-mode .hero-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+body.student-mode .hero-eyebrow .eyebrow-label {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--s-text-mute);
+}
+body.student-mode .hero-title {
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    margin: 0 0 6px;
+    color: var(--s-text);
+}
+body.student-mode .hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    color: var(--s-text-dim);
+    font-size: 13px;
+    margin: 6px 0 18px;
+}
+body.student-mode .hero-meta .meta-dot { color: var(--s-text-mute); }
+body.student-mode .hero-meta .meta-frac { color: var(--s-text); font-weight: 500; }
+body.student-mode .hero-meta i { margin-right: 4px; opacity: 0.85; }
+
+body.student-mode .hero-next {
+    background: var(--s-surface-2);
+    border: 1px solid var(--s-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+    color: var(--s-text-dim);
+    margin: 0 0 20px;
+    line-height: 1.55;
+}
+body.student-mode .hero-next strong { color: var(--s-text); font-weight: 500; }
+
+body.student-mode .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+body.student-mode .btn-s {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 9px;
+    background: var(--s-surface-2);
+    border: 1px solid var(--s-border-2);
+    color: var(--s-text);
+    font-size: 13.5px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 150ms var(--s-ease), border-color 150ms var(--s-ease),
+                transform 100ms var(--s-ease), box-shadow 150ms var(--s-ease);
+}
+body.student-mode .btn-s:hover {
+    background: var(--s-surface-3);
+    border-color: #3a445a;
+    transform: translateY(-1px);
+}
+body.student-mode .btn-s-primary {
+    background: var(--s-blue);
+    border-color: var(--s-blue);
+    color: white;
+}
+body.student-mode .btn-s-primary:hover {
+    background: var(--s-blue-2);
+    border-color: var(--s-blue-2);
+    color: white;
+    box-shadow: 0 4px 16px -6px rgba(59,130,246,0.6);
+}
+body.student-mode .btn-s-purple {
+    background: var(--s-purple-soft);
+    border-color: rgba(139,92,246,0.4);
+    color: var(--s-purple);
+}
+body.student-mode .btn-s-purple:hover {
+    background: rgba(139,92,246,0.22);
+    color: var(--s-purple);
+    border-color: rgba(139,92,246,0.6);
+}
+body.student-mode .btn-s-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--s-text-dim);
+}
+body.student-mode .btn-s-ghost:hover {
+    background: var(--s-surface-2);
+    color: var(--s-text);
+    border-color: transparent;
+}
+body.student-mode .btn-s[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
+body.student-mode .btn-s-sm { padding: 6px 12px; font-size: 12.5px; }
+
+/* ============================================================
+   Status badges
+   ============================================================ */
+body.student-mode .student-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--s-border);
+    background: var(--s-surface-2);
+    color: var(--s-text-dim);
+    white-space: nowrap;
+}
+body.student-mode .student-status .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+body.student-mode .student-status.green {
+    color: var(--s-green);
+    background: var(--s-green-soft);
+    border-color: rgba(34,197,94,0.3);
+}
+body.student-mode .student-status.amber {
+    color: var(--s-amber);
+    background: var(--s-amber-soft);
+    border-color: rgba(245,158,11,0.3);
+}
+body.student-mode .student-status.red {
+    color: var(--s-red);
+    background: var(--s-red-soft);
+    border-color: rgba(239,68,68,0.3);
+}
+body.student-mode .student-status.blue {
+    color: var(--s-blue-2);
+    background: var(--s-blue-soft);
+    border-color: rgba(59,130,246,0.3);
+}
+body.student-mode .student-status.purple {
+    color: var(--s-purple);
+    background: var(--s-purple-soft);
+    border-color: rgba(139,92,246,0.3);
+}
+body.student-mode .student-status.mute {
+    color: var(--s-text-mute);
+    background: var(--s-surface-2);
+}
+
+/* ============================================================
+   Progress bars
+   ============================================================ */
+body.student-mode .student-progress {
+    height: 8px;
+    background: var(--s-surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+}
+body.student-mode .student-progress.tall { height: 10px; }
+body.student-mode .student-progress .bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--s-blue), var(--s-blue-2));
+    transition: width 700ms var(--s-ease);
+}
+body.student-mode .student-progress .bar.green {
+    background: linear-gradient(90deg, var(--s-green), #34d399);
+}
+body.student-mode .student-progress .bar.amber {
+    background: linear-gradient(90deg, var(--s-amber), #FBBF24);
+}
+
+/* ============================================================
+   Due-soon list (homework list aside)
+   ============================================================ */
+body.student-mode .due-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+body.student-mode .due-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--s-border);
+    transition: background 150ms var(--s-ease), padding 150ms var(--s-ease);
+}
+body.student-mode .due-row:last-child { border-bottom: none; }
+body.student-mode .due-row:hover {
+    background: var(--s-surface-2);
+    padding-left: 10px;
+    padding-right: 10px;
+}
+body.student-mode .due-date {
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+body.student-mode .due-month {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--s-text-mute);
+}
+body.student-mode .due-day {
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.1;
+    color: var(--s-text);
+}
+body.student-mode .due-main { flex: 1; min-width: 0; }
+body.student-mode .due-name { font-size: 14.5px; color: var(--s-text); }
+body.student-mode .due-sub { font-size: 12.5px; color: var(--s-text-mute); margin-top: 2px; }
+body.student-mode .due-row-wrap {
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--s-border);
+}
+body.student-mode .due-row-wrap:last-child { border-bottom: none; }
+body.student-mode .due-row-wrap .due-row {
+    padding: 0;
+    border-bottom: none;
+}
+body.student-mode .due-row-wrap .due-row:hover { padding: 0; background: transparent; }
+body.student-mode .due-sections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+    padding-left: 62px;
+}
+@media (max-width: 640px) {
+    body.student-mode .due-sections { padding-left: 0; }
+}
+body.student-mode .section-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px 5px 6px;
+    border-radius: 999px;
+    background: var(--s-surface-2);
+    border: 1px solid var(--s-border);
+    font-size: 12px;
+    color: var(--s-text-dim);
+    text-decoration: none;
+    transition: background 150ms var(--s-ease), color 150ms var(--s-ease), border-color 150ms var(--s-ease);
+}
+body.student-mode .section-pill:hover {
+    background: var(--s-surface-3);
+    color: var(--s-text);
+    border-color: var(--s-border-2);
+}
+body.student-mode .section-pill-num {
+    display: grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--s-surface-3);
+    color: var(--s-text-dim);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px;
+}
+body.student-mode .section-pill-status {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--s-text-mute);
+}
+body.student-mode .section-pill-status.green { background: var(--s-green); }
+body.student-mode .section-pill-status.amber { background: var(--s-amber); }
+body.student-mode .section-pill-status.red   { background: var(--s-red); }
+body.student-mode .section-pill-status.mute  { background: var(--s-text-mute); opacity: 0.6; }
+
+/* ============================================================
+   Tutor feedback card (aside)
+   ============================================================ */
+body.student-mode .tutor-feedback-card {
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-left: 2px solid var(--s-purple);
+    border-radius: 12px;
+    padding: 20px 22px;
+}
+body.student-mode .tutor-feedback-card .tfc-label {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--s-text-mute);
+    margin-bottom: 10px;
+}
+body.student-mode .tutor-feedback-card .tfc-quote {
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 14px;
+    color: var(--s-text);
+}
+body.student-mode .tutor-feedback-card .tfc-source {
+    font-size: 11px;
+    color: var(--s-text-mute);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* ============================================================
+   Section list (assignment detail)
+   ============================================================ */
+body.student-mode .section-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+body.student-mode .section-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-radius: 12px;
+    color: var(--s-text);
+    text-decoration: none;
+    transition: border-color 180ms var(--s-ease), transform 150ms var(--s-ease);
+}
+body.student-mode .section-row:hover {
+    border-color: var(--s-border-2);
+    transform: translateY(-1px);
+    color: var(--s-text);
+}
+body.student-mode .section-row .leading {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--s-surface-2);
+    display: grid;
+    place-items: center;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--s-text-dim);
+    flex-shrink: 0;
+}
+body.student-mode .section-row .name {
+    flex: 1;
+    min-width: 0;
+    font-size: 14.5px;
+}
+body.student-mode .section-row .name .small {
+    font-size: 12px;
+    color: var(--s-text-mute);
+    margin-top: 2px;
+}
+
+/* ============================================================
+   Section workspace (section_detail student branch)
+   ============================================================ */
+body.student-mode .student-workspace {
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-radius: 16px;
+    padding: 24px 26px;
+    margin-bottom: 24px;
+}
+body.student-mode .student-workspace .ws-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--s-text-mute);
+    margin-bottom: 4px;
+}
+body.student-mode .student-workspace .ws-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--s-text);
+}
+body.student-mode .student-workspace .ws-sub {
+    font-size: 13.5px;
+    color: var(--s-text-dim);
+    margin-bottom: 16px;
+    line-height: 1.55;
+}
+body.student-mode .student-workspace .reasoning-textarea {
+    width: 100%;
+    min-height: 130px;
+    background: var(--s-surface-2);
+    border: 1px solid var(--s-border);
+    color: var(--s-text);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.55;
+    resize: vertical;
+}
+body.student-mode .student-workspace .reasoning-textarea:focus {
+    outline: none;
+    border-color: var(--s-blue);
+    background: var(--s-surface-3);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+}
+body.student-mode .student-workspace .reasoning-textarea::placeholder { color: var(--s-text-mute); }
+
+body.student-mode .reasoning-meter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--s-text-mute);
+}
+body.student-mode .reasoning-meter .meter-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--s-surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+}
+body.student-mode .reasoning-meter .meter-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--s-amber);
+    border-radius: 999px;
+    transition: width 300ms var(--s-ease), background 300ms var(--s-ease);
+}
+body.student-mode .reasoning-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+body.student-mode .reasoning-keyword {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--s-surface-3);
+    border: 1px solid var(--s-border);
+    color: var(--s-text-mute);
+    transition: all 200ms var(--s-ease);
+}
+body.student-mode .reasoning-keyword.hit {
+    background: var(--s-green-soft);
+    border-color: rgba(34,197,94,0.3);
+    color: var(--s-green);
+}
+body.student-mode .reasoning-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+body.student-mode .reasoning-feedback {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    animation: studentPopIn 240ms var(--s-ease) both;
+}
+body.student-mode .reasoning-feedback.correct {
+    background: var(--s-green-soft);
+    border: 1px solid rgba(34,197,94,0.3);
+    color: var(--s-green);
+}
+body.student-mode .reasoning-feedback.partial {
+    background: var(--s-amber-soft);
+    border: 1px solid rgba(245,158,11,0.3);
+    color: var(--s-amber);
+}
+body.student-mode .reasoning-feedback.incorrect {
+    background: var(--s-red-soft);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--s-red);
+}
+body.student-mode .reasoning-feedback .fb-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+body.student-mode .reasoning-feedback .fb-body {
+    color: var(--s-text);
+    flex: 1;
+}
+
+/* Tutor side panel */
+body.student-mode .workspace-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 22px;
+    align-items: start;
+}
+@media (max-width: 1200px) {
+    body.student-mode .workspace-grid { grid-template-columns: 1fr; }
+}
+body.student-mode .student-tutor-panel {
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    position: sticky;
+    top: 88px;
+}
+body.student-mode .student-tutor-panel .tp-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--s-border);
+}
+body.student-mode .student-tutor-panel .tp-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--s-purple), var(--s-blue));
+    display: grid;
+    place-items: center;
+    color: white;
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+body.student-mode .student-tutor-panel .tp-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--s-text);
+}
+body.student-mode .student-tutor-panel .tp-sub {
+    font-size: 11.5px;
+    color: var(--s-text-mute);
+}
+body.student-mode .student-tutor-panel .tp-quick {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+body.student-mode .student-tutor-panel .tp-quick button {
+    text-align: left;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--s-surface-2);
+    border: 1px solid var(--s-border);
+    color: var(--s-text-dim);
+    font-size: 11.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 150ms var(--s-ease), color 150ms var(--s-ease);
+}
+body.student-mode .student-tutor-panel .tp-quick button:hover {
+    background: var(--s-surface-3);
+    color: var(--s-text);
+}
+body.student-mode .student-tutor-panel .tp-quick button svg {
+    width: 12px;
+    height: 12px;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+body.student-mode .student-tutor-panel .tp-response {
+    background: var(--s-purple-soft);
+    border: 1px solid rgba(139,92,246,0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--s-text);
+    margin-bottom: 12px;
+    animation: studentPopIn 280ms var(--s-ease) both;
+}
+body.student-mode .student-tutor-panel .tp-response .tp-tag {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--s-purple);
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+body.student-mode .student-tutor-panel .tp-link {
+    display: block;
+    text-align: center;
+    padding: 10px 14px;
+    border-radius: 9px;
+    background: var(--s-purple-soft);
+    border: 1px solid rgba(139,92,246,0.4);
+    color: var(--s-purple);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 150ms var(--s-ease);
+}
+body.student-mode .student-tutor-panel .tp-link:hover {
+    background: rgba(139,92,246,0.22);
+    color: var(--s-purple);
+}
+
+/* ============================================================
+   Submission / answer Bootstrap forms inside student-content
+   (used by section_detail submission card)
+   ============================================================ */
+body.student-mode .student-content .card {
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-radius: 14px;
+    color: var(--s-text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+body.student-mode .student-content .card-header,
+body.student-mode .student-content .card-header.bg-light {
+    background: var(--s-surface-2) !important;
+    border-bottom: 1px solid var(--s-border);
+    color: var(--s-text);
+}
+body.student-mode .student-content .form-control,
+body.student-mode .student-content textarea.form-control {
+    background: var(--s-surface-2);
+    color: var(--s-text);
+    border: 1px solid var(--s-border);
+    border-radius: 10px;
+}
+body.student-mode .student-content .form-control:focus,
+body.student-mode .student-content textarea.form-control:focus {
+    background: var(--s-surface-3);
+    border-color: var(--s-blue);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+    color: var(--s-text);
+}
+body.student-mode .student-content .alert.alert-info {
+    background: var(--s-blue-soft);
+    border-color: rgba(59,130,246,0.3);
+    color: var(--s-blue-2);
+}
+body.student-mode .student-content .alert.alert-success {
+    background: var(--s-green-soft);
+    border-color: rgba(34,197,94,0.3);
+    color: var(--s-green);
+}
+body.student-mode .student-content .alert.alert-warning {
+    background: var(--s-amber-soft);
+    border-color: rgba(245,158,11,0.3);
+    color: var(--s-amber);
+}
+body.student-mode .student-content .btn-primary {
+    background: var(--s-blue);
+    border-color: var(--s-blue);
+    border-radius: 9px;
+}
+body.student-mode .student-content .btn-primary:hover {
+    background: var(--s-blue-2);
+    border-color: var(--s-blue-2);
+}
+body.student-mode .student-content .btn-success {
+    background: var(--s-green);
+    border-color: var(--s-green);
+    border-radius: 9px;
+}
+body.student-mode .student-content .btn-outline-secondary {
+    color: var(--s-text-dim);
+    border-color: var(--s-border-2);
+    border-radius: 9px;
+}
+body.student-mode .student-content .btn-outline-secondary:hover {
+    background: var(--s-surface-3);
+    color: var(--s-text);
+    border-color: var(--s-border-2);
+}
+body.student-mode .student-content .breadcrumb {
+    background: transparent;
+    padding: 0;
+}
+body.student-mode .student-content .breadcrumb-item a { color: var(--s-text-dim); }
+body.student-mode .student-content .breadcrumb-item.active { color: var(--s-text-mute); }
+body.student-mode .student-content .text-muted { color: var(--s-text-mute) !important; }
+
+/* Course cards (courses/list student branch) */
+body.student-mode .course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+body.student-mode .course-card {
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: var(--s-text);
+    transition: transform 200ms var(--s-ease), border-color 200ms var(--s-ease),
+                box-shadow 200ms var(--s-ease);
+    animation: studentCardIn 420ms var(--s-ease) both;
+}
+body.student-mode .course-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--s-border-2);
+    box-shadow: 0 18px 42px -26px rgba(0,0,0,0.5);
+    color: var(--s-text);
+}
+body.student-mode .course-cover {
+    height: 88px;
+    background:
+        linear-gradient(135deg, rgba(59,130,246,0.55), rgba(139,92,246,0.40)),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 8px, transparent 8px 16px);
+}
+body.student-mode .course-cover.violet {
+    background:
+        linear-gradient(135deg, rgba(139,92,246,0.55), rgba(239,68,68,0.30)),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 8px, transparent 8px 16px);
+}
+body.student-mode .course-cover.teal {
+    background:
+        linear-gradient(135deg, rgba(34,197,94,0.50), rgba(59,130,246,0.40)),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 8px, transparent 8px 16px);
+}
+body.student-mode .course-body {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+body.student-mode .course-body h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--s-text);
+}
+body.student-mode .course-body .course-sub {
+    color: var(--s-text-dim);
+    font-size: 13px;
+}
+body.student-mode .course-body .course-meta {
+    font-size: 12.5px;
+    color: var(--s-text-mute);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 0 6px;
+}
+body.student-mode .course-foot {
+    margin-top: auto;
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes studentSlideIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes studentCardIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes studentFadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes studentPopIn {
+    from { opacity: 0; transform: translateY(4px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   Mobile shell
+   ============================================================ */
+@media (max-width: 880px) {
+    body.student-mode .student-shell { grid-template-columns: 1fr; }
+    body.student-mode .student-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 100;
+        width: 270px;
+        transform: translateX(-100%);
+        transition: transform 240ms var(--s-ease);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    body.student-mode .student-sidebar.open { transform: translateX(0); }
+    body.student-mode .student-topbar { padding: 12px 18px; }
+    body.student-mode .student-content { padding: 20px 18px; }
+}
+
+/* ============================================================
+   Conversation surface inside student shell
+   (preserves JS hooks: .conversation-container, .message-container,
+   #message-form, #content, .r-run-button, [data-message-id],
+   .r-execution-output)
+   ============================================================ */
+body.student-mode .conversation-container { color: var(--s-text); }
+body.student-mode .message-container {
+    background: var(--s-surface-2);
+    border: 1px solid var(--s-border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+}
+body.student-mode .message-container .message-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--s-text-mute);
+}
+body.student-mode .message-container .message-header .text-muted { color: var(--s-text-mute) !important; }
+body.student-mode .message-container .badge {
+    border-radius: 999px;
+    font-size: 11px;
+    padding: 3px 9px;
+}
+body.student-mode .message-container .badge.bg-primary {
+    background: var(--s-blue-soft) !important;
+    color: var(--s-blue-2);
+}
+body.student-mode .message-container .badge.bg-success {
+    background: var(--s-purple-soft) !important;
+    color: var(--s-purple);
+}
+body.student-mode .message-container .badge.bg-secondary {
+    background: var(--s-surface-3) !important;
+    color: var(--s-text-dim);
+}
+body.student-mode .message-container .badge.bg-info {
+    background: var(--s-blue-soft) !important;
+    color: var(--s-blue-2);
+}
+body.student-mode .message-container .message-content {
+    color: var(--s-text);
+    line-height: 1.6;
+}
+body.student-mode .message-container .message-content pre,
+body.student-mode .message-container .message-content code {
+    background: var(--s-bg);
+    color: var(--s-text);
+    border-radius: 8px;
+}
+body.student-mode .r-code-container {
+    background: var(--s-bg);
+    border: 1px solid var(--s-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+body.student-mode .r-code-header {
+    background: var(--s-surface-3);
+    color: var(--s-text-dim);
+    border-bottom: 1px solid var(--s-border);
+}
+body.student-mode .r-code-container pre {
+    background: var(--s-bg);
+    color: var(--s-text);
+    margin: 0;
+    padding: 12px 14px;
+}
+body.student-mode .r-execution-output {
+    background: var(--s-surface-2);
+    color: var(--s-text);
+    border-top: 1px solid var(--s-border);
+}
+
+/* Message input form inside student shell */
+body.student-mode #message-form .form-control,
+body.student-mode #message-form textarea.form-control {
+    background: var(--s-bg);
+    color: var(--s-text);
+    border: 1px solid var(--s-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+body.student-mode #message-form .form-control:focus,
+body.student-mode #message-form textarea.form-control:focus {
+    background: var(--s-surface-3);
+    border-color: var(--s-blue);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+    outline: none;
+}
+body.student-mode #message-form .form-control::placeholder { color: var(--s-text-mute); }
+body.student-mode #message-form .btn-outline-primary {
+    color: var(--s-blue-2);
+    border-color: var(--s-blue);
+    background: transparent;
+    border-radius: 8px;
+}
+body.student-mode #message-form .btn-check:checked + .btn-outline-primary {
+    background: var(--s-blue);
+    color: white;
+}
+body.student-mode #message-form .btn-outline-success {
+    color: var(--s-green);
+    border-color: rgba(34,197,94,0.5);
+    background: transparent;
+    border-radius: 8px;
+}
+body.student-mode #message-form .btn-check:checked + .btn-outline-success {
+    background: var(--s-green);
+    color: white;
+}
+
+/* Profile form Django widgets — inherit dark surfaces */
+body.student-mode .student-content input[type="text"],
+body.student-mode .student-content input[type="email"],
+body.student-mode .student-content input[type="password"] {
+    width: 100%;
+    background: var(--s-surface-2);
+    color: var(--s-text);
+    border: 1px solid var(--s-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+body.student-mode .student-content input[type="text"]:focus,
+body.student-mode .student-content input[type="email"]:focus,
+body.student-mode .student-content input[type="password"]:focus {
+    background: var(--s-surface-3);
+    border-color: var(--s-blue);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+    outline: none;
+}
+
+/* Sidebar toggle (only visible on mobile) */
+body.student-mode .student-sidebar-toggle {
+    display: none;
+    width: 38px;
+    height: 38px;
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-radius: 8px;
+    color: var(--s-text);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+@media (max-width: 880px) {
+    body.student-mode .student-sidebar-toggle { display: inline-flex; }
+}
+body.student-mode .student-sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(2px);
+    z-index: 90;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms var(--s-ease);
+}
+body.student-mode .student-sidebar-scrim.show {
+    opacity: 1;
+    pointer-events: auto;
+}

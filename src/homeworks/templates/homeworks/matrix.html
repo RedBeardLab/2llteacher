@@ -3,29 +3,42 @@
 {% block title %}Matrix Dashboard - {{ course.name }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'courses:list' %}">Courses</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'courses:detail' course.id %}">{{ course.name }}</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Matrix Dashboard</li>
-                </ol>
+{% if request.user.teacher_profile %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="courses" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <a href="{% url 'courses:list' %}">Courses</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'courses:detail' course.id %}">{{ course.name }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <span class="crumb-now">Matrix</span>
             </nav>
-            <h1>Matrix Dashboard</h1>
-            <p class="text-muted">Overview of students and homework submissions for {{ course.name }}</p>
-        </div>
-        <div class="text-end">
-            <a href="{% url 'courses:matrix-export' course.id %}" class="btn btn-success me-2">
-                <i class="bi bi-download"></i> Export to CSV
-            </a>
-            <a href="{% url 'courses:detail' course.id %}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back to Course
-            </a>
-        </div>
-    </div>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content" style="max-width: none; padding: 24px 28px;">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">{{ course.name }}</div>
+                    <h1 class="page-title">Matrix Dashboard</h1>
+                    <p class="page-sub">Overview of students and homework submissions across this course.</p>
+                </div>
+                <div class="hero-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a href="{% url 'courses:matrix-export' course.id %}" class="btn-t btn-t-sm btn-t-primary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Export CSV
+                    </a>
+                    <a href="{% url 'courses:detail' course.id %}" class="btn-t btn-t-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        Back to course
+                    </a>
+                </div>
+            </header>
 
     <!-- Summary Statistics -->
     <div class="row mb-4">
@@ -216,8 +229,46 @@
         </div>
     </div>
 </div>
+        </div>
+    </main>
+</div>
+{% else %}
+<div class="container-fluid mt-4">
+    <h1>Matrix Dashboard</h1>
+    <a href="{% url 'courses:detail' course.id %}" class="btn btn-outline-secondary">Back to Course</a>
+</div>
+{% endif %}
 
 <style>
+/* Teacher-mode polish for the matrix dashboard */
+body.teacher-mode .matrix-container {
+    border-color: var(--t-border) !important;
+    border-radius: 12px;
+    background: var(--t-surface);
+}
+body.teacher-mode .matrix-table {
+    color: var(--t-text);
+    background: var(--t-surface);
+}
+body.teacher-mode .matrix-table thead th,
+body.teacher-mode .matrix-table tbody th,
+body.teacher-mode .matrix-table tbody td {
+    background: var(--t-surface) !important;
+    color: var(--t-text) !important;
+    border-color: var(--t-border) !important;
+}
+body.teacher-mode .matrix-table thead {
+    background: var(--t-surface-2) !important;
+}
+body.teacher-mode .homework-title { color: var(--t-text); }
+body.teacher-mode .homework-due-date,
+body.teacher-mode .student-email { color: var(--t-text-mute); }
+body.teacher-mode .student-name { color: var(--t-text); }
+body.teacher-mode .card { background: var(--t-surface); border-color: var(--t-border); color: var(--t-text); border-radius: 12px; }
+body.teacher-mode .card .card-body { color: var(--t-text); }
+body.teacher-mode .card-body h5 { color: var(--t-text); }
+body.teacher-mode .legend-box { border-color: var(--t-border); }
+
 /* Matrix Container */
 .matrix-container {
     overflow-x: auto;

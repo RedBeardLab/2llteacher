@@ -8,6 +8,383 @@
 {% endblock %}
 
 {% block content %}
+{% if 'student' in data.user_roles and 'teacher' not in data.user_roles %}
+{% comment %}STUDENT branch — dark modern shell{% endcomment %}
+<div class="student-shell">
+    {% include "student/_sidebar.html" with active="homework" %}
+
+    <main class="student-main">
+        <header class="student-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <span class="crumb-now">{{ data.title }}</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="student-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Assignment</div>
+                    <h1 class="page-title">{{ data.title }}</h1>
+                    <p class="page-sub">
+                        Created by {{ data.created_by_name }} · Due {{ data.due_date|date:"F d, Y" }}
+                    </p>
+                </div>
+                <div class="hero-actions">
+                    {% if data.is_overdue %}
+                    <span class="student-status red"><span class="dot"></span>Overdue</span>
+                    {% else %}
+                    <span class="student-status blue"><span class="dot"></span>In progress</span>
+                    {% endif %}
+                </div>
+            </header>
+
+            {% if data.description %}
+            <section class="student-card stagger" style="margin-bottom: 22px;">
+                <div class="card-eyebrow">Description</div>
+                <div style="color: var(--s-text); line-height: 1.65;">
+                    <zero-md src="data:text/markdown;charset=utf-8,{{ data.description|urlencode }}">
+                        <template data-append>
+                            <style>.markdown-body { background-color: transparent !important; color: inherit; }</style>
+                        </template>
+                    </zero-md>
+                </div>
+            </section>
+            {% endif %}
+
+            {% comment %} Pre-assessment widgets (students only) {% endcomment %}
+            {% if data.widget_progress and data.widget_progress.widgets %}
+            <section class="student-card" style="margin-bottom: 22px;">
+                <div class="card-eyebrow">Pre-assessment</div>
+                <h3 class="card-title" style="margin-bottom: 14px;">Before you start</h3>
+                {% for widget in data.widget_progress.widgets %}
+                <div style="padding: 14px 0; border-top: 1px solid var(--s-border);">
+                    <div style="font-weight: 500; margin-bottom: 8px;">{{ widget.pre_prompt }}</div>
+                    {% if widget.pre_value is not null %}
+                    <span class="student-status green"><span class="dot"></span>Answered: {{ widget.pre_value }}</span>
+                    {% else %}
+                    <form method="post" action="{% url 'homeworks:widget_answer' data.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="widget_id" value="{{ widget.id }}">
+                        <input type="hidden" name="value_type" value="pre">
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0 12px;">
+                            <span style="font-size: 11px; color: var(--s-text-mute);">0</span>
+                            <input type="range" name="value" min="0" max="10" step="1" value="5" style="flex: 1; accent-color: var(--s-blue);"
+                                   oninput="this.nextElementSibling.textContent = this.value">
+                            <span style="font-weight: 600; min-width: 24px; text-align: center; color: var(--s-text);">5</span>
+                            <span style="font-size: 11px; color: var(--s-text-mute);">10</span>
+                        </div>
+                        <button type="submit" class="btn-s btn-s-primary">Save assessment</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </section>
+            {% endif %}
+
+            {% comment %} Section list {% endcomment %}
+            <section style="margin-bottom: 22px;">
+                <div class="page-eyebrow">Sections</div>
+                <div class="section-list">
+                    {% for section in data.sections %}
+                    {% if section.section_type == 'non_interactive' %}
+                        <a class="section-row" href="{% url 'homeworks:section_answer' homework_id=data.id section_id=section.id %}">
+                            <span class="leading">{{ section.order }}</span>
+                            <div class="name">
+                                {{ section.title }}
+                                <div class="small">
+                                    {% if data.widget_progress and not data.widget_progress.all_pre_answered %}
+                                    Locked — complete the pre-assessment first
+                                    {% elif section.status == 'submitted' %}
+                                    Answered
+                                    {% elif section.status == 'overdue' %}
+                                    Overdue — not answered
+                                    {% else %}
+                                    Not answered
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if data.widget_progress and not data.widget_progress.all_pre_answered %}
+                            <span class="student-status mute"><span class="dot"></span>Locked</span>
+                            {% elif section.status == 'submitted' %}
+                            <span class="student-status green"><span class="dot"></span>Answered</span>
+                            {% elif section.status == 'overdue' %}
+                            <span class="student-status red"><span class="dot"></span>Overdue</span>
+                            {% else %}
+                            <span class="student-status mute"><span class="dot"></span>Not started</span>
+                            {% endif %}
+                            <span class="btn-s btn-s-sm">
+                                {% if section.status == 'submitted' %}Review{% else %}Answer{% endif %}
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                            </span>
+                        </a>
+                    {% elif section.conversation_id and section.status == 'submitted' %}
+                        <a class="section-row" href="{% url 'conversations:detail' section.conversation_id %}">
+                            <span class="leading">{{ section.order }}</span>
+                            <div class="name">
+                                {{ section.title }}
+                                <div class="small">Submitted</div>
+                            </div>
+                            <span class="student-status green"><span class="dot"></span>Submitted</span>
+                            <span class="btn-s btn-s-sm">
+                                Review
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                            </span>
+                        </a>
+                    {% elif section.conversation_id %}
+                        <a class="section-row" href="{% url 'conversations:detail' section.conversation_id %}">
+                            <span class="leading">{{ section.order }}</span>
+                            <div class="name">
+                                {{ section.title }}
+                                <div class="small">
+                                    {% if section.status == 'in_progress_overdue' %}In progress (overdue){% else %}In progress{% endif %}
+                                </div>
+                            </div>
+                            {% if section.status == 'in_progress_overdue' %}
+                            <span class="student-status red"><span class="dot"></span>In progress · Overdue</span>
+                            {% else %}
+                            <span class="student-status amber"><span class="dot"></span>In progress</span>
+                            {% endif %}
+                            <span class="btn-s btn-s-primary btn-s-sm">
+                                Continue
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                            </span>
+                        </a>
+                    {% else %}
+                        <a class="section-row" href="{% if data.widget_progress and not data.widget_progress.all_pre_answered %}#{% else %}{% url 'conversations:start' section_id=section.id %}{% endif %}">
+                            <span class="leading">{{ section.order }}</span>
+                            <div class="name">
+                                {{ section.title }}
+                                <div class="small">
+                                    {% if data.widget_progress and not data.widget_progress.all_pre_answered %}
+                                    Locked — complete the pre-assessment first
+                                    {% elif section.status == 'overdue' %}
+                                    Overdue
+                                    {% else %}
+                                    Not started
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if data.widget_progress and not data.widget_progress.all_pre_answered %}
+                            <span class="student-status mute"><span class="dot"></span>Locked</span>
+                            {% elif section.status == 'overdue' %}
+                            <span class="student-status red"><span class="dot"></span>Overdue</span>
+                            {% else %}
+                            <span class="student-status mute"><span class="dot"></span>Not started</span>
+                            {% endif %}
+                            <span class="btn-s btn-s-primary btn-s-sm">
+                                Start
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                            </span>
+                        </a>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </section>
+
+            {% comment %} Post-assessment widgets {% endcomment %}
+            {% if data.widget_progress and data.widget_progress.widgets and data.widget_progress.all_pre_answered %}
+            <section class="student-card" style="margin-bottom: 22px;">
+                <div class="card-eyebrow">Post-assessment</div>
+                <h3 class="card-title" style="margin-bottom: 14px;">After you finish</h3>
+                {% for widget in data.widget_progress.widgets %}
+                <div style="padding: 14px 0; border-top: 1px solid var(--s-border);">
+                    <div style="font-weight: 500; margin-bottom: 8px;">{{ widget.post_prompt }}</div>
+                    {% if widget.post_value is not null %}
+                    <span class="student-status green"><span class="dot"></span>Answered: {{ widget.post_value }}</span>
+                    {% if widget.difference is not null %}
+                    <span class="student-status {% if widget.difference > 0 %}green{% elif widget.difference < 0 %}red{% else %}mute{% endif %}" style="margin-left: 6px;">
+                        <span class="dot"></span>Change: {{ widget.difference }}
+                    </span>
+                    {% endif %}
+                    {% else %}
+                    <form method="post" action="{% url 'homeworks:widget_answer' data.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="widget_id" value="{{ widget.id }}">
+                        <input type="hidden" name="value_type" value="post">
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0 12px;">
+                            <span style="font-size: 11px; color: var(--s-text-mute);">0</span>
+                            <input type="range" name="value" min="0" max="10" step="1" value="5" style="flex: 1; accent-color: var(--s-blue);"
+                                   oninput="this.nextElementSibling.textContent = this.value">
+                            <span style="font-weight: 600; min-width: 24px; text-align: center; color: var(--s-text);">5</span>
+                            <span style="font-size: 11px; color: var(--s-text-mute);">10</span>
+                        </div>
+                        <button type="submit" class="btn-s btn-s-primary">Save assessment</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </section>
+            {% endif %}
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                <a href="{% url 'homeworks:list' %}" class="btn-s">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    Back to homework
+                </a>
+            </div>
+        </div>
+    </main>
+</div>
+
+{% elif 'teacher' in data.user_roles %}
+{% comment %}TEACHER branch — dark modern instructor shell{% endcomment %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="homework" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <span class="crumb-now">{{ data.title }}</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Assignment</div>
+                    <h1 class="page-title">{{ data.title }}</h1>
+                    <p class="page-sub">
+                        Created by {{ data.created_by_name }} · {{ data.created_at|date:"F d, Y" }} · Due {{ data.due_date|date:"F d, Y" }}
+                    </p>
+                </div>
+                <div class="hero-actions" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                    {% if data.is_overdue %}
+                        <span class="teacher-status red"><span class="dot"></span>Overdue</span>
+                    {% endif %}
+                    {% if data.is_scheduled %}
+                        <span class="teacher-status blue"><span class="dot"></span>Scheduled — not visible to students</span>
+                    {% elif data.is_draft %}
+                        <span class="teacher-status amber"><span class="dot"></span>Draft — not visible to students</span>
+                    {% elif data.is_hidden %}
+                        <span class="teacher-status mute"><span class="dot"></span>Hidden</span>
+                    {% elif not data.is_accessible_to_students %}
+                        <span class="teacher-status red"><span class="dot"></span>Expired</span>
+                    {% else %}
+                        <span class="teacher-status green"><span class="dot"></span>Visible to students</span>
+                    {% endif %}
+                    {% if data.can_edit %}
+                    <a href="{% url 'homeworks:edit' data.id %}" class="btn-t btn-t-sm">Edit</a>
+                    {% endif %}
+                    <a href="{% url 'homeworks:submissions' data.id %}" class="btn-t btn-t-sm btn-t-primary">View Submissions</a>
+                </div>
+            </header>
+
+            {% if data.is_scheduled and data.publish_at %}
+            <div class="alert alert-info" style="margin-bottom: 22px;">
+                Publishes {{ data.publish_at|date:"F d, Y H:i" }}
+            </div>
+            {% endif %}
+            {% if data.expires_at and data.is_accessible_to_students %}
+            <div class="alert alert-info" style="margin-bottom: 22px;">
+                Expires {{ data.expires_at|date:"F d, Y" }}
+            </div>
+            {% endif %}
+
+            {% if data.description %}
+            <section class="teacher-card stagger" style="margin-bottom: 22px;">
+                <div class="card-eyebrow">Description</div>
+                <div style="color: var(--t-text); line-height: 1.65; margin-top: 8px;">
+                    <zero-md src="data:text/markdown;charset=utf-8,{{ data.description|urlencode }}">
+                        <template data-append>
+                            <style>.markdown-body { background-color: transparent !important; color: inherit; }</style>
+                        </template>
+                    </zero-md>
+                </div>
+            </section>
+            {% endif %}
+
+            <section style="margin-bottom: 22px;">
+                <div class="page-eyebrow" style="margin-bottom: 8px;">Sections</div>
+                {% for section in data.sections %}
+                <div class="teacher-card" style="margin-bottom: 12px; padding: 18px 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                            <div class="leading" style="width:32px;height:32px;border-radius:8px;background:var(--t-surface-2);display:grid;place-items:center;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--t-text-dim);flex-shrink:0;">{{ section.order }}</div>
+                            <div style="min-width: 0;">
+                                <div style="font-size: 15px; font-weight: 500; color: var(--t-text);">{{ section.title }}</div>
+                                <div style="font-size: 12px; color: var(--t-text-mute); margin-top: 2px;">
+                                    {% if section.section_type == 'non_interactive' %}Non-interactive{% else %}Interactive{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% if section.has_solution %}
+                        <span class="teacher-status purple"><span class="dot"></span>Has solution</span>
+                        {% endif %}
+                    </div>
+                    <div style="border-top: 1px solid var(--t-border); padding-top: 12px;">
+                        <zero-md src="data:text/markdown;charset=utf-8,{{ section.content|urlencode }}">
+                            <template data-append>
+                                <style>.markdown-body { background-color: transparent !important; color: inherit; }</style>
+                            </template>
+                        </zero-md>
+                    </div>
+                    {% if section.has_solution %}
+                    <div style="margin-top: 14px; padding: 14px 16px; background: var(--t-purple-soft); border: 1px solid rgba(139,92,246,0.3); border-radius: 10px;">
+                        <div class="card-eyebrow" style="color: var(--t-purple); margin-bottom: 6px;">Solution (teachers only)</div>
+                        <zero-md src="data:text/markdown;charset=utf-8,{{ section.solution_content|urlencode }}">
+                            <template data-append>
+                                <style>.markdown-body { background-color: transparent !important; color: inherit; }</style>
+                            </template>
+                        </zero-md>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </section>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px;">
+                <a href="{% url 'homeworks:list' %}" class="btn-t">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    Back to homework
+                </a>
+                {% if data.can_edit %}
+                <button type="button" class="btn-t" style="background: var(--t-red-soft); border-color: rgba(239,68,68,0.4); color: var(--t-red);" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                    Delete
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</div>
+
+{% if data.can_edit %}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this homework? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'homeworks:detail' data.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete">
+                    <button type="submit" class="btn btn-danger">Delete Permanently</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+{% comment %}TA / fallback branch — original markup{% endcomment %}
 <div class="container mt-4">
     <!-- Homework Header -->
     <div class="d-flex justify-content-between align-items-start mb-4">
@@ -359,5 +736,6 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endif %}
 {% endblock %}

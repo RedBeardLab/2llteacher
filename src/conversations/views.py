@@ -32,7 +32,7 @@ from llteacher.tracing import record_exception
 
 
 from homeworks.models import Section
-from .models import Conversation, PasteEvent, RapidTextGrowthEvent
+from .models import Conversation, PasteEvent, RapidTextGrowthEvent, Submission
 from .services import (
     ConversationService,
     SubmissionService,
@@ -344,7 +344,36 @@ class ConversationDetailView(View):
         ) and request.user.id != conversation_data.user_id
         timeline = self._create_timeline(conversation_data, is_instructor_viewing)
 
-        # Render the conversation detail template
+        # Teacher feedback lookup. Students only see feedback addressed to them;
+        # teachers/TAs see all feedback on this conversation. Teachers also get a
+        # bound form (pre-populated with their own existing feedback, if any).
+        from .forms import TeacherFeedbackForm  # local import to avoid cycles
+
+        teacher_feedback_list = list(
+            TeacherFeedback.objects.filter(
+                conversation_id=conversation_data.id
+            ).select_related("teacher").order_by("-updated_at")
+        )
+
+        is_owner = str(request.user.id) == str(conversation_data.user_id)
+        can_submit_feedback = (
+            hasattr(request.user, "teacher_profile")
+            and not conversation_data.is_teacher_test
+            and not is_owner
+        )
+        my_feedback = None
+        feedback_form = None
+        if can_submit_feedback:
+            my_feedback = next(
+                (
+                    f
+                    for f in teacher_feedback_list
+                    if f.teacher_id == request.user.id
+                ),
+                None,
+            )
+            feedback_form = TeacherFeedbackForm(instance=my_feedback)
+
         return render(
             request,
             "conversations/detail.html",
@@ -352,6 +381,10 @@ class ConversationDetailView(View):
                 "conversation_data": conversation_data,
                 "timeline": timeline,
                 "is_instructor_viewing": is_instructor_viewing,
+                "teacher_feedback_list": teacher_feedback_list,
+                "can_submit_feedback": can_submit_feedback,
+                "my_feedback": my_feedback,
+                "feedback_form": feedback_form,
             },
         )
 
@@ -940,3 +973,69 @@ class SectionAnswerDetailView(View):
                 "answers": answers,
             },
         )
+
+
+from llteacher.permissions.decorators import teacher_required, TeacherRequest  # noqa: E402
+from .forms import TeacherFeedbackForm  # noqa: E402
+from .models import TeacherFeedback  # noqa: E402
+
+
+class TeacherFeedbackSubmitView(View):
+    """POST endpoint for teachers to create/update feedback on a conversation."""
+
+    @method_decorator(teacher_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request: TeacherRequest, conversation_id: UUID) -> HttpResponse:
+        try:
+            conversation = Conversation.objects.select_related(
+                "section__homework__course", "user"
+            ).get(id=conversation_id, is_deleted=False)
+        except Conversation.DoesNotExist:
+            raise Http404("Conversation not found.")
+
+        # Refuse to give feedback on a teacher's own test conversation
+        if conversation.is_teacher_test:
+            return HttpResponseForbidden(
+                "Feedback can only be left on student conversations."
+            )
+
+        # Teacher must be assigned to the homework's course
+        course = conversation.section.homework.course
+        if course is not None:
+            teaches_course = course.get_teacher_role(request.user.teacher_profile) is not None
+            if not teaches_course:
+                return HttpResponseForbidden(
+                    "You do not have permission to leave feedback on this conversation."
+                )
+
+        # Find any existing feedback by this teacher on this conversation
+        instance = TeacherFeedback.objects.filter(
+            teacher=request.user, conversation=conversation
+        ).first()
+
+        form = TeacherFeedbackForm(request.POST, instance=instance)
+        if form.is_valid():
+            feedback = form.save(commit=False)
+            feedback.teacher = request.user
+            feedback.student = conversation.user
+            feedback.section = conversation.section
+            feedback.conversation = conversation
+            try:
+                feedback.submission = conversation.submission
+            except Submission.DoesNotExist:
+                feedback.submission = None
+            feedback.save()
+            messages.success(request, "Feedback saved.")
+        else:
+            # Surface form errors via messages framework so existing detail GET
+            # can render them without needing a re-render path.
+            for err in form.errors.get("feedback", []):
+                messages.error(request, err)
+            for err in form.errors.get("feedback_type", []):
+                messages.error(request, err)
+            if not form.errors:
+                messages.error(request, "Could not save feedback.")
+
+        return redirect("conversations:detail", conversation_id=conversation.id)

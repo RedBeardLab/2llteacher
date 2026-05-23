@@ -8,6 +8,338 @@
 {% endblock %}
 
 {% block content %}
+{% if 'student' in data.user_types and 'teacher' not in data.user_types %}
+{% comment %}STUDENT branch — dark modern dashboard shell{% endcomment %}
+<div class="student-shell">
+    {% include "student/_sidebar.html" with active="homework" %}
+
+    <main class="student-main">
+        <header class="student-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <span class="crumb-now">Homework</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="student-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Your homework</div>
+                    <h1 class="page-title">Welcome back, {{ request.user.username }}</h1>
+                    <p class="page-sub">Pick up where you left off and keep your reasoning sharp.</p>
+                </div>
+            </header>
+
+            <div class="student-grid">
+
+                <div class="student-grid-main stagger">
+                    {% comment %}
+                        Hero — first unsubmitted homework only.
+                        Multiple candidates may match in the loop; the
+                        CSS rule `.student-hero-card ~ .student-hero-card`
+                        hides every candidate after the first.
+                    {% endcomment %}
+                    {% for hw in data.homeworks %}
+                        {% if 'student' in hw.roles and not hw.is_submitted %}
+                        <section class="student-hero-card" aria-label="Continue working">
+                            <div class="hero-eyebrow">
+                                <span class="eyebrow-label">Continue working</span>
+                                {% if hw.is_overdue %}
+                                <span class="student-status red"><span class="dot"></span>Overdue</span>
+                                {% else %}
+                                <span class="student-status amber"><span class="dot"></span>Needs attention</span>
+                                {% endif %}
+                            </div>
+                            <h2 class="hero-title">{{ hw.title }}</h2>
+                            <div class="hero-meta">
+                                <span><i class="bi bi-list-task"></i> {{ hw.section_count }} section{{ hw.section_count|pluralize }}</span>
+                                <span class="meta-dot">·</span>
+                                <span><i class="bi bi-calendar3"></i> Due {{ hw.due_date|date:"M d, Y" }}</span>
+                                {% if hw.sections %}
+                                <span class="meta-dot">·</span>
+                                <span class="meta-frac">{{ hw.completed_percentage }}% complete</span>
+                                {% endif %}
+                            </div>
+                            {% if hw.sections %}
+                            <div class="student-progress tall" role="progressbar"
+                                 aria-valuenow="{{ hw.completed_percentage }}" aria-valuemin="0" aria-valuemax="100"
+                                 style="margin-bottom: 20px;">
+                                <div class="bar green" style="width: {{ hw.completed_percentage }}%;"></div>
+                                <div class="bar amber" style="width: {{ hw.in_progress_percentage }}%;"></div>
+                            </div>
+                            {% endif %}
+                            <p class="hero-next">
+                                <strong>Next:</strong>
+                                open the assignment to continue your sections. The AI tutor is ready to help when you explain your reasoning.
+                            </p>
+                            <div class="hero-actions">
+                                <a href="{% url 'homeworks:detail' hw.id %}" class="btn-s btn-s-primary">
+                                    Continue
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                                </a>
+                                <a href="{% url 'homeworks:detail' hw.id %}" class="btn-s btn-s-ghost">View details</a>
+                            </div>
+                        </section>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% comment %} All homework list {% endcomment %}
+                    <section class="student-card">
+                        <div class="card-eyebrow">All homework</div>
+                        <h3 class="card-title" style="margin-bottom: 14px;">This term</h3>
+
+                        {% if data.total_count == 0 %}
+                        <div class="hero-next" style="margin: 0;">
+                            No homeworks have been assigned to you yet.
+                        </div>
+                        {% else %}
+                        <ul class="due-list">
+                            {% for hw in data.homeworks %}
+                                {% if 'student' in hw.roles %}
+                                <li class="due-row-wrap">
+                                    <div class="due-row">
+                                        <div class="due-date">
+                                            <div class="due-month">{{ hw.due_date|date:"M" }}</div>
+                                            <div class="due-day">{{ hw.due_date|date:"d" }}</div>
+                                        </div>
+                                        <div class="due-main">
+                                            <div class="due-name">{{ hw.title }}</div>
+                                            <div class="due-sub">
+                                                {{ hw.section_count }} section{{ hw.section_count|pluralize }} · Due {{ hw.due_date|date:"M d, Y" }}
+                                            </div>
+                                        </div>
+                                        {% if hw.is_submitted %}
+                                        <span class="student-status green"><span class="dot"></span>Submitted</span>
+                                        {% elif hw.is_overdue %}
+                                        <span class="student-status red"><span class="dot"></span>Overdue</span>
+                                        {% else %}
+                                        <span class="student-status blue"><span class="dot"></span>In progress</span>
+                                        {% endif %}
+                                        <a href="{% url 'homeworks:detail' hw.id %}" class="btn-s btn-s-sm">
+                                            {% if hw.is_submitted %}Review{% else %}Continue{% endif %}
+                                        </a>
+                                    </div>
+                                    {% if hw.sections %}
+                                    <div class="due-sections">
+                                        {% for section in hw.sections %}
+                                        {% if section.section_type == 'non_interactive' %}
+                                            <a class="section-pill" href="{% url 'homeworks:section_answer' homework_id=hw.id section_id=section.id %}">
+                                                <span class="section-pill-num">{{ section.order }}</span>
+                                                <span>{{ section.title }}</span>
+                                                {% if section.status == 'submitted' %}
+                                                <span class="section-pill-status green"></span>
+                                                {% elif section.status == 'overdue' %}
+                                                <span class="section-pill-status red"></span>
+                                                {% else %}
+                                                <span class="section-pill-status mute"></span>
+                                                {% endif %}
+                                            </a>
+                                        {% elif section.conversation_id %}
+                                            <a class="section-pill" href="{% url 'conversations:detail' section.conversation_id %}">
+                                                <span class="section-pill-num">{{ section.order }}</span>
+                                                <span>{{ section.title }}</span>
+                                                {% if section.status == 'submitted' %}
+                                                <span class="section-pill-status green"></span>
+                                                {% elif section.status == 'in_progress_overdue' or section.status == 'overdue' %}
+                                                <span class="section-pill-status red"></span>
+                                                {% else %}
+                                                <span class="section-pill-status amber"></span>
+                                                {% endif %}
+                                            </a>
+                                        {% else %}
+                                            <a class="section-pill" href="{% url 'conversations:start' section_id=section.id %}">
+                                                <span class="section-pill-num">{{ section.order }}</span>
+                                                <span>{{ section.title }}</span>
+                                                {% if section.status == 'overdue' %}
+                                                <span class="section-pill-status red"></span>
+                                                {% else %}
+                                                <span class="section-pill-status mute"></span>
+                                                {% endif %}
+                                            </a>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </section>
+                </div>
+
+                <aside class="student-grid-aside stagger">
+                    {% if data.latest_teacher_feedback %}
+                    {% with fb=data.latest_teacher_feedback %}
+                    <section class="tutor-feedback-card">
+                        <div class="tfc-label">Recent Teacher Feedback</div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+                            <span class="student-status
+                                {% if fb.feedback_type == 'good_work' %}green
+                                {% elif fb.feedback_type == 'needs_revision' %}amber
+                                {% elif fb.feedback_type == 'clarify_reasoning' %}blue
+                                {% else %}mute{% endif %}">
+                                <span class="dot"></span>{{ fb.feedback_type_display }}
+                            </span>
+                            <span style="font-size: 11.5px; color: var(--s-text-mute); margin-left: auto;">{{ fb.updated_at|date:"M d, Y" }}</span>
+                        </div>
+                        <p class="tfc-quote" style="white-space: pre-wrap;">{{ fb.feedback|truncatechars:240 }}</p>
+                        <div class="tfc-source">
+                            From {{ fb.teacher_username }}{% if fb.section_title %} · {{ fb.section_title }}{% endif %}
+                        </div>
+                        {% if fb.conversation_id %}
+                        <div style="margin-top: 12px;">
+                            <a href="{% url 'conversations:detail' fb.conversation_id %}" class="btn-s btn-s-sm">Review feedback</a>
+                        </div>
+                        {% elif fb.homework_id and fb.section_id %}
+                        <div style="margin-top: 12px;">
+                            <a href="{% url 'homeworks:section_detail' homework_id=fb.homework_id section_id=fb.section_id %}" class="btn-s btn-s-sm">View section</a>
+                        </div>
+                        {% endif %}
+                    </section>
+                    {% endwith %}
+                    {% else %}
+                    <section class="tutor-feedback-card">
+                        <div class="tfc-label">Reasoning Reminder</div>
+                        <p class="tfc-quote">
+                            Before submitting, make sure your explanation connects your calculation to your final answer.
+                        </p>
+                    </section>
+                    {% endif %}
+
+                    <section class="student-card">
+                        <div class="card-eyebrow">Snapshot</div>
+                        <h3 class="card-title" style="margin-bottom: 14px;">Your progress</h3>
+                        <div style="display: flex; flex-direction: column; gap: 14px;">
+                            <div>
+                                <div style="font-size: 11px; color: var(--s-text-mute); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px;">Assignments</div>
+                                <div style="font-size: 22px; font-family: ui-monospace, Menlo, monospace; color: var(--s-text);">
+                                    {{ data.total_count }}<span style="color: var(--s-text-mute); font-size: 14px;"> total</span>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: var(--s-text-mute); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px;">Current focus</div>
+                                <div style="font-size: 13.5px; color: var(--s-text-dim); line-height: 1.55;">
+                                    Strengthen your written reasoning — explain not just the answer, but the steps that led to it.
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </aside>
+
+            </div>
+        </div>
+    </main>
+</div>
+
+{% elif 'teacher' in data.user_types %}
+{% comment %}TEACHER branch — dark modern instructor dashboard shell{% endcomment %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="homework" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <span class="crumb-now">Homework</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Teacher dashboard</div>
+                    <h1 class="page-title">Homework</h1>
+                    <p class="page-sub">Manage assignments, review submissions, and monitor progress across your courses.</p>
+                </div>
+            </header>
+
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Assignments</div>
+                    <div class="stat-value">{{ data.total_count }}</div>
+                    <div class="stat-sub">In your view</div>
+                </div>
+                <a href="{% url 'courses:list' %}" class="stat-card t-nav-card">
+                    <div class="stat-label">Courses</div>
+                    <div class="nav-action">Manage courses</div>
+                    <div class="stat-sub">Roster, TAs, and matrix</div>
+                </a>
+                <a href="{% url 'accounts:profile' %}" class="stat-card t-nav-card">
+                    <div class="stat-label">Profile</div>
+                    <div class="nav-action">Account settings</div>
+                    <div class="stat-sub">Update your details</div>
+                </a>
+            </div>
+
+            {% if data.total_count == 0 %}
+            <div class="teacher-card" style="text-align: center; padding: 40px 24px;">
+                <div class="card-eyebrow">No homework yet</div>
+                <h3 class="card-title">Get started</h3>
+                <p style="color: var(--t-text-dim); margin: 8px 0 18px;">
+                    You haven't created any homework yet. Open a course and create a homework from there.
+                </p>
+                <a href="{% url 'courses:list' %}" class="btn-t btn-t-primary">Go to courses</a>
+            </div>
+            {% else %}
+
+            <section class="teacher-card stagger" style="padding: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 14px; border-bottom: 1px solid var(--t-border); margin-bottom: 14px;">
+                    <h3 class="card-title" style="margin: 0;">All assignments</h3>
+                    <a href="{% url 'courses:list' %}" class="btn-t btn-t-sm">Manage in courses</a>
+                </div>
+
+                {% for homework in data.homeworks %}
+                <div class="hw-row">
+                    <div class="hw-date">
+                        <div class="hw-month">{{ homework.due_date|date:"M" }}</div>
+                        <div class="hw-day">{{ homework.due_date|date:"d" }}</div>
+                    </div>
+                    <div class="hw-main">
+                        <a href="{% url 'homeworks:detail' homework.id %}" style="color: var(--t-text); text-decoration: none;">
+                            <div class="hw-title">{{ homework.title }}</div>
+                        </a>
+                        <div class="hw-meta">
+                            {{ homework.section_count }} section{{ homework.section_count|pluralize }}
+                            · Due {{ homework.due_date|date:"M d, Y" }}
+                            {% if 'teacher_assistant' in homework.roles %} · TA{% endif %}
+                        </div>
+                    </div>
+                    <div>
+                        {% if 'teacher' in homework.roles %}
+                            {% if homework.is_scheduled %}
+                                <span class="teacher-status blue"><span class="dot"></span>Scheduled</span>
+                            {% elif homework.is_draft %}
+                                <span class="teacher-status amber"><span class="dot"></span>Draft</span>
+                            {% elif homework.is_hidden %}
+                                <span class="teacher-status mute"><span class="dot"></span>Hidden</span>
+                            {% elif not homework.is_accessible_to_students %}
+                                <span class="teacher-status red"><span class="dot"></span>Expired</span>
+                            {% else %}
+                                <span class="teacher-status green"><span class="dot"></span>Active</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    <div class="hw-actions">
+                        <a href="{% url 'homeworks:detail' homework.id %}" class="btn-t btn-t-sm">View &amp; Edit</a>
+                        {% if 'teacher' in homework.roles %}
+                        <a href="{% url 'homeworks:submissions' homework.id %}" class="btn-t btn-t-sm btn-t-info">Submissions</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </section>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+{% else %}
+{% comment %}TA / fallback branch — original markup{% endcomment %}
 <div class="container mt-4">
     <div class="row mb-4">
         <div class="col">
@@ -17,13 +349,7 @@
 
     {% if data.total_count == 0 %}
     <div class="alert alert-info">
-        {% if 'teacher' in data.user_types %}
-            You haven't created any homework yet. Go to a course and create a homework from there.
-        {% elif 'student' in data.user_types %}
-            No homeworks have been assigned to you yet.
-        {% else %}
-            No homeworks are available.
-        {% endif %}
+        No homeworks are available.
     </div>
     {% else %}
     <div class="row row-cols-1 row-cols-md-2 g-4">
@@ -83,17 +409,17 @@
                         <small class="text-muted">{{ homework.section_count }} Sections</small>
                         <small class="text-muted">Due: {{ homework.due_date|date:"M d, Y" }}</small>
                     </div>
-                    
+
                     {% if homework.sections %}
                     <div class="mt-3">
                         <div class="progress" style="height: 25px;">
-                            <div class="progress-bar bg-success" role="progressbar" 
-                                 style="width: {{ homework.completed_percentage }}%;" 
+                            <div class="progress-bar bg-success" role="progressbar"
+                                 style="width: {{ homework.completed_percentage }}%;"
                                  aria-valuenow="{{ homework.completed_percentage }}" aria-valuemin="0" aria-valuemax="100">
                                 {% if homework.completed_percentage > 0 %}{{ homework.completed_percentage }}%{% endif %}
                             </div>
-                            <div class="progress-bar bg-warning" role="progressbar" 
-                                 style="width: {{ homework.in_progress_percentage }}%;" 
+                            <div class="progress-bar bg-warning" role="progressbar"
+                                 style="width: {{ homework.in_progress_percentage }}%;"
                                  aria-valuenow="{{ homework.in_progress_percentage }}" aria-valuemin="0" aria-valuemax="100">
                                 {% if homework.in_progress_percentage > 0 %}{{ homework.in_progress_percentage }}%{% endif %}
                             </div>
@@ -151,4 +477,5 @@
     </div>
     {% endif %}
 </div>
+{% endif %}
 {% endblock %}

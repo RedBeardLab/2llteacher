@@ -3,10 +3,150 @@
 {% block title %}Start Conversation - {{ view_data.section_title }}{% endblock %}
 
 {% block content %}
+{% if request.user.student_profile and not request.user.teacher_profile %}
+{% comment %}STUDENT branch — dark modern start conversation{% endcomment %}
+<div class="student-shell">
+    {% include "student/_sidebar.html" with active="homework" %}
+
+    <main class="student-main">
+        <header class="student-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:detail' homework_id=view_data.homework_id %}">{{ view_data.homework_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:section_detail' homework_id=view_data.homework_id section_id=view_data.section_id %}">{{ view_data.section_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <span class="crumb-now">Start conversation</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="student-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">{{ view_data.homework_title }}</div>
+                    <h1 class="page-title">Start a new conversation</h1>
+                    <p class="page-sub">For section: {{ view_data.section_title }}</p>
+                </div>
+            </header>
+
+            {% if error %}
+            <section class="reasoning-feedback incorrect" style="margin-bottom: 22px;">
+                <div class="fb-body">
+                    <div class="fb-title">Something went wrong</div>
+                    <div>{{ error }}</div>
+                </div>
+            </section>
+            {% endif %}
+
+            <section class="student-hero-card" style="margin-bottom: 22px;">
+                <div class="hero-eyebrow">
+                    <span class="eyebrow-label">AI tutor</span>
+                </div>
+                <h2 class="hero-title">Discuss this section with your AI tutor</h2>
+                <p class="hero-next" style="margin-top: 8px;">
+                    A new conversation will be created for this section. Ask questions, walk through your reasoning,
+                    and get feedback before you submit your work.
+                </p>
+                <form method="post" action="{% url 'conversations:start' section_id=view_data.section_id %}">
+                    {% csrf_token %}
+                    <div class="hero-actions">
+                        <button type="submit" class="btn-s btn-s-primary">
+                            Start conversation
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                        </button>
+                        <a href="{% url 'homeworks:section_detail' homework_id=view_data.homework_id section_id=view_data.section_id %}" class="btn-s btn-s-ghost">Cancel</a>
+                    </div>
+                </form>
+            </section>
+
+            <section class="student-card">
+                <div class="card-eyebrow">What happens next</div>
+                <h3 class="card-title" style="margin-bottom: 12px;">When you start a conversation</h3>
+                <ul style="color: var(--s-text-dim); font-size: 13.5px; line-height: 1.75; padding-left: 18px; margin: 0;">
+                    <li>A new conversation is created for this section.</li>
+                    <li>You can ask questions and get responses from the AI tutor.</li>
+                    <li>Your messages are saved so you can return to them later.</li>
+                    <li>You can submit your conversation once you're satisfied with your work.</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+</div>
+
+{% elif request.user.teacher_profile %}
+{% comment %}TEACHER branch — dark modern instructor shell{% endcomment %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="homework" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:detail' homework_id=view_data.homework_id %}">{{ view_data.homework_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:section_detail' homework_id=view_data.homework_id section_id=view_data.section_id %}">{{ view_data.section_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <span class="crumb-now">Start Conversation</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">{{ view_data.homework_title }}</div>
+                    <h1 class="page-title">Start a New Conversation</h1>
+                    <p class="page-sub">Section: {{ view_data.section_title }}</p>
+                </div>
+            </header>
+
+            {% if error %}
+            <div class="alert alert-danger" style="margin-bottom: 22px;">{{ error }}</div>
+            {% endif %}
+
+            <section class="teacher-card stagger" style="margin-bottom: 22px;">
+                <div class="card-eyebrow">Instructor preview</div>
+                <h3 class="card-title" style="margin: 0 0 10px;">Start a test conversation for this section</h3>
+                <p style="color: var(--t-text-dim); font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
+                    Use this to verify the assignment prompt and the AI tutor's responses from a student's perspective.
+                    Your conversation is saved and visible from the section's conversations list.
+                </p>
+                <form method="post" action="{% url 'conversations:start' section_id=view_data.section_id %}">
+                    {% csrf_token %}
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="submit" class="btn-t btn-t-primary">
+                            Start Conversation
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                        </button>
+                        <a href="{% url 'homeworks:section_detail' homework_id=view_data.homework_id section_id=view_data.section_id %}" class="btn-t">Cancel</a>
+                    </div>
+                </form>
+            </section>
+
+            <section class="teacher-card">
+                <div class="card-eyebrow">What happens next</div>
+                <ul style="color: var(--t-text-dim); font-size: 13.5px; line-height: 1.75; padding-left: 18px; margin: 8px 0 0;">
+                    <li>A new conversation is created for this section under your account.</li>
+                    <li>You can exchange messages with the configured AI tutor and review its responses.</li>
+                    <li>The conversation appears in the section's Conversations list for later review.</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+</div>
+
+{% else %}
+{% comment %}TA / fallback branch — original markup{% endcomment %}
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-8 offset-md-2">
-            <!-- Navigation breadcrumb -->
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'homeworks:list' %}">Homework</a></li>
@@ -15,37 +155,13 @@
                     <li class="breadcrumb-item active">Start Conversation</li>
                 </ol>
             </nav>
-
-            <!-- Card container -->
             <div class="card shadow">
                 <div class="card-header bg-primary text-white">
                     <h2 class="mb-0">Start a New Conversation</h2>
                 </div>
                 <div class="card-body">
                     <h4>Section: {{ view_data.section_title }}</h4>
-                    
-                    {% if error %}
-                    <div class="alert alert-danger" role="alert">
-                        {{ error }}
-                    </div>
-                    {% endif %}
-                    
-                    <p class="mt-4">
-                        You are about to start a new conversation for this section. 
-                        The AI tutor will help you work through the problems or discuss the content.
-                    </p>
-                    
-                    <div class="alert alert-info">
-                        <h5>What happens next?</h5>
-                        <ul>
-                            <li>A new conversation will be created for this section</li>
-                            <li>You can ask questions and get responses from the AI tutor</li>
-                            <li>All messages will be saved for later review</li>
-                            <li>You can submit your conversation once you're satisfied with your work</li>
-                        </ul>
-                    </div>
-                    
-                    <!-- Start conversation form -->
+                    {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
                     <form method="post" action="{% url 'conversations:start' section_id=view_data.section_id %}">
                         {% csrf_token %}
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
@@ -58,4 +174,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
