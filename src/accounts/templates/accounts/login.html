@@ -3,6 +3,90 @@
 {% block title %}Login{% endblock %}
 
 {% block content %}
+{% if not user.is_authenticated %}
+<div class="auth-shell">
+    <header class="auth-topbar">
+        <a href="{% url 'homepage' %}" class="brand">
+            <span class="brand-mark">LL</span>
+            <span class="brand-text">
+                <span class="brand-name">LLTeacher</span>
+                <span class="brand-sub">Interactive homework with AI-guided reasoning.</span>
+            </span>
+        </a>
+        <div class="auth-topbar-links">
+            <a href="{% url 'accounts:register' %}">Create account</a>
+        </div>
+    </header>
+
+    <main class="auth-main">
+        <div class="auth-content">
+            <section class="auth-hero">
+                <div class="eyebrow">Welcome back</div>
+                <h1>Sign in to keep working.</h1>
+                <p>
+                    Pick up where you left off. Continue an assignment, review your
+                    explanation, or open a conversation with the AI tutor.
+                </p>
+            </section>
+
+            <section class="auth-card">
+                <h2>Login</h2>
+                <p class="auth-tag">Use your LLTeacher account.</p>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="field">
+                        <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.username.errors|join:", " }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="field">
+                        <label for="{{ form.password.id_for_label }}" class="form-label">Password</label>
+                        {{ form.password }}
+                        {% if form.password.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.password.errors|join:", " }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <input type="hidden" name="next" value="{{ next_url }}">
+
+                    <button type="submit" class="btn btn-primary">Login</button>
+
+                    <div class="forgot-link">
+                        <a href="{% url 'accounts:password_reset' %}">Forgot your password?</a>
+                    </div>
+                </form>
+
+                <div class="auth-foot">
+                    Don't have an account? <a href="{% url 'accounts:register' %}">Register</a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="auth-footer">
+        © 2025 LLTeacher ·
+        <a href="https://github.com/RedBeardLab/2llteacher" target="_blank" rel="noopener noreferrer">Open source on GitHub</a>
+    </footer>
+</div>
+
+{% else %}
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-6 col-lg-4">
@@ -13,7 +97,7 @@
                 <div class="card-body">
                     <form method="post">
                         {% csrf_token %}
-                        
+
                         {% if form.non_field_errors %}
                         <div class="alert alert-danger">
                             {% for error in form.non_field_errors %}
@@ -21,8 +105,7 @@
                             {% endfor %}
                         </div>
                         {% endif %}
-                        
-                        <!-- Username Field -->
+
                         <div class="mb-3">
                             <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
                             {{ form.username }}
@@ -32,8 +115,7 @@
                             </div>
                             {% endif %}
                         </div>
-                        
-                        <!-- Password Field -->
+
                         <div class="mb-3">
                             <label for="{{ form.password.id_for_label }}" class="form-label">Password</label>
                             {{ form.password }}
@@ -43,16 +125,13 @@
                             </div>
                             {% endif %}
                         </div>
-                        
-                        <!-- Hidden Next URL Field -->
+
                         <input type="hidden" name="next" value="{{ next_url }}">
-                        
-                        <!-- Submit Button -->
+
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary">Login</button>
                         </div>
-                        
-                        <!-- Forgot Password Link -->
+
                         <div class="text-center mt-3">
                             <a href="{% url 'accounts:password_reset' %}" class="text-decoration-none small">
                                 Forgot your password?
@@ -67,4 +146,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

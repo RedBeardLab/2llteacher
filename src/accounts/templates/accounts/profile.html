@@ -3,6 +3,218 @@
 {% block title %}User Profile{% endblock %}
 
 {% block content %}
+{% if profile_data.role == 'student' and request.user.student_profile and not request.user.teacher_profile %}
+{% comment %}STUDENT branch — dark modern profile{% endcomment %}
+<div class="student-shell">
+    {% include "student/_sidebar.html" with active="profile" %}
+
+    <main class="student-main">
+        <header class="student-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <span class="crumb-now">Profile</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="student-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Account</div>
+                    <h1 class="page-title">
+                        {% if profile_data.first_name or profile_data.last_name %}
+                        {{ profile_data.first_name }} {{ profile_data.last_name }}
+                        {% else %}
+                        {{ profile_data.username }}
+                        {% endif %}
+                    </h1>
+                    <p class="page-sub">@{{ profile_data.username }} · Student · Member since {{ profile_data.joined_date|date:"F j, Y" }}</p>
+                </div>
+                <div class="hero-actions">
+                    <span class="student-status blue"><span class="dot"></span>Student</span>
+                </div>
+            </header>
+
+            <div class="student-grid">
+                <div class="student-grid-main stagger">
+                    <section class="student-card">
+                        <div class="card-eyebrow">Edit profile</div>
+                        <h3 class="card-title" style="margin-bottom: 14px;">Personal information</h3>
+
+                        <form method="post" action="{% url 'accounts:profile' %}">
+                            {% csrf_token %}
+
+                            {% if form.non_field_errors %}
+                            <div class="reasoning-feedback incorrect" style="margin-top: 0; margin-bottom: 14px;">
+                                <div class="fb-body">
+                                    <div class="fb-title">Could not update</div>
+                                    {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <div style="display: flex; flex-direction: column; gap: 14px;">
+                                <div>
+                                    <label for="{{ form.first_name.id_for_label }}" style="display: block; font-size: 12px; color: var(--s-text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">First name</label>
+                                    {{ form.first_name }}
+                                    {% if form.first_name.errors %}
+                                    <div style="color: var(--s-red); font-size: 12px; margin-top: 4px;">{{ form.first_name.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <label for="{{ form.last_name.id_for_label }}" style="display: block; font-size: 12px; color: var(--s-text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Last name</label>
+                                    {{ form.last_name }}
+                                    {% if form.last_name.errors %}
+                                    <div style="color: var(--s-red); font-size: 12px; margin-top: 4px;">{{ form.last_name.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <label for="{{ form.email.id_for_label }}" style="display: block; font-size: 12px; color: var(--s-text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Email</label>
+                                    {{ form.email }}
+                                    {% if form.email.errors %}
+                                    <div style="color: var(--s-red); font-size: 12px; margin-top: 4px;">{{ form.email.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="hero-actions" style="margin-top: 22px;">
+                                <button type="submit" class="btn-s btn-s-primary">Update profile</button>
+                                <a href="{% url 'homeworks:list' %}" class="btn-s btn-s-ghost">Cancel</a>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+
+                <aside class="student-grid-aside stagger">
+                    <section class="student-card">
+                        <div class="card-eyebrow">Stats</div>
+                        <h3 class="card-title" style="margin-bottom: 14px;">Your activity</h3>
+                        <div style="display: flex; flex-direction: column; gap: 14px;">
+                            <div>
+                                <div style="font-size: 11px; color: var(--s-text-mute); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px;">Submissions</div>
+                                <div style="font-size: 22px; font-family: ui-monospace, Menlo, monospace; color: var(--s-text);">{{ profile_data.submissions_count }}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: var(--s-text-mute); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px;">Completed sections</div>
+                                <div style="font-size: 22px; font-family: ui-monospace, Menlo, monospace; color: var(--s-text);">{{ profile_data.completed_sections }}</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="tutor-feedback-card">
+                        <div class="tfc-label">Reminder</div>
+                        <p class="tfc-quote">
+                            Strong explanations carry through the term. Show your steps, name the rule,
+                            and connect the reasoning to your answer.
+                        </p>
+                        <div class="tfc-source">From your AI tutor</div>
+                    </section>
+                </aside>
+            </div>
+        </div>
+    </main>
+</div>
+
+{% elif request.user.teacher_profile %}
+{% comment %}TEACHER branch — dark modern profile shell{% endcomment %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="profile" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <span class="crumb-now">Profile</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Account</div>
+                    <h1 class="page-title">
+                        {% if profile_data.first_name or profile_data.last_name %}
+                        {{ profile_data.first_name }} {{ profile_data.last_name }}
+                        {% else %}
+                        {{ profile_data.username }}
+                        {% endif %}
+                    </h1>
+                    <p class="page-sub">@{{ profile_data.username }} · Instructor · Member since {{ profile_data.joined_date|date:"F j, Y" }}</p>
+                </div>
+                <div class="hero-actions">
+                    <span class="teacher-status blue"><span class="dot"></span>Instructor</span>
+                </div>
+            </header>
+
+            <div class="stat-grid stagger">
+                <div class="stat-card">
+                    <div class="stat-label">Courses created</div>
+                    <div class="stat-value blue">{{ profile_data.courses_created|default:0 }}</div>
+                    <div class="stat-sub">Across your account</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Role</div>
+                    <div class="stat-value" style="font-size: 18px;">{{ profile_data.role|title }}</div>
+                    <div class="stat-sub">Current account role</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Joined</div>
+                    <div class="stat-value" style="font-size: 16px;">{{ profile_data.joined_date|date:"M Y" }}</div>
+                    <div class="stat-sub">Member since</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Username</div>
+                    <div class="stat-value" style="font-size: 16px;">@{{ profile_data.username }}</div>
+                    <div class="stat-sub">Login identifier</div>
+                </div>
+            </div>
+
+            <section class="teacher-card" style="margin-bottom: 22px;">
+                <div class="card-eyebrow">Edit profile</div>
+                <h3 class="card-title" style="margin: 0 0 16px;">Personal information</h3>
+
+                <form method="post" action="{% url 'accounts:profile' %}">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger" style="margin-bottom: 14px;">
+                        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                        <div>
+                            <label for="{{ form.first_name.id_for_label }}" style="display:block;font-size:12px;color:var(--t-text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">First name</label>
+                            {{ form.first_name }}
+                            {% if form.first_name.errors %}<div style="color:var(--t-red);font-size:12px;margin-top:4px;">{{ form.first_name.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div>
+                            <label for="{{ form.last_name.id_for_label }}" style="display:block;font-size:12px;color:var(--t-text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Last name</label>
+                            {{ form.last_name }}
+                            {% if form.last_name.errors %}<div style="color:var(--t-red);font-size:12px;margin-top:4px;">{{ form.last_name.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <label for="{{ form.email.id_for_label }}" style="display:block;font-size:12px;color:var(--t-text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Email</label>
+                            {{ form.email }}
+                            {% if form.email.errors %}<div style="color:var(--t-red);font-size:12px;margin-top:4px;">{{ form.email.errors.0 }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 22px; display: flex; gap: 10px;">
+                        <button type="submit" class="btn-t btn-t-primary">Update profile</button>
+                        <a href="{% url 'homeworks:list' %}" class="btn-t">Cancel</a>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </main>
+</div>
+
+{% else %}
+{% comment %}TA / fallback branch — original markup{% endcomment %}
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-8 offset-md-2">
@@ -59,7 +271,7 @@
                         <h4>Edit Profile</h4>
                         <form method="post" action="{% url 'accounts:profile' %}">
                             {% csrf_token %}
-                            
+
                             {% if form.non_field_errors %}
                             <div class="alert alert-danger">
                                 {% for error in form.non_field_errors %}
@@ -109,4 +321,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

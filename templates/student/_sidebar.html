@@ -1,0 +1,67 @@
+{% comment %}
+Student app shell sidebar.
+Usage: {% include "student/_sidebar.html" with active="homework" %}
+Valid active values: homework, courses, profile.
+{% endcomment %}
+<aside class="student-sidebar" aria-label="Student navigation">
+    <a href="{% url 'homeworks:list' %}" class="brand">
+        <span class="brand-mark">LL</span>
+        <span class="brand-text">
+            <span class="brand-name">LLTeacher</span>
+            <span class="brand-sub">Student</span>
+        </span>
+    </a>
+
+    <div class="nav-section">Workspace</div>
+    <nav class="student-nav" aria-label="Primary">
+        <a class="nav-item {% if active == 'home' %}active{% endif %}"
+           href="{% url 'homepage' %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m3 11 9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-7h4v7h4a1 1 0 0 0 1-1V10"/>
+            </svg>
+            <span>Dashboard</span>
+        </a>
+        <a class="nav-item {% if active == 'homework' %}active{% endif %}"
+           href="{% url 'homeworks:list' %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/>
+                <circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>
+            </svg>
+            <span>Homework</span>
+        </a>
+        <a class="nav-item {% if active == 'courses' %}active{% endif %}"
+           href="{% url 'courses:list' %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 0-2 2V5z"/>
+                <path d="M19 17H6a2 2 0 0 0-2 2"/>
+            </svg>
+            <span>Courses</span>
+        </a>
+    </nav>
+
+    <div class="nav-section">Account</div>
+    <nav class="student-nav" aria-label="Account">
+        <a class="nav-item {% if active == 'profile' %}active{% endif %}"
+           href="{% url 'accounts:profile' %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>
+            </svg>
+            <span>Profile</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-foot">
+        <div class="avatar">{{ request.user.username|slice:":2"|upper }}</div>
+        <div class="who">
+            <div class="who-name">{{ request.user.username }}</div>
+            <div class="who-role">Student</div>
+        </div>
+        <a href="{% url 'accounts:logout' %}" class="sidebar-logout" title="Sign out" aria-label="Sign out">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M15 17l5-5-5-5"/><path d="M20 12H8"/>
+                <path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/>
+            </svg>
+        </a>
+    </div>
+</aside>

@@ -8,6 +8,154 @@
 {% endblock %}
 
 {% block content %}
+{% if 'student' in data.user_types and 'teacher' not in data.user_types and 'teacher_assistant' not in data.user_types %}
+{% comment %}STUDENT branch — dark modern courses dashboard{% endcomment %}
+<div class="student-shell">
+    {% include "student/_sidebar.html" with active="courses" %}
+
+    <main class="student-main">
+        <header class="student-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <span class="crumb-now">Courses</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="student-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Your courses</div>
+                    <h1 class="page-title">Courses</h1>
+                    <p class="page-sub">Browse and enroll in available courses for this term.</p>
+                </div>
+            </header>
+
+            {% if data.courses|length == 0 %}
+            <section class="student-card">
+                <p style="margin: 0; color: var(--s-text-dim);">No courses are currently available.</p>
+            </section>
+            {% else %}
+            <div class="course-grid stagger">
+                {% for course in data.courses %}
+                <a class="course-card" href="{% url 'courses:detail' course.id %}">
+                    <div class="course-cover {% cycle '' 'violet' 'teal' %}"></div>
+                    <div class="course-body">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                            <span class="student-status mute"><span class="dot"></span>{{ course.code }}</span>
+                            {% if course.is_enrolled %}
+                            <span class="student-status green"><span class="dot"></span>Enrolled</span>
+                            {% else %}
+                            <span class="student-status blue"><span class="dot"></span>Available</span>
+                            {% endif %}
+                        </div>
+                        <h3>{{ course.name }}</h3>
+                        {% if course.instructors %}
+                        <div class="course-meta">
+                            <span>
+                                Instructor:
+                                {% for instructor in course.instructors %}{{ instructor.first_name }} {{ instructor.last_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                            </span>
+                        </div>
+                        {% endif %}
+                        <div class="course-foot">
+                            {% if course.is_enrolled %}
+                            <span class="btn-s btn-s-primary" style="width: 100%;">
+                                Open course
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                            </span>
+                            {% else %}
+                            <form method="post" action="{% url 'courses:enroll' course.id %}" style="width: 100%;" onclick="event.stopPropagation();">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-s btn-s-primary" style="width: 100%;">
+                                    Enroll
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+{% elif 'teacher' in data.user_types %}
+{% comment %}TEACHER branch — dark modern courses dashboard{% endcomment %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="courses" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <span class="crumb-now">Courses</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Instructor</div>
+                    <h1 class="page-title">Courses</h1>
+                    <p class="page-sub">Manage the courses you teach and create new ones for your students.</p>
+                </div>
+                <div class="hero-actions">
+                    <a href="{% url 'courses:create' %}" class="btn-t btn-t-primary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                        Create course
+                    </a>
+                </div>
+            </header>
+
+            {% if data.courses|length == 0 %}
+            <div class="teacher-card" style="text-align: center; padding: 40px 24px;">
+                <div class="card-eyebrow">No courses yet</div>
+                <h3 class="card-title">Start by creating a course</h3>
+                <p style="color: var(--t-text-dim); margin: 8px 0 18px;">Create your first course to organize homework, sections, and student enrollment.</p>
+                <a href="{% url 'courses:create' %}" class="btn-t btn-t-primary">Create course</a>
+            </div>
+            {% else %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;" class="stagger">
+                {% for course in data.courses %}
+                <a href="{% url 'courses:detail' course.id %}" class="teacher-card" style="display: block; text-decoration: none; padding: 0; overflow: hidden; transition: border-color 180ms var(--t-ease), transform 150ms var(--t-ease);">
+                    <div style="height: 70px; background: linear-gradient(135deg, var(--t-blue), var(--t-purple)); position: relative;">
+                        <div style="position: absolute; bottom: 10px; left: 16px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: rgba(255,255,255,0.9); letter-spacing: 0.05em;">{{ course.code }}</div>
+                    </div>
+                    <div style="padding: 16px 18px 18px;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                            {% if 'teacher' in course.roles %}
+                            <span class="teacher-status blue"><span class="dot"></span>Teaching</span>
+                            {% endif %}
+                            {% if 'teacher_assistant' in course.roles %}
+                            <span class="teacher-status amber"><span class="dot"></span>TA</span>
+                            {% endif %}
+                        </div>
+                        <h3 style="font-size: 16.5px; font-weight: 500; color: var(--t-text); margin: 0 0 6px;">{{ course.name }}</h3>
+                        {% if course.instructors %}
+                        <div style="font-size: 12.5px; color: var(--t-text-mute); margin-bottom: 10px;">
+                            {% for instructor in course.instructors %}{{ instructor.first_name }} {{ instructor.last_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        </div>
+                        {% endif %}
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <span class="btn-t btn-t-sm" style="flex: 1; justify-content: center;">Open</span>
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+{% else %}
+{% comment %}TA / fallback branch — original markup{% endcomment %}
 <div class="container mt-4">
     <div class="row mb-4">
         <div class="col">
@@ -126,4 +274,5 @@
     </div>
     {% endif %}
 </div>
+{% endif %}
 {% endblock %}

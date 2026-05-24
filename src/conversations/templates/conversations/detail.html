@@ -9,6 +9,478 @@
 {% endblock %}
 
 {% block content %}
+{% if request.user.student_profile and not request.user.teacher_profile and not conversation_data.is_teacher_test %}
+{% comment %}STUDENT branch — wraps existing chat surface in shell. JS hooks preserved.{% endcomment %}
+<div class="student-shell">
+    {% include "student/_sidebar.html" with active="homework" %}
+
+    <main class="student-main">
+        <header class="student-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                {% if conversation_data.homework_id %}
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:detail' homework_id=conversation_data.homework_id %}">{{ conversation_data.homework_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:section_detail' homework_id=conversation_data.homework_id section_id=conversation_data.section_id %}">{{ conversation_data.section_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                {% endif %}
+                <span class="crumb-now">Conversation</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="student-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">AI Tutor conversation</div>
+                    <h1 class="page-title">{{ conversation_data.section_title }}</h1>
+                    <p class="page-sub">Work through your reasoning with the AI tutor before submitting.</p>
+                </div>
+                {% if user.id == conversation_data.user_id %}
+                <div class="hero-actions" style="gap: 10px;">
+                    <form method="post" action="{% url 'conversations:delete_and_restart' conversation_id=conversation_data.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-s" onclick="return confirm('Are you sure you want to delete this conversation and start a new one? This action cannot be undone.')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="m6 6 1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/></svg>
+                            Delete &amp; Start New
+                        </button>
+                    </form>
+                    {% if conversation_data.can_submit %}
+                    <form method="post" action="{% url 'conversations:submit_conversation' conversation_id=conversation_data.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-s btn-s-primary" onclick="return confirm('Are you sure you want to submit this conversation for section \'{{ conversation_data.section_title }}\'?')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+                            Submit Conversation
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </header>
+
+            <section class="student-card" style="padding: 0; overflow: hidden;">
+                <div style="padding: 22px 24px;">
+                    {# ====== EXISTING CHAT SURFACE — JS hooks must stay intact ====== #}
+                    <div class="conversation-container">
+                        {% if timeline %}
+                            {% for item in timeline %}
+                                {% if item.type == 'message' %}
+                                    {% with message=item.data %}
+                                    <div class="message-container {{ message.css_class }} mb-3" data-message-id="{{ message.id }}">
+                                        <div class="message-header">
+                                            {% if message.is_from_student %}
+                                            <span class="badge bg-primary">Student</span>
+                                            {% elif message.is_from_ai %}
+                                            <span class="badge bg-success">AI Tutor</span>
+                                            {% elif message.is_system_message %}
+                                            <span class="badge bg-secondary">System</span>
+                                            {% else %}
+                                            <span class="badge bg-info">Other</span>
+                                            {% endif %}
+                                            <small class="text-muted">{{ message.timestamp|date:"M d, Y H:i" }}</small>
+                                        </div>
+                                        <div class="message-content p-3 rounded">
+                                            {% if message.message_type == 'code' %}
+                                            <div class="r-code-container">
+                                                <div class="r-code-header">
+                                                    <span class="r-code-label">
+                                                        <i class="bi bi-code-slash"></i>
+                                                        R Code
+                                                    </span>
+                                                    <button class="btn btn-sm btn-outline-primary r-run-button"
+                                                            data-message-id="{{ message.id }}"
+                                                            disabled>
+                                                        <i class="bi bi-hourglass-split"></i> Initializing...
+                                                    </button>
+                                                </div>
+                                                <pre><code class="language-r">{{ message.content }}</code></pre>
+                                                <div class="r-execution-output" id="r-output-{{ message.id }}"></div>
+                                            </div>
+                                            {% elif message.message_type == 'code_execution' %}
+                                            <pre><code class="output">{{ message.content }}</code></pre>
+                                            {% else %}
+                                            <zero-md src="data:text/markdown;charset=utf-8,{{ message.content|urlencode }}">
+                                                <template data-append>
+                                                    <style>
+                                                        .markdown-body {
+                                                            background-color: transparent !important;
+                                                        }
+                                                    </style>
+                                                </template>
+                                            </zero-md>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endwith %}
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-info" style="margin: 0;">
+                                Send your first message to start the conversation.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Message input form — students only #}
+                {% if user.id == conversation_data.user_id %}
+                <div style="border-top: 1px solid var(--s-border); padding: 18px 24px; background: var(--s-surface-2);">
+                    <form method="post" action="{% url 'conversations:send_message' conversation_id=conversation_data.id %}" id="message-form">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="content" style="display: block; font-size: 12px; color: var(--s-text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Your message</label>
+                            <textarea class="form-control" id="content" name="content" rows="3" required placeholder="Walk through your reasoning, ask a question, or share a code snippet…"></textarea>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3" style="gap: 14px; flex-wrap: wrap;">
+                            <div class="message-type-selector">
+                                <div class="btn-group" role="group" aria-label="Message type selection">
+                                    <input type="radio" class="btn-check" name="message_type" id="message_type_student" value="student" checked>
+                                    <label class="btn btn-outline-primary" for="message_type_student">
+                                        <i class="bi bi-chat-text"></i> Chat
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="message_type" id="message_type_code" value="code">
+                                    <label class="btn btn-outline-success" for="message_type_code">
+                                        <i class="bi bi-code-slash"></i> R Code
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-s btn-s-primary">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+                                Send message
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            </section>
+
+            {% if teacher_feedback_list %}
+            <section class="student-card" style="margin-top: 18px;">
+                <div class="card-eyebrow">Teacher Feedback</div>
+                <h3 class="card-title" style="margin: 0 0 12px;">From your instructor</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    {% for fb in teacher_feedback_list %}
+                    <div style="padding: 12px 14px; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 10px;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
+                            <span style="font-size: 13px; color: var(--s-text); font-weight: 500;">{{ fb.teacher.username }}</span>
+                            <span class="student-status
+                                {% if fb.feedback_type == 'good_work' %}green
+                                {% elif fb.feedback_type == 'needs_revision' %}amber
+                                {% elif fb.feedback_type == 'clarify_reasoning' %}blue
+                                {% else %}mute{% endif %}">
+                                <span class="dot"></span>{{ fb.get_feedback_type_display }}
+                            </span>
+                            <span style="font-size: 11.5px; color: var(--s-text-mute); margin-left: auto;">{{ fb.updated_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <p style="margin: 0; white-space: pre-wrap; color: var(--s-text); font-size: 13.5px; line-height: 1.6;">{{ fb.feedback }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            {% if conversation_data.homework_id %}
+            <div style="margin-top: 18px;">
+                <a href="{% url 'homeworks:section_detail' homework_id=conversation_data.homework_id section_id=conversation_data.section_id %}" class="btn-s">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    Back to section
+                </a>
+            </div>
+            {% else %}
+            <div style="margin-top: 18px;">
+                <a href="{% url 'homeworks:list' %}" class="btn-s">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    Back to homework
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+{% elif request.user.teacher_profile %}
+{% comment %}TEACHER branch — dark modern conversation workspace. JS hooks preserved.{% endcomment %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="homework" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                {% if conversation_data.homework_id %}
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:detail' homework_id=conversation_data.homework_id %}">{{ conversation_data.homework_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:section_detail' homework_id=conversation_data.homework_id section_id=conversation_data.section_id %}">{{ conversation_data.section_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                {% endif %}
+                <span class="crumb-now">Conversation</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">
+                        {% if conversation_data.is_teacher_test %}Instructor test conversation{% else %}Student conversation{% endif %}
+                    </div>
+                    <h1 class="page-title">{{ conversation_data.section_title }}</h1>
+                    <p class="page-sub">
+                        {% if conversation_data.is_teacher_test %}
+                            Test conversation under your account. Use it to verify prompts and AI responses.
+                        {% else %}
+                            Read-only view of a student's AI tutor conversation for this section.
+                        {% endif %}
+                    </p>
+                </div>
+                {% if not conversation_data.is_teacher_test and user.id == conversation_data.user_id %}
+                <div class="hero-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <form method="post" action="{% url 'conversations:delete_and_restart' conversation_id=conversation_data.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-t" onclick="return confirm('Are you sure you want to delete this conversation and start a new one? This action cannot be undone.')">
+                            Delete &amp; Start New
+                        </button>
+                    </form>
+                    {% if conversation_data.can_submit %}
+                    <form method="post" action="{% url 'conversations:submit_conversation' conversation_id=conversation_data.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-t btn-t-primary" onclick="return confirm('Are you sure you want to submit this conversation for section \'{{ conversation_data.section_title }}\'?')">
+                            Submit Conversation
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </header>
+
+            {% if conversation_data.is_teacher_test %}
+            <div class="alert alert-info" style="margin-bottom: 18px;">
+                You're viewing this conversation as a teacher.
+            </div>
+            {% endif %}
+
+            {% if conversation_data.paste_events and user.id != conversation_data.user_id %}
+            <div class="alert alert-warning" style="margin-bottom: 18px;">
+                <strong>{{ conversation_data.paste_events|length }} paste event{{ conversation_data.paste_events|length|pluralize }} detected</strong>
+                in this conversation (shown inline below).
+            </div>
+            {% endif %}
+
+            <section class="teacher-card" style="padding: 0; overflow: hidden; margin-bottom: 18px;">
+                <div style="padding: 22px 24px;">
+                    {# ====== EXISTING CHAT SURFACE — JS hooks must stay intact ====== #}
+                    <div class="conversation-container">
+                        {% if timeline %}
+                            {% for item in timeline %}
+                                {% if item.type == 'message' %}
+                                    {% with message=item.data %}
+                                    <div class="message-container {{ message.css_class }} mb-3" data-message-id="{{ message.id }}">
+                                        <div class="message-header">
+                                            {% if message.is_from_student %}
+                                            <span class="badge bg-primary">Student</span>
+                                            {% elif message.is_from_ai %}
+                                            <span class="badge bg-success">AI Tutor</span>
+                                            {% elif message.is_system_message %}
+                                            <span class="badge bg-secondary">System</span>
+                                            {% else %}
+                                            <span class="badge bg-info">Other</span>
+                                            {% endif %}
+                                            <small class="text-muted">{{ message.timestamp|date:"M d, Y H:i" }}</small>
+                                        </div>
+                                        <div class="message-content p-3 rounded">
+                                            {% if message.message_type == 'code' %}
+                                            <div class="r-code-container">
+                                                <div class="r-code-header">
+                                                    <span class="r-code-label">
+                                                        <i class="bi bi-code-slash"></i>
+                                                        R Code
+                                                    </span>
+                                                    <button class="btn btn-sm btn-outline-primary r-run-button"
+                                                            data-message-id="{{ message.id }}"
+                                                            disabled>
+                                                        <i class="bi bi-hourglass-split"></i> Initializing...
+                                                    </button>
+                                                </div>
+                                                <pre><code class="language-r">{{ message.content }}</code></pre>
+                                                <div class="r-execution-output" id="r-output-{{ message.id }}"></div>
+                                            </div>
+                                            {% elif message.message_type == 'code_execution' %}
+                                            <pre><code class="output">{{ message.content }}</code></pre>
+                                            {% else %}
+                                            <zero-md src="data:text/markdown;charset=utf-8,{{ message.content|urlencode }}">
+                                                <template data-append>
+                                                    <style>.markdown-body { background-color: transparent !important; color: inherit; }</style>
+                                                </template>
+                                            </zero-md>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endwith %}
+                                {% elif item.type == 'paste_event' %}
+                                    {% with paste_event=item.data %}
+                                    <div class="paste-event-container mb-3" style="border: 1px solid rgba(239,68,68,0.5); border-radius: 10px; overflow: hidden;">
+                                        <div class="paste-event-header p-2" style="background: var(--t-red-soft); color: var(--t-red);">
+                                            <strong>PASTE DETECTED</strong>
+                                            <span class="float-end">
+                                                {{ paste_event.timestamp|date:"M d, Y H:i" }} |
+                                                {{ paste_event.word_count }} words ({{ paste_event.content_length }} chars)
+                                            </span>
+                                        </div>
+                                        <div class="paste-event-content p-3" style="background: var(--t-surface-2);">
+                                            <details>
+                                                <summary style="cursor: pointer; color: var(--t-red); font-weight: 600;">Click to view pasted content</summary>
+                                                <pre style="white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; margin-top: 8px; padding: 8px; background: var(--t-surface); border: 1px solid var(--t-border); border-radius: 6px; color: var(--t-text);">{{ paste_event.pasted_content }}</pre>
+                                            </details>
+                                        </div>
+                                    </div>
+                                    {% endwith %}
+                                {% elif item.type == 'rapid_text_growth_event' %}
+                                    {% with rapid_text_growth_event=item.data %}
+                                    <div class="rapid-text-growth-event-container mb-3" style="border: 1px solid rgba(245,158,11,0.5); border-radius: 10px; overflow: hidden;">
+                                        <div class="rapid-text-growth-event-header p-2" style="background: var(--t-amber-soft); color: var(--t-amber);">
+                                            <strong>RAPID TEXT GROWTH DETECTED</strong>
+                                            <span class="float-end">
+                                                {{ rapid_text_growth_event.timestamp|date:"M d, Y H:i" }} |
+                                                {{ rapid_text_growth_event.added_text|length }} chars
+                                            </span>
+                                        </div>
+                                        <div class="rapid-text-growth-event-content p-3" style="background: var(--t-surface-2);">
+                                            <details>
+                                                <summary style="cursor: pointer; color: var(--t-amber); font-weight: 600;">Click to view added text</summary>
+                                                <pre style="white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; margin-top: 8px; padding: 8px; background: var(--t-surface); border: 1px solid var(--t-border); border-radius: 6px; color: var(--t-text);">{{ rapid_text_growth_event.added_text }}</pre>
+                                            </details>
+                                        </div>
+                                    </div>
+                                    {% endwith %}
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-info" style="margin: 0;">No messages in this conversation yet.</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Message composer — only if this is the teacher's own conversation #}
+                {% if user.id == conversation_data.user_id %}
+                <div style="border-top: 1px solid var(--t-border); padding: 18px 24px; background: var(--t-surface-2);">
+                    <form method="post" action="{% url 'conversations:send_message' conversation_id=conversation_data.id %}" id="message-form">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="content" style="display:block;font-size:12px;color:var(--t-text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Your message</label>
+                            <textarea class="form-control" id="content" name="content" rows="3" required placeholder="Type a message, an explanation, or paste R code…"></textarea>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3" style="gap: 14px; flex-wrap: wrap;">
+                            <div class="message-type-selector">
+                                <div class="btn-group" role="group" aria-label="Message type selection">
+                                    <input type="radio" class="btn-check" name="message_type" id="message_type_student" value="student" checked>
+                                    <label class="btn btn-outline-primary" for="message_type_student">
+                                        <i class="bi bi-chat-text"></i> Chat Message
+                                    </label>
+                                    <input type="radio" class="btn-check" name="message_type" id="message_type_code" value="code">
+                                    <label class="btn btn-outline-success" for="message_type_code">
+                                        <i class="bi bi-code-slash"></i> R Code
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-t btn-t-primary">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+                                Send Message
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                {% elif conversation_data.is_teacher_test %}
+                <div style="padding: 14px 24px; border-top: 1px solid var(--t-border); color: var(--t-text-mute); font-size: 13.5px;">
+                    You are viewing this conversation as a teacher and cannot send messages.
+                </div>
+                {% else %}
+                <div style="padding: 14px 24px; border-top: 1px solid var(--t-border); color: var(--t-text-mute); font-size: 13.5px;">
+                    Conversation review is read-only.
+                </div>
+                {% endif %}
+            </section>
+
+            {# Teacher feedback — saved entries and submission form #}
+            {% if teacher_feedback_list or can_submit_feedback %}
+            <section class="teacher-card" style="margin-bottom: 18px;">
+                <div class="card-eyebrow">Teacher Feedback</div>
+                <h3 class="card-title" style="margin: 0 0 12px;">Feedback on this conversation</h3>
+
+                {% if teacher_feedback_list %}
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
+                    {% for fb in teacher_feedback_list %}
+                    <div style="padding: 12px 14px; background: var(--t-surface-2); border: 1px solid var(--t-border); border-radius: 10px;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
+                            <span style="font-size: 13px; color: var(--t-text); font-weight: 500;">{{ fb.teacher.username }}</span>
+                            <span class="teacher-status
+                                {% if fb.feedback_type == 'good_work' %}green
+                                {% elif fb.feedback_type == 'needs_revision' %}amber
+                                {% elif fb.feedback_type == 'clarify_reasoning' %}blue
+                                {% else %}mute{% endif %}">
+                                <span class="dot"></span>{{ fb.get_feedback_type_display }}
+                            </span>
+                            <span style="font-size: 11.5px; color: var(--t-text-mute); margin-left: auto;">{{ fb.updated_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <p style="margin: 0; white-space: pre-wrap; color: var(--t-text); font-size: 13.5px; line-height: 1.6;">{{ fb.feedback }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if can_submit_feedback %}
+                <form method="post" action="{% url 'conversations:submit_feedback' conversation_id=conversation_data.id %}">
+                    {% csrf_token %}
+                    <div style="display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px; align-items: start;">
+                        <div>
+                            <label for="{{ feedback_form.feedback_type.id_for_label }}" style="display:block;font-size:11px;color:var(--t-text-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Feedback type</label>
+                            {{ feedback_form.feedback_type }}
+                        </div>
+                        <div>
+                            <label for="{{ feedback_form.feedback.id_for_label }}" style="display:block;font-size:11px;color:var(--t-text-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Feedback</label>
+                            {{ feedback_form.feedback }}
+                            {% if feedback_form.feedback.errors %}
+                            <div style="color: var(--t-red); font-size: 12px; margin-top: 4px;">{{ feedback_form.feedback.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 14px;">
+                        <button type="submit" class="btn-t btn-t-primary">
+                            {% if my_feedback %}Update Feedback{% else %}Save Feedback{% endif %}
+                        </button>
+                    </div>
+                </form>
+                {% endif %}
+            </section>
+            {% endif %}
+
+            {% if conversation_data.homework_id %}
+            <div>
+                <a href="{% url 'homeworks:section_detail' homework_id=conversation_data.homework_id section_id=conversation_data.section_id %}" class="btn-t">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    Back to section
+                </a>
+            </div>
+            {% else %}
+            <div>
+                <a href="{% url 'homeworks:list' %}" class="btn-t">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    Back to homework
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+{% else %}
+{% comment %}TA / fallback branch — original markup{% endcomment %}
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-10 offset-md-1">
@@ -61,7 +533,7 @@
                         <strong>{{ conversation_data.paste_events|length }} paste event{{ conversation_data.paste_events|length|pluralize }} detected</strong> in this conversation (shown inline below).
                     </div>
                     {% endif %}
-                    
+
                     <!-- Messages container -->
                     <div class="conversation-container">
                         {% if timeline %}
@@ -164,7 +636,7 @@
                             </div>
                         {% endif %}
                     </div>
-                    
+
                     <!-- Message input form -->
                     {% if user.id == conversation_data.user_id %}
                     <div class="mt-4">
@@ -184,7 +656,7 @@
                                                 <label class="btn btn-outline-primary" for="message_type_student">
                                                     <i class="bi bi-chat-text"></i> Chat Message
                                                 </label>
-                                                
+
                                                 <input type="radio" class="btn-check" name="message_type" id="message_type_code" value="code">
                                                 <label class="btn btn-outline-success" for="message_type_code">
                                                     <i class="bi bi-code-slash"></i> R Code
@@ -201,13 +673,13 @@
                     </div>
                     {% elif conversation_data.is_teacher_test %}
                     <div class="alert alert-info mt-4">
-                        <i class="fas fa-info-circle"></i> 
+                        <i class="fas fa-info-circle"></i>
                         You are viewing this conversation as a teacher and cannot send messages.
                     </div>
                     {% endif %}
                 </div>
             </div>
-            
+
             <!-- Back button -->
             {% if conversation_data.homework_id %}
             <div class="mt-3">
@@ -225,6 +697,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Configuration for JavaScript modules -->
 <script>

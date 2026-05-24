@@ -1,65 +1,198 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Welcome to LLTeacher{% endblock %}
 
 {% block content %}
+{% if not user.is_authenticated %}
+<div class="auth-shell">
+    <header class="auth-topbar">
+        <a href="{% url 'homepage' %}" class="brand">
+            <span class="brand-mark">LL</span>
+            <span class="brand-text">
+                <span class="brand-name">LLTeacher</span>
+                <span class="brand-sub">Interactive homework with AI-guided reasoning.</span>
+            </span>
+        </a>
+        <div class="auth-topbar-links">
+            <a href="{% url 'accounts:login' %}">Log in</a>
+            <a href="{% url 'accounts:register' %}" class="primary">Create account</a>
+        </div>
+    </header>
+
+    <main class="auth-main">
+        <div class="auth-content">
+            <section class="auth-hero">
+                <div class="eyebrow">LLTeacher</div>
+                <h1>Show your reasoning. Get real feedback.</h1>
+                <p>
+                    LLTeacher is a homework platform built around explaining your work.
+                    Submit answers with the reasoning behind them and get focused
+                    feedback from an AI tutor that helps you think — not one that gives away the answer.
+                </p>
+                <ul class="auth-feature-list">
+                    <li>
+                        <span class="feature-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+                        </span>
+                        Work through problems with structured reasoning prompts.
+                    </li>
+                    <li>
+                        <span class="feature-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg>
+                        </span>
+                        Discuss your explanation with an AI tutor before submitting.
+                    </li>
+                    <li>
+                        <span class="feature-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/></svg>
+                        </span>
+                        Teachers see real progress and where students get stuck.
+                    </li>
+                </ul>
+            </section>
+
+            <section class="auth-card">
+                <h2>Sign in</h2>
+                <p class="auth-tag">Continue with your school account.</p>
+                <form method="post" action="{% url 'accounts:login' %}">
+                    {% csrf_token %}
+
+                    <div class="field">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+
+                    <div class="field">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+
+                    <input type="hidden" name="next" value="/">
+
+                    <button type="submit" class="btn-primary">Login</button>
+                </form>
+
+                <div class="auth-foot">
+                    Don't have an account?
+                    <a href="{% url 'accounts:register' %}">Create Account</a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="auth-footer">
+        © 2025 LLTeacher · Supported by ASA SSDSE Member Initiative Grant ·
+        <a href="https://github.com/RedBeardLab/2llteacher" target="_blank" rel="noopener noreferrer">Open source on GitHub</a>
+    </footer>
+</div>
+
+{% elif user.teacher_profile %}
+{% comment %}TEACHER landed on / — render the teacher app shell{% endcomment %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="home" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <span class="crumb-now">Home</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Instructor</div>
+                    <h1 class="page-title">Welcome back, {{ user.username }}</h1>
+                    <p class="page-sub">Manage homework, review submissions, and monitor course progress.</p>
+                </div>
+                <div class="hero-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a href="{% url 'homeworks:list' %}" class="btn-t btn-t-primary">View Homework</a>
+                    <a href="{% url 'courses:list' %}" class="btn-t">View Courses</a>
+                    <a href="{% url 'accounts:profile' %}" class="btn-t">My Profile</a>
+                </div>
+            </header>
+
+            <div class="stat-grid stagger">
+                <a href="{% url 'homeworks:list' %}" class="stat-card t-nav-card">
+                    <div class="stat-label">Homework</div>
+                    <div class="nav-action">Manage assignments</div>
+                    <div class="stat-sub">Create, review, and edit</div>
+                </a>
+                <a href="{% url 'courses:list' %}" class="stat-card t-nav-card">
+                    <div class="stat-label">Courses</div>
+                    <div class="nav-action">View your courses</div>
+                    <div class="stat-sub">Roster, TAs, and matrix</div>
+                </a>
+                <a href="{% url 'accounts:profile' %}" class="stat-card t-nav-card">
+                    <div class="stat-label">Profile</div>
+                    <div class="nav-action">Account settings</div>
+                    <div class="stat-sub">Update your details</div>
+                </a>
+                <div class="stat-card">
+                    <div class="stat-label">Signed in as</div>
+                    <div class="stat-value" style="font-size: 16px;">@{{ user.username }}</div>
+                    <div class="stat-sub">Instructor account</div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+{% elif user.student_profile %}
+{% comment %}STUDENT landed on / — render the student app shell{% endcomment %}
+<div class="student-shell">
+    {% include "student/_sidebar.html" with active="home" %}
+
+    <main class="student-main">
+        <header class="student-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <span class="crumb-now">Home</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="student-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Student</div>
+                    <h1 class="page-title">Welcome back, {{ user.username }}</h1>
+                    <p class="page-sub">Continue your homework and review teacher feedback.</p>
+                </div>
+                <div class="hero-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a href="{% url 'homeworks:list' %}" class="btn-s btn-s-primary">View Homework</a>
+                    <a href="{% url 'courses:list' %}" class="btn-s">View Courses</a>
+                    <a href="{% url 'accounts:profile' %}" class="btn-s">My Profile</a>
+                </div>
+            </header>
+        </div>
+    </main>
+</div>
+
+{% else %}
+{% comment %}Authenticated but no teacher/student profile (e.g. TA, admin) — keep a minimal welcome{% endcomment %}
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
             <div class="text-center mb-4">
-                <h1 class="display-4 mb-3">Welcome to LLTeacher</h1>
-                <p class="lead text-muted">A next-generation teaching platform powered by AI to enhance learning experiences.</p>
+                <h1 class="mb-3">Welcome to LLTeacher</h1>
             </div>
-            
-            {% if not user.is_authenticated %}
-            <!-- Login Form -->
             <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0 text-center">Login to Get Started</h4>
-                </div>
-                <div class="card-body">
-                    <form method="post" action="{% url 'accounts:login' %}">
-                        {% csrf_token %}
-                        
-                        <div class="mb-3">
-                            <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" id="username" name="username" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
-                        </div>
-                        
-                        <input type="hidden" name="next" value="/">
-                        
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">Login</button>
-                        </div>
-                    </form>
-                </div>
-                <div class="card-footer bg-light text-center">
-                    <p class="mb-2">Don't have an account?</p>
-                    <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary">Create Account</a>
-                </div>
-            </div>
-            {% else %}
-            <!-- Welcome Back Message -->
-            <div class="card shadow">
-                <div class="card-header bg-success text-white">
-                    <h4 class="mb-0 text-center">Welcome Back!</h4>
-                </div>
                 <div class="card-body text-center">
                     <p class="card-text fs-5">Hello, <strong>{{ user.username }}</strong>!</p>
-                    <p class="card-text text-muted">Ready to continue your teaching journey?</p>
                     <div class="d-grid gap-2 col-8 mx-auto">
-                        <a href="{% url 'homeworks:list' %}" class="btn btn-success btn-lg">View Homework</a>
-                        <a href="{% url 'accounts:profile' %}" class="btn btn-outline-success">My Profile</a>
+                        <a href="{% url 'homeworks:list' %}" class="btn btn-primary btn-lg">View Homework</a>
+                        <a href="{% url 'accounts:profile' %}" class="btn btn-outline-primary">My Profile</a>
                     </div>
                 </div>
             </div>
-            {% endif %}
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

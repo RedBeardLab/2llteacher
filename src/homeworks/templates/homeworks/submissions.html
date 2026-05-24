@@ -3,297 +3,267 @@
 {% block title %}{{ data.homework_title }} - Submissions{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <!-- Homework Header -->
-    <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <h1>{{ data.homework_title }} - Submissions</h1>
-            <p class="text-muted">Due: {{ data.homework_due_date|date:"F d, Y" }} | {{ data.total_sections }} sections</p>
-        </div>
-        <div class="text-end">
-            <a href="{% url 'homeworks:detail' data.homework_id %}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back to Homework
-            </a>
-        </div>
-    </div>
+{% if request.user.teacher_profile %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="homework" %}
 
-    <!-- Alert for non-participating students -->
-    {% if data.inactive_students > 0 %}
-    <div class="alert alert-warning mb-4">
-        <h5><i class="bi bi-exclamation-triangle"></i> {{ data.inactive_students }} Student(s) Not Participating</h5>
-        <p class="mb-0">{{ data.inactive_students }} out of {{ data.total_students }} students have not started this homework.</p>
-    </div>
-    {% endif %}
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:detail' data.homework_id %}">{{ data.homework_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <span class="crumb-now">Submissions</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
 
-    <!-- Summary Statistics -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="mb-1">{{ data.total_students }}</h5>
-                    <small class="text-muted">Total Students</small>
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Submissions</div>
+                    <h1 class="page-title">{{ data.homework_title }}</h1>
+                    <p class="page-sub">
+                        Due {{ data.homework_due_date|date:"F d, Y" }} · {{ data.total_sections }} section{{ data.total_sections|pluralize }}.
+                        Review each student's progress, conversations, and answers.
+                    </p>
+                </div>
+                <div class="hero-actions">
+                    <a href="{% url 'homeworks:detail' data.homework_id %}" class="btn-t btn-t-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        Back to homework
+                    </a>
+                </div>
+            </header>
+
+            {% if data.inactive_students > 0 %}
+            <div class="alert alert-warning" style="margin-bottom: 22px;">
+                <strong>{{ data.inactive_students }} Student(s) Not Participating</strong>
+                — {{ data.inactive_students }} out of {{ data.total_students }} students have not started this homework.
+            </div>
+            {% endif %}
+
+            <div class="stat-grid stagger">
+                <div class="stat-card">
+                    <div class="stat-label">Total students</div>
+                    <div class="stat-value">{{ data.total_students }}</div>
+                    <div class="stat-sub">Enrolled in this course</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Participating</div>
+                    <div class="stat-value green">{{ data.active_students }}</div>
+                    <div class="stat-sub">Started or submitted</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Not started</div>
+                    <div class="stat-value amber">{{ data.inactive_students }}</div>
+                    <div class="stat-sub">No interaction yet</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Submissions</div>
+                    <div class="stat-value blue">{{ data.total_submissions }}</div>
+                    <div class="stat-sub">Across all students</div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="text-success mb-1">{{ data.active_students }}</h5>
-                    <small class="text-muted">Participating</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="text-warning mb-1">{{ data.inactive_students }}</h5>
-                    <small class="text-muted">Not Started</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="text-info mb-1">{{ data.total_submissions }}</h5>
-                    <small class="text-muted">Submissions</small>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Filter Options -->
-    <div class="mb-3">
-        <div class="btn-group" role="group" aria-label="Filter students">
-            <input type="radio" class="btn-check" name="filter" id="filter-all" autocomplete="off" checked>
-            <label class="btn btn-outline-primary" for="filter-all">All Students</label>
+            <section class="teacher-card" style="padding: 14px 16px; margin-bottom: 22px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                    <span style="font-size: 11px; color: var(--t-text-mute); text-transform: uppercase; letter-spacing: 0.12em; margin-right: 4px;">Filter</span>
+                    <div class="btn-group" role="group" aria-label="Filter students">
+                        <input type="radio" class="btn-check" name="filter" id="filter-all" autocomplete="off" checked>
+                        <label class="btn-t btn-t-sm" for="filter-all" style="margin-right: 6px;">All students</label>
 
-            <input type="radio" class="btn-check" name="filter" id="filter-no-interaction" autocomplete="off">
-            <label class="btn btn-outline-warning" for="filter-no-interaction">No Interaction Only</label>
+                        <input type="radio" class="btn-check" name="filter" id="filter-no-interaction" autocomplete="off">
+                        <label class="btn-t btn-t-sm btn-t-warning" for="filter-no-interaction" style="margin-right: 6px;">No interaction</label>
 
-            <input type="radio" class="btn-check" name="filter" id="filter-active" autocomplete="off">
-            <label class="btn btn-outline-success" for="filter-active">Active Only</label>
-        </div>
-    </div>
-
-    <!-- Student Cards -->
-    {% for student in data.students %}
-    <div id="student-{{ student.student_id }}" class="card mb-3 student-card {% if student.participation_status == 'no_interaction' %}border-warning no-interaction{% elif student.participation_status == 'active' %}active{% else %}partial{% endif %}" 
-         data-participation="{{ student.participation_status }}">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="mb-0">
-                    {{ student.student_name }} 
-                    <small class="text-muted">({{ student.student_username }})</small>
-                </h6>
-                <small class="text-muted">{{ student.student_email }}</small>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <!-- Participation Status Badge -->
-                {% if student.participation_status == 'no_interaction' %}
-                    <span class="badge bg-warning text-dark">
-                        <i class="bi bi-exclamation-triangle"></i> No Interaction
-                    </span>
-                {% elif student.participation_status == 'partial' %}
-                    <span class="badge bg-info">
-                        <i class="bi bi-clock"></i> Partial Progress
-                    </span>
-                {% else %}
-                    <span class="badge bg-success">
-                        <i class="bi bi-check-circle"></i> Active
-                    </span>
-                {% endif %}
-
-                <!-- Quick Stats -->
-                <small class="text-muted">
-                    {% if student.has_interactions %}
-                        {{ student.total_conversations }} conv. | {{ student.submitted_count }} submitted
-                    {% endif %}
-                </small>
-            </div>
-        </div>
-        
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-3 mb-3">
-                    <div class="d-flex flex-column gap-1">
-                        <small class="text-muted">Sections Started:</small>
-                        <span class="fw-bold">{{ student.sections_started }} / {{ data.total_sections }}</span>
-
-                        {% if student.missing_sections > 0 %}
-                        <small class="text-danger mt-1">Missing Sections:</small>
-                        <span class="fw-bold text-danger">{{ student.missing_sections }}</span>
-                        {% endif %}
-
-                        {% if student.has_interactions %}
-                        <small class="text-muted mt-2">Last Activity:</small>
-                        <span class="fw-bold">{{ student.last_activity|date:"M d, Y H:i" }}</span>
-                        {% endif %}
+                        <input type="radio" class="btn-check" name="filter" id="filter-active" autocomplete="off">
+                        <label class="btn-t btn-t-sm btn-t-info" for="filter-active">Active only</label>
                     </div>
                 </div>
-                <div class="col-md-9">
-                    <h6 class="mb-2">Section Progress (ordered by section number):</h6>
+            </section>
 
-                    <!-- Widget Progress -->
-                    {% if student.widget_progress %}
-                    <div class="widget-block mb-3 p-3 border rounded bg-light">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0">
-                                <i class="bi bi-clipboard-check"></i> Assessments
-                            </h6>
+            {% for student in data.students %}
+            <article id="student-{{ student.student_id }}"
+                     class="teacher-card student-card stagger
+                            {% if student.participation_status == 'no_interaction' %}no-interaction{% elif student.participation_status == 'active' %}active{% else %}partial{% endif %}"
+                     data-participation="{{ student.participation_status }}"
+                     style="margin-bottom: 14px; padding: 0;">
+                <header style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--t-border); flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                        <div style="width: 38px; height: 38px; border-radius: 9px; background: linear-gradient(135deg,#2a3142,#444c63); color: var(--t-text); display: grid; place-items: center; font-weight: 600; font-size: 13px; flex-shrink: 0;">
+                            {{ student.student_username|slice:":2"|upper }}
                         </div>
-                        <div class="row">
-                            {% for widget in student.widget_progress %}
-                            <div class="col-md-6 mb-2">
-                                <div class="p-2 bg-white border rounded">
-                                    <div class="small text-muted mb-1">{{ widget.pre_prompt|truncatechars:30 }}</div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="fw-bold">{{ widget.pre_value }}</span>
-                                        <span>→</span>
-                                        <span class="fw-bold">{% if widget.post_value is not null %}{{ widget.post_value }}{% else %}-{% endif %}</span>
+                        <div style="min-width: 0;">
+                            <div style="font-size: 15px; font-weight: 500; color: var(--t-text);">
+                                {{ student.student_name }} <span style="color: var(--t-text-mute); font-weight: 400;">· {{ student.student_username }}</span>
+                            </div>
+                            <div style="font-size: 12px; color: var(--t-text-mute); margin-top: 2px;">{{ student.student_email }}</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        {% if student.participation_status == 'no_interaction' %}
+                            <span class="teacher-status amber"><span class="dot"></span>No Interaction</span>
+                        {% elif student.participation_status == 'partial' %}
+                            <span class="teacher-status blue"><span class="dot"></span>Partial Progress</span>
+                        {% else %}
+                            <span class="teacher-status green"><span class="dot"></span>Active</span>
+                        {% endif %}
+                        {% if student.has_interactions %}
+                        <span style="font-size: 12px; color: var(--t-text-mute);">
+                            {{ student.total_conversations }} conv. · {{ student.submitted_count }} submitted
+                        </span>
+                        {% endif %}
+                    </div>
+                </header>
+
+                <div style="padding: 18px 20px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px;">
+                    <aside style="display: flex; flex-direction: column; gap: 10px;">
+                        <div>
+                            <div style="font-size: 11px; color: var(--t-text-mute); text-transform: uppercase; letter-spacing: 0.1em;">Sections started</div>
+                            <div style="font-size: 22px; font-family: ui-monospace, Menlo, monospace; color: var(--t-text);">
+                                {{ student.sections_started }}<span style="color: var(--t-text-mute); font-size: 14px;"> / {{ data.total_sections }}</span>
+                            </div>
+                        </div>
+                        {% if student.missing_sections > 0 %}
+                        <div>
+                            <div style="font-size: 11px; color: var(--t-text-mute); text-transform: uppercase; letter-spacing: 0.1em;">Missing</div>
+                            <div style="font-size: 18px; font-weight: 500; color: var(--t-red);">{{ student.missing_sections }}</div>
+                        </div>
+                        {% endif %}
+                        {% if student.has_interactions %}
+                        <div>
+                            <div style="font-size: 11px; color: var(--t-text-mute); text-transform: uppercase; letter-spacing: 0.1em;">Last activity</div>
+                            <div style="font-size: 13px; color: var(--t-text-dim);">{{ student.last_activity|date:"M d, Y H:i" }}</div>
+                        </div>
+                        {% endif %}
+                    </aside>
+
+                    <div>
+                        {% if student.widget_progress %}
+                        <div style="background: var(--t-surface-2); border: 1px solid var(--t-border); border-radius: 10px; padding: 14px; margin-bottom: 14px;">
+                            <div class="card-eyebrow" style="margin-bottom: 10px;">Assessments</div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+                                {% for widget in student.widget_progress %}
+                                <div style="background: var(--t-surface); border: 1px solid var(--t-border); border-radius: 8px; padding: 10px 12px;">
+                                    <div style="font-size: 11px; color: var(--t-text-mute); margin-bottom: 6px;">{{ widget.pre_prompt|truncatechars:32 }}</div>
+                                    <div style="display: flex; align-items: center; gap: 8px; font-family: ui-monospace, Menlo, monospace;">
+                                        <span style="font-size: 15px; color: var(--t-text);">{{ widget.pre_value }}</span>
+                                        <span style="color: var(--t-text-mute);">→</span>
+                                        <span style="font-size: 15px; color: var(--t-text);">{% if widget.post_value is not null %}{{ widget.post_value }}{% else %}—{% endif %}</span>
                                         {% if widget.difference is not null %}
-                                        <span class="badge {% if widget.difference > 0 %}bg-success{% elif widget.difference < 0 %}bg-danger{% else %}bg-secondary{% endif %}">
-                                            {{ widget.difference }}
+                                        <span class="teacher-status {% if widget.difference > 0 %}green{% elif widget.difference < 0 %}red{% else %}mute{% endif %}" style="margin-left: auto;">
+                                            <span class="dot"></span>{{ widget.difference }}
                                         </span>
                                         {% endif %}
                                     </div>
                                 </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div style="font-size: 11px; color: var(--t-text-mute); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px;">Section progress</div>
+                        <div class="section-progress-list" style="display: flex; flex-direction: column; gap: 10px;">
+                            {% for section_status in student.section_statuses %}
+                            <div class="section-block" style="background: var(--t-surface-2); border: 1px solid {% if section_status.is_missing %}rgba(239,68,68,0.35){% else %}var(--t-border){% endif %}; border-radius: 10px; padding: 12px 14px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; flex-wrap: wrap;">
+                                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                                        <span style="font-size: 14px; color: var(--t-text); font-weight: 500;">Section {{ section_status.section_order }}: {{ section_status.section_title }}</span>
+                                        {% if section_status.is_missing %}
+                                            <span class="teacher-status red"><span class="dot"></span>Missing</span>
+                                        {% elif section_status.section_type == 'non_interactive' %}
+                                            <span class="teacher-status green"><span class="dot"></span>{{ section_status.answer_count }} Answer{{ section_status.answer_count|pluralize }}</span>
+                                        {% elif section_status.submission_count > 0 %}
+                                            <span class="teacher-status green"><span class="dot"></span>{{ section_status.submission_count }} Submitted</span>
+                                        {% else %}
+                                            <span class="teacher-status blue"><span class="dot"></span>In progress</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if section_status.latest_conversation_date %}
+                                    <span style="font-size: 12px; color: var(--t-text-mute);">Latest {{ section_status.latest_conversation_date|date:"M d, H:i" }}</span>
+                                    {% elif section_status.latest_answer_date %}
+                                    <span style="font-size: 12px; color: var(--t-text-mute);">Latest {{ section_status.latest_answer_date|date:"M d, H:i" }}</span>
+                                    {% endif %}
+                                </div>
+
+                                {% if section_status.is_missing %}
+                                <div style="font-size: 13px; color: var(--t-text-mute); font-style: italic; padding: 4px 0;">
+                                    {% if section_status.section_type == 'non_interactive' %}
+                                    Student has not answered this section.
+                                    {% else %}
+                                    Student has not started this section.
+                                    {% endif %}
+                                </div>
+                                {% elif section_status.section_type == 'non_interactive' %}
+                                <div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; background: var(--t-surface); border: 1px solid var(--t-border); border-radius: 8px;">
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="font-size: 11px; color: var(--t-text-mute); margin-bottom: 4px;">Latest answer</div>
+                                        <p style="margin: 0; white-space: pre-wrap; color: var(--t-text); font-size: 13.5px;">{{ section_status.latest_answer }}</p>
+                                    </div>
+                                    <a href="{% url 'conversations:section_answers' section_status.section_id student.student_id %}" class="btn-t btn-t-sm">
+                                        View all ({{ section_status.answer_count }})
+                                    </a>
+                                </div>
+                                {% else %}
+                                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+                                    {% for conversation in section_status.conversations %}
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--t-surface); border: 1px solid var(--t-border); border-radius: 8px; {% if conversation.is_deleted %}opacity: 0.7;{% endif %}">
+                                        <div style="min-width: 0;">
+                                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                                <span style="font-size: 13.5px; color: var(--t-text); font-weight: 500;">Conversation {{ forloop.counter }}</span>
+                                                {% if conversation.is_deleted %}
+                                                <span class="teacher-status mute"><span class="dot"></span>Deleted</span>
+                                                {% endif %}
+                                                {% if conversation.is_submitted %}
+                                                <span class="teacher-status green"><span class="dot"></span>Submitted</span>
+                                                {% endif %}
+                                                {% if conversation.paste_event_count > 0 %}
+                                                <span class="teacher-status red"><span class="dot"></span>{{ conversation.paste_event_count }} paste{{ conversation.paste_event_count|pluralize }}</span>
+                                                {% endif %}
+                                            </div>
+                                            <div style="font-size: 11.5px; color: var(--t-text-mute); margin-top: 3px;">
+                                                Created {{ conversation.created_at|date:"M d, H:i" }} ·
+                                                Updated {{ conversation.updated_at|date:"M d, H:i" }} ·
+                                                {{ conversation.message_count }} message{{ conversation.message_count|pluralize }}
+                                                {% if conversation.submission_date %} · Submitted {{ conversation.submission_date|date:"M d, H:i" }}{% endif %}
+                                            </div>
+                                        </div>
+                                        <a href="{% url 'conversations:detail' conversation.conversation_id %}" class="btn-t btn-t-sm btn-t-info">View</a>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
                             {% endfor %}
                         </div>
                     </div>
-                    {% endif %}
-
-                    <div class="section-progress-list">
-                        {% for section_status in student.section_statuses %}
-                        <div class="section-block mb-3 p-3 border rounded 
-                                    {% if section_status.is_missing %}border-danger bg-light-danger{% else %}border-success{% endif %}">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0">
-                                    Section {{ section_status.section_order }}: {{ section_status.section_title }}
-                                    {% if section_status.is_missing %}
-                                        <span class="badge bg-danger ms-2">
-                                            <i class="bi bi-exclamation-triangle"></i> Missing
-                                        </span>
-                                    {% elif section_status.section_type == 'non_interactive' %}
-                                        <span class="badge bg-success ms-2">
-                                            <i class="bi bi-pencil-square"></i> {{ section_status.answer_count }} Answer{{ section_status.answer_count|pluralize }}
-                                        </span>
-                                    {% elif section_status.submission_count > 0 %}
-                                        <span class="badge bg-success ms-2">
-                                            <i class="bi bi-check-circle"></i> {{ section_status.submission_count }} Submitted
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-info ms-2">
-                                            <i class="bi bi-clock"></i> In Progress
-                                        </span>
-                                    {% endif %}
-                                </h6>
-                                {% if section_status.latest_conversation_date %}
-                                <small class="text-muted">
-                                    Latest: {{ section_status.latest_conversation_date|date:"M d, Y H:i" }}
-                                </small>
-                                {% elif section_status.latest_answer_date %}
-                                <small class="text-muted">
-                                    Latest: {{ section_status.latest_answer_date|date:"M d, Y H:i" }}
-                                </small>
-                                {% endif %}
-                            </div>
-
-                            {% if section_status.is_missing %}
-                            <div class="text-center text-muted py-2">
-                                <i class="bi bi-exclamation-circle"></i>
-                                {% if section_status.section_type == 'non_interactive' %}
-                                <em>Student has not answered this section</em>
-                                {% else %}
-                                <em>Student has not started this section</em>
-                                {% endif %}
-                            </div>
-                            {% elif section_status.section_type == 'non_interactive' %}
-                            <div class="answers-in-section">
-                                <div class="d-flex justify-content-between align-items-start mt-2 p-2 bg-white border rounded">
-                                    <div class="flex-grow-1">
-                                        <div class="small text-muted mb-1">Latest answer:</div>
-                                        <p class="mb-0" style="white-space: pre-wrap;">{{ section_status.latest_answer }}</p>
-                                    </div>
-                                    <div class="flex-shrink-0 ms-3">
-                                        <a href="{% url 'conversations:section_answers' section_status.section_id student.student_id %}"
-                                           class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-eye"></i> View All ({{ section_status.answer_count }})
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            {% else %}
-                            <div class="conversations-in-section">
-                                <small class="text-muted">Conversations ({{ section_status.conversations|length }}):</small>
-                                {% for conversation in section_status.conversations %}
-                                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-white border rounded
-                                            {% if conversation.is_deleted %}bg-light{% endif %}">
-                                    <div class="flex-grow-1">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="fw-bold">Conversation {{ forloop.counter }}</span>
-                                            {% if conversation.is_deleted %}
-                                                <span class="badge bg-secondary">Deleted</span>
-                                            {% endif %}
-                                            {% if conversation.is_submitted %}
-                                                <span class="badge bg-success">
-                                                    <i class="bi bi-check-circle"></i> Submitted
-                                                </span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="small text-muted">
-                                            Created: {{ conversation.created_at|date:"M d, Y H:i" }} |
-                                            Updated: {{ conversation.updated_at|date:"M d, Y H:i" }} |
-                                            {{ conversation.message_count }} messages
-                                            {% if conversation.submission_date %}
-                                                | Submitted: {{ conversation.submission_date|date:"M d, Y H:i" }}
-                                            {% endif %}
-                                            {% if conversation.paste_event_count > 0 %}
-                                                | <span class="badge bg-danger">
-                                                    <i class="bi bi-exclamation-triangle-fill"></i> {{ conversation.paste_event_count }} Paste{{ conversation.paste_event_count|pluralize }} Detected
-                                                </span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <div class="flex-shrink-0">
-                                        <a href="{% url 'conversations:detail' conversation.conversation_id %}"
-                                           class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-eye"></i> View
-                                        </a>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
                 </div>
+            </article>
+            {% empty %}
+            <div class="alert alert-info">
+                <strong>No students found.</strong> There are no students in the system yet.
             </div>
+            {% endfor %}
         </div>
-    </div>
-    {% empty %}
-    <div class="alert alert-info">
-        <h5><i class="bi bi-info-circle"></i> No Students Found</h5>
-        <p class="mb-0">There are no students in the system yet.</p>
-    </div>
-    {% endfor %}
+    </main>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Filter functionality
     const filterButtons = document.querySelectorAll('input[name="filter"]');
     const studentCards = document.querySelectorAll('.student-card');
-    
+
     filterButtons.forEach(button => {
         button.addEventListener('change', function() {
             const filter = this.id.replace('filter-', '');
-            
+
             studentCards.forEach(card => {
                 const participation = card.dataset.participation;
                 let show = false;
-                
+
                 switch(filter) {
                     case 'all':
                         show = true;
@@ -305,8 +275,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         show = participation === 'active';
                         break;
                 }
-                
-                card.style.display = show ? 'block' : 'none';
+
+                card.style.display = show ? '' : 'none';
             });
         });
     });
@@ -314,50 +284,21 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-.student-card.no-interaction {
-    border-left: 4px solid #ffc107 !important;
-}
-
-.student-card.active {
-    border-left: 4px solid #198754 !important;
-}
-
-.student-card.partial {
-    border-left: 4px solid #0dcaf0 !important;
-}
-
-.section-progress-list {
-    max-height: 500px;
-    overflow-y: auto;
-}
-
-.bg-light-danger {
-    background-color: #f8d7da !important;
-}
-
-.section-block {
-    transition: all 0.2s ease;
-}
-
-.section-block:hover {
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.conversations-in-section {
-    border-top: 1px solid #dee2e6;
-    padding-top: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-@media (prefers-color-scheme: dark) {
-    .conversations-in-section {
-        border-top-color: #404040;
-    }
-
-    .bg-light-danger {
-        background-color: #4d1a1a !important;
-        color: #ff9999;
-    }
+body.teacher-mode .student-card.no-interaction { border-left: 3px solid var(--t-amber) !important; }
+body.teacher-mode .student-card.active         { border-left: 3px solid var(--t-green) !important; }
+body.teacher-mode .student-card.partial        { border-left: 3px solid var(--t-blue) !important; }
+body.teacher-mode .section-progress-list { max-height: 520px; overflow-y: auto; padding-right: 4px; }
+@media (max-width: 900px) {
+    body.teacher-mode .student-card > div { grid-template-columns: 1fr !important; }
 }
 </style>
+
+{% else %}
+{# Fallback for non-teacher access (kept simple; teacher_required normally gates this view) #}
+<div class="container mt-4">
+    <h1>{{ data.homework_title }} - Submissions</h1>
+    <p class="text-muted">Due: {{ data.homework_due_date|date:"F d, Y" }} | {{ data.total_sections }} sections</p>
+    <a href="{% url 'homeworks:detail' data.homework_id %}" class="btn btn-outline-secondary">Back to homework</a>
+</div>
+{% endif %}
 {% endblock %}

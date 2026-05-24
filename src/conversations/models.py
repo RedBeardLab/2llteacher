@@ -280,3 +280,80 @@ class HomeworkProgressWidgetResponse(models.Model):
         if self.post_value is not None and self.post_submitted_at is None:
             self.post_submitted_at = timezone.now()
         super().save(*args, **kwargs)
+
+
+class TeacherFeedback(models.Model):
+    """Teacher-authored feedback on a student's conversation/section.
+
+    Visible to the student who owns the conversation and to teachers/TAs of
+    the same course context. One feedback per (teacher, conversation) pair;
+    teachers can update their own feedback.
+    """
+
+    FEEDBACK_TYPE_GENERAL = "general"
+    FEEDBACK_TYPE_NEEDS_REVISION = "needs_revision"
+    FEEDBACK_TYPE_GOOD_WORK = "good_work"
+    FEEDBACK_TYPE_CLARIFY_REASONING = "clarify_reasoning"
+
+    FEEDBACK_TYPE_CHOICES = [
+        (FEEDBACK_TYPE_GENERAL, "General"),
+        (FEEDBACK_TYPE_NEEDS_REVISION, "Needs revision"),
+        (FEEDBACK_TYPE_GOOD_WORK, "Good work"),
+        (FEEDBACK_TYPE_CLARIFY_REASONING, "Clarify reasoning"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="authored_feedback",
+    )
+    student = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="received_feedback",
+    )
+    section = models.ForeignKey(
+        "homeworks.Section",
+        on_delete=models.CASCADE,
+        related_name="teacher_feedback",
+    )
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name="teacher_feedback",
+        null=True,
+        blank=True,
+    )
+    submission = models.ForeignKey(
+        Submission,
+        on_delete=models.SET_NULL,
+        related_name="teacher_feedback",
+        null=True,
+        blank=True,
+    )
+    feedback = models.TextField(validators=[MinLengthValidator(1)])
+    feedback_type = models.CharField(
+        max_length=32,
+        choices=FEEDBACK_TYPE_CHOICES,
+        default=FEEDBACK_TYPE_GENERAL,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "conversations_teacher_feedback"
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["teacher", "conversation"],
+                condition=models.Q(conversation__isnull=False),
+                name="uniq_teacher_feedback_per_conversation",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"Feedback by {self.teacher.username} for "
+            f"{self.student.username} on section {self.section_id}"
+        )

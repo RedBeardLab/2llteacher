@@ -1,13 +1,351 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Section {{ data.section_order }}: {{ data.section_title }}{% endblock %}
 
 {% block extra_js %}
 <!-- zero-md for markdown rendering with LaTeX support -->
 <script type="module" src="https://cdn.jsdelivr.net/npm/zero-md@3?register"></script>
+{% if 'student' in data.user_roles and 'teacher' not in data.user_roles %}
+<script src="{% static 'js/student-workspace.js' %}" defer></script>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% if 'student' in data.user_roles and 'teacher' not in data.user_roles %}
+{% comment %}STUDENT branch — dark modern workspace{% endcomment %}
+<div class="student-shell">
+    {% include "student/_sidebar.html" with active="homework" %}
+
+    <main class="student-main">
+        <header class="student-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:detail' data.homework_id %}">{{ data.homework_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <span class="crumb-now">Section {{ data.section_order }}</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="student-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Section {{ data.section_order }} · {{ data.homework_title }}</div>
+                    <h1 class="page-title">{{ data.section_title }}</h1>
+                    <p class="page-sub">
+                        Work through the problem, write your reasoning, and discuss with the AI tutor before submitting.
+                    </p>
+                </div>
+                <div class="hero-actions">
+                    {% if data.submission %}
+                    <span class="student-status green"><span class="dot"></span>Submitted</span>
+                    {% elif data.section_type == 'non_interactive' %}
+                    <span class="student-status blue"><span class="dot"></span>Open answer</span>
+                    {% else %}
+                    <span class="student-status amber"><span class="dot"></span>In progress</span>
+                    {% endif %}
+                </div>
+            </header>
+
+            <div class="workspace-grid">
+                <div>
+                    {# Problem prompt #}
+                    <section class="student-card" style="margin-bottom: 22px;">
+                        <div class="card-eyebrow">Problem</div>
+                        <div style="color: var(--s-text); line-height: 1.65;">
+                            <zero-md src="data:text/markdown;charset=utf-8,{{ data.section_content|urlencode }}">
+                                <template data-append>
+                                    <style>.markdown-body { background-color: transparent !important; color: inherit; }</style>
+                                </template>
+                            </zero-md>
+                        </div>
+                    </section>
+
+                    {# Reasoning workspace — interactive sections #}
+                    {% if data.section_type != 'non_interactive' %}
+                    <section class="student-workspace" data-student-workspace>
+                        <div class="ws-eyebrow">Your reasoning</div>
+                        <div class="ws-title">Explain how you got your answer</div>
+                        <p class="ws-sub">
+                            Before submitting, write a short explanation of how you worked through this section.
+                            Mention the steps, the formula or rule you used, and why your answer follows.
+                            Your reasoning helps the AI tutor give better feedback.
+                        </p>
+
+                        <label for="reasoning-input" class="visually-hidden">Your reasoning</label>
+                        <textarea id="reasoning-input" class="reasoning-textarea"
+                                  placeholder="Walk through your steps: what you did first, the formula or rule you applied, and why your conclusion follows…"></textarea>
+
+                        <div class="reasoning-meter" aria-hidden="true">
+                            <span>Explanation strength</span>
+                            <div class="meter-bar"><div class="meter-fill"></div></div>
+                        </div>
+                        <div class="reasoning-keywords" aria-hidden="true">
+                            <span class="reasoning-keyword">calculation</span>
+                            <span class="reasoning-keyword">formula</span>
+                            <span class="reasoning-keyword">step</span>
+                            <span class="reasoning-keyword">because</span>
+                            <span class="reasoning-keyword">conclusion</span>
+                        </div>
+
+                        <div class="reasoning-actions">
+                            <button type="button" class="btn-s btn-s-primary" data-check-reasoning>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+                                Check explanation
+                            </button>
+                            <a href="{% url 'conversations:start' section_id=data.section_id %}" class="btn-s btn-s-purple">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg>
+                                Discuss with AI tutor
+                            </a>
+                        </div>
+
+                        <div class="reasoning-feedback" hidden></div>
+                    </section>
+                    {% endif %}
+
+                    {# Non-interactive: existing answer form #}
+                    {% if data.section_type == 'non_interactive' %}
+                    <section class="student-card" style="margin-bottom: 22px;">
+                        <div class="card-eyebrow">Your answer</div>
+                        <h3 class="card-title" style="margin-bottom: 12px;">Submit your answer</h3>
+                        <form method="post" action="{% url 'conversations:answer_section' section_id=data.section_id %}">
+                            {% csrf_token %}
+                            <textarea name="answer" class="reasoning-textarea" rows="6" placeholder="Enter your answer here…" required></textarea>
+                            <div class="reasoning-actions">
+                                <button type="submit" class="btn-s btn-s-primary">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+                                    Submit answer
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+
+                    {% if data.existing_answers %}
+                    <section class="student-card" style="margin-bottom: 22px;">
+                        <div class="card-eyebrow">Previous answers</div>
+                        <h3 class="card-title" style="margin-bottom: 12px;">Your past submissions</h3>
+                        {% for ans in data.existing_answers %}
+                        <div style="padding: 12px 14px; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 10px; {% if not forloop.last %}margin-bottom: 8px;{% endif %}">
+                            <div style="font-size: 11px; color: var(--s-text-mute); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px;">
+                                {{ ans.submitted_at|date:"F d, Y H:i" }}
+                            </div>
+                            <p style="margin: 0; white-space: pre-wrap; color: var(--s-text);">{{ ans.answer }}</p>
+                        </div>
+                        {% endfor %}
+                    </section>
+                    {% endif %}
+                    {% endif %}
+
+                    {# Submission status — interactive sections #}
+                    {% if data.section_type != 'non_interactive' %}
+                    <section class="student-card" style="margin-bottom: 22px;">
+                        <div class="card-eyebrow">Submission</div>
+                        {% if data.submission %}
+                        <h3 class="card-title" style="margin-bottom: 8px; color: var(--s-green);">Submitted</h3>
+                        <p style="color: var(--s-text-dim); font-size: 13.5px; margin: 0;">
+                            You submitted this section on {{ data.submission.submitted_at|date:"F d, Y H:i" }}.
+                        </p>
+                        {% else %}
+                        <h3 class="card-title" style="margin-bottom: 8px;">Not submitted yet</h3>
+                        <p style="color: var(--s-text-dim); font-size: 13.5px; margin: 0 0 14px;">
+                            Once you've worked through your reasoning with the AI tutor, you can submit from the conversation page.
+                        </p>
+                        <a href="{% url 'conversations:start' section_id=data.section_id %}" class="btn-s btn-s-primary">
+                            Start a conversation
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+                        </a>
+                        {% endif %}
+                    </section>
+
+                    {# Existing conversations list #}
+                    {% if data.conversations %}
+                    <section class="student-card" style="margin-bottom: 22px;">
+                        <div class="card-eyebrow">Your conversations</div>
+                        <h3 class="card-title" style="margin-bottom: 12px;">Continue or review</h3>
+                        <div class="section-list">
+                            {% for conversation in data.conversations %}
+                            <a class="section-row" href="{% url 'conversations:detail' conversation.id %}">
+                                <span class="leading">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg>
+                                </span>
+                                <div class="name">
+                                    {{ conversation.label }}
+                                    <div class="small">{{ conversation.message_count }} message{{ conversation.message_count|pluralize }} · updated {{ conversation.updated_at|date:"M d, Y H:i" }}</div>
+                                </div>
+                                <span class="btn-s btn-s-sm">Open</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endif %}
+                    {% endif %}
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                        <a href="{% url 'homeworks:detail' data.homework_id %}" class="btn-s">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                            Back to homework
+                        </a>
+                    </div>
+                </div>
+
+                {# AI Tutor side panel — interactive sections only #}
+                {% if data.section_type != 'non_interactive' %}
+                <aside class="student-tutor-panel" data-student-tutor>
+                    <div class="tp-head">
+                        <div class="tp-avatar">AI</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div class="tp-title">AI Tutor</div>
+                            <div class="tp-sub">Hints, formula help, and reasoning feedback.</div>
+                        </div>
+                    </div>
+
+                    <div class="tp-quick">
+                        <button type="button" data-tutor-action="hint">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12c1 .8 2 2 2 3v1h4v-1c0-1 1-2.2 2-3a7 7 0 0 0-4-12z"/></svg>
+                            Give me a hint
+                        </button>
+                        <button type="button" data-tutor-action="check">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 5 5 9-11"/></svg>
+                            Check my reasoning
+                        </button>
+                        <button type="button" data-tutor-action="formula">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18"/><path d="M5 5v14h14V5"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+                            Explain formula
+                        </button>
+                        <button type="button" data-tutor-action="missing">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+                            What am I missing?
+                        </button>
+                    </div>
+
+                    <div class="tp-response" hidden>
+                        <div class="tp-tag">AI tutor</div>
+                        <div class="tp-text"></div>
+                    </div>
+
+                    <a href="{% url 'conversations:start' section_id=data.section_id %}" class="tp-link">
+                        Open full AI conversation →
+                    </a>
+                </aside>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</div>
+
+{% elif 'teacher' in data.user_roles %}
+{% comment %}TEACHER branch — dark modern instructor shell{% endcomment %}
+<div class="teacher-shell">
+    {% include "teacher/_sidebar.html" with active="homework" %}
+
+    <main class="teacher-main">
+        <header class="teacher-topbar">
+            <nav class="topbar-crumbs" aria-label="Breadcrumb">
+                <a href="{% url 'homeworks:list' %}">Homework</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <a href="{% url 'homeworks:detail' data.homework_id %}">{{ data.homework_title }}</a>
+                <span class="sep" aria-hidden="true">›</span>
+                <span class="crumb-now">Section {{ data.section_order }}</span>
+            </nav>
+            <div class="topbar-actions">
+                <div class="topbar-avatar" aria-hidden="true">{{ request.user.username|slice:":2"|upper }}</div>
+            </div>
+        </header>
+
+        <div class="teacher-content">
+            <header class="page-head">
+                <div>
+                    <div class="page-eyebrow">Section {{ data.section_order }} · {{ data.homework_title }}</div>
+                    <h1 class="page-title">{{ data.section_title }}</h1>
+                    <p class="page-sub">
+                        Review the prompt, the solution, and any student conversations for this section.
+                    </p>
+                </div>
+                <div class="hero-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <span class="teacher-status blue"><span class="dot"></span>Teaching</span>
+                    {% if data.section_type == 'non_interactive' %}
+                    <span class="teacher-status mute"><span class="dot"></span>Non-Interactive</span>
+                    {% else %}
+                    <span class="teacher-status purple"><span class="dot"></span>Interactive</span>
+                    {% endif %}
+                </div>
+            </header>
+
+            <section class="teacher-card stagger" style="margin-bottom: 22px;">
+                <div class="card-eyebrow">Prompt</div>
+                <div style="color: var(--t-text); line-height: 1.65; margin-top: 8px;">
+                    <zero-md src="data:text/markdown;charset=utf-8,{{ data.section_content|urlencode }}">
+                        <template data-append>
+                            <style>.markdown-body { background-color: transparent !important; color: inherit; }</style>
+                        </template>
+                    </zero-md>
+                </div>
+            </section>
+
+            {% if data.has_solution %}
+            <section class="teacher-card" style="margin-bottom: 22px; border-color: rgba(139,92,246,0.35); background: var(--t-purple-soft);">
+                <div class="card-eyebrow" style="color: var(--t-purple);">Solution · Teachers only</div>
+                <div style="color: var(--t-text); line-height: 1.65; margin-top: 8px;">
+                    <zero-md src="data:text/markdown;charset=utf-8,{{ data.solution_content|urlencode }}">
+                        <template data-append>
+                            <style>.markdown-body { background-color: transparent !important; color: inherit; }</style>
+                        </template>
+                    </zero-md>
+                </div>
+            </section>
+            {% endif %}
+
+            <section class="teacher-card" style="margin-bottom: 22px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <div>
+                        <div class="card-eyebrow">Conversations</div>
+                        <h3 class="card-title" style="margin: 0;">Student discussions on this section</h3>
+                    </div>
+                    <a href="{% url 'conversations:start' section_id=data.section_id %}" class="btn-t btn-t-sm btn-t-primary">New conversation</a>
+                </div>
+
+                {% if data.conversations %}
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    {% for conversation in data.conversations %}
+                    <a class="teacher-section-row" href="{% url 'conversations:detail' conversation.id %}" style="margin-bottom: 0;">
+                        <span class="leading">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg>
+                        </span>
+                        <div class="name">
+                            {{ conversation.label }}
+                            <div class="small">{{ conversation.message_count }} message{{ conversation.message_count|pluralize }} · updated {{ conversation.updated_at|date:"M d, Y H:i" }}</div>
+                        </div>
+                        {% if conversation.role == 'teacher' %}
+                        <span class="teacher-status blue"><span class="dot"></span>Teaching</span>
+                        {% elif conversation.role == 'student' %}
+                        <span class="teacher-status green"><span class="dot"></span>Student</span>
+                        {% elif conversation.role == 'teacher_assistant' %}
+                        <span class="teacher-status amber"><span class="dot"></span>TA</span>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color: var(--t-text-mute); margin: 12px 0 0;">No conversations started yet for this section.</p>
+                {% endif %}
+            </section>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <a href="{% url 'homeworks:detail' data.homework_id %}" class="btn-t">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    Back to homework
+                </a>
+            </div>
+        </div>
+    </main>
+</div>
+
+{% else %}
+{% comment %}TA / fallback branch — original markup{% endcomment %}
 <div class="container mt-4">
     {% if 'teacher_assistant' in data.user_roles and 'teacher' not in data.user_roles and 'student' not in data.user_roles %}
     <div class="alert alert-info mb-4">
@@ -83,7 +421,7 @@
             {% if data.conversations %}
             <div class="list-group">
                 {% for conversation in data.conversations %}
-                <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <a href="{% url 'conversations:detail' conversation.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="mb-1">
                             {{ conversation.label }}
@@ -116,70 +454,6 @@
     </div>
     {% endif %}
 
-    <!-- Submission Section (interactive sections, students only) -->
-    {% if 'student' in data.user_roles and data.section_type != 'non_interactive' %}
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h4 class="mb-0">Submission Status</h4>
-        </div>
-        <div class="card-body">
-            {% if data.submission %}
-            <div class="alert alert-success">
-                <i class="bi bi-check-circle-fill"></i>
-                <strong>Submitted!</strong> You submitted this section on {{ data.submission.submitted_at|date:"F d, Y H:i" }}
-            </div>
-            {% else %}
-            <div class="alert alert-warning">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-                <strong>Not submitted yet.</strong> Once you're done working on this section, please submit your work.
-            </div>
-            <div class="text-center mt-3">
-                <button class="btn btn-success" disabled>
-                    <i class="bi bi-check2-circle"></i> Submit Section
-                </button>
-                <small class="d-block text-muted mt-2">You need an active conversation to submit</small>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Answer Section (non-interactive sections, students only) -->
-    {% if 'student' in data.user_roles and data.section_type == 'non_interactive' %}
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h4 class="mb-0">Submit Your Answer</h4>
-        </div>
-        <div class="card-body">
-            <form method="post" action="{% url 'conversations:answer_section' section_id=data.section_id %}">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <textarea name="answer" class="form-control" rows="6" placeholder="Enter your answer here..." required></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-send"></i> Submit Answer
-                </button>
-            </form>
-        </div>
-    </div>
-
-    {% if data.existing_answers %}
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h4 class="mb-0">Previous Answers</h4>
-        </div>
-        <div class="card-body">
-            {% for ans in data.existing_answers %}
-            <div class="border rounded p-3 {% if not forloop.last %}mb-2{% endif %}">
-                <small class="text-muted">Submitted {{ ans.submitted_at|date:"F d, Y H:i" }}</small>
-                <p class="mt-1 mb-0">{{ ans.answer }}</p>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-    {% endif %}
-
     <!-- Action Buttons -->
     <div class="d-flex justify-content-between">
         <a href="{% url 'homeworks:detail' data.homework_id %}" class="btn btn-outline-secondary">
@@ -187,4 +461,5 @@
         </a>
     </div>
 </div>
+{% endif %}
 {% endblock %}

@@ -42,6 +42,11 @@ urlpatterns = [
         views.ConversationDeleteAndRestartView.as_view(),
         name="delete_and_restart",
     ),
+    path(
+        "<uuid:conversation_id>/feedback/",
+        views.TeacherFeedbackSubmitView.as_view(),
+        name="submit_feedback",
+    ),
     # API endpoints for real-time chat
     path(
         "api/<uuid:conversation_id>/stream/",
