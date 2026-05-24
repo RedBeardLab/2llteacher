@@ -164,9 +164,7 @@ class TeacherFeedbackCreateTests(TeacherFeedbackBase):
             "conversations:submit_feedback",
             kwargs={"conversation_id": teacher_conv.id},
         )
-        resp = self.client.post(
-            url, data={"feedback_type": "general", "feedback": "x"}
-        )
+        resp = self.client.post(url, data={"feedback_type": "general", "feedback": "x"})
         self.assertEqual(resp.status_code, 403)
 
 

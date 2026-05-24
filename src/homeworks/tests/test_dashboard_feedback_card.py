@@ -83,7 +83,9 @@ class StudentDashboardFeedbackCardTests(TestCase):
         # Link to review feedback (the conversation) is present.
         self.assertContains(
             resp,
-            reverse("conversations:detail", kwargs={"conversation_id": self.conversation.id}),
+            reverse(
+                "conversations:detail", kwargs={"conversation_id": self.conversation.id}
+            ),
         )
         # Reasoning Reminder fallback should not appear.
         self.assertNotContains(resp, "Reasoning Reminder")

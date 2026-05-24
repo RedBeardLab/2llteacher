@@ -326,7 +326,9 @@ class HomeworkListView(View):
 
                 fb = (
                     TeacherFeedback.objects.filter(student=user)
-                    .select_related("teacher", "section", "section__homework", "conversation")
+                    .select_related(
+                        "teacher", "section", "section__homework", "conversation"
+                    )
                     .order_by("-updated_at")
                     .first()
                 )

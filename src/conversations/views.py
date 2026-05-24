@@ -350,9 +350,9 @@ class ConversationDetailView(View):
         from .forms import TeacherFeedbackForm  # local import to avoid cycles
 
         teacher_feedback_list = list(
-            TeacherFeedback.objects.filter(
-                conversation_id=conversation_data.id
-            ).select_related("teacher").order_by("-updated_at")
+            TeacherFeedback.objects.filter(conversation_id=conversation_data.id)
+            .select_related("teacher")
+            .order_by("-updated_at")
         )
 
         is_owner = str(request.user.id) == str(conversation_data.user_id)
@@ -365,11 +365,7 @@ class ConversationDetailView(View):
         feedback_form = None
         if can_submit_feedback:
             my_feedback = next(
-                (
-                    f
-                    for f in teacher_feedback_list
-                    if f.teacher_id == request.user.id
-                ),
+                (f for f in teacher_feedback_list if f.teacher_id == request.user.id),
                 None,
             )
             feedback_form = TeacherFeedbackForm(instance=my_feedback)
@@ -1004,23 +1000,29 @@ class TeacherFeedbackSubmitView(View):
         # Teacher must be assigned to the homework's course
         course = conversation.section.homework.course
         if course is not None:
-            teaches_course = course.get_teacher_role(request.user.teacher_profile) is not None
+            teaches_course = (
+                course.get_teacher_role(request.user.teacher_profile) is not None
+            )
             if not teaches_course:
                 return HttpResponseForbidden(
                     "You do not have permission to leave feedback on this conversation."
                 )
 
-        # Find any existing feedback by this teacher on this conversation
+        # Find any existing feedback by this teacher on this conversation.
+        # request.user under @teacher_required is typed as UserWithTeacher
+        # (Protocol with only teacher_profile), so use the Teacher → User FK
+        # to obtain the teacher's User primary key in a type-safe way.
+        teacher_user_id = request.user.teacher_profile.user_id
         instance = TeacherFeedback.objects.filter(
-            teacher=request.user, conversation=conversation
+            teacher_id=teacher_user_id, conversation=conversation
         ).first()
 
         form = TeacherFeedbackForm(request.POST, instance=instance)
         if form.is_valid():
             feedback = form.save(commit=False)
-            feedback.teacher = request.user
-            feedback.student = conversation.user
-            feedback.section = conversation.section
+            feedback.teacher_id = teacher_user_id
+            feedback.student_id = conversation.user_id
+            feedback.section_id = conversation.section_id
             feedback.conversation = conversation
             try:
                 feedback.submission = conversation.submission
@@ -1032,9 +1034,9 @@ class TeacherFeedbackSubmitView(View):
             # Surface form errors via messages framework so existing detail GET
             # can render them without needing a re-render path.
             for err in form.errors.get("feedback", []):
-                messages.error(request, err)
+                messages.error(request, str(err))
             for err in form.errors.get("feedback_type", []):
-                messages.error(request, err)
+                messages.error(request, str(err))
             if not form.errors:
                 messages.error(request, "Could not save feedback.")
 
