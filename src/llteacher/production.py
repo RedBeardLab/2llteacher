@@ -18,7 +18,14 @@ DEBUG = False
 
 # Domain configuration
 DOMAIN = os.environ.get("DOMAIN", "llteacher.coolify.redbeardlab.com")
-ALLOWED_HOSTS = [DOMAIN, f"www.{DOMAIN}", "localhost", "127.0.0.1"]
+ADDITIONAL_DOMAINS = ["app.llteacher.com", "llteacher.com"]
+ALLOWED_HOSTS = [
+    DOMAIN,
+    f"www.{DOMAIN}",
+    *ADDITIONAL_DOMAINS,
+    "localhost",
+    "127.0.0.1",
+]
 
 # If DOMAIN is set to '*', allow all hosts (for development/testing)
 if DOMAIN == "*":
@@ -131,6 +138,7 @@ AUTH_USER_MODEL = "accounts.User"
 CSRF_TRUSTED_ORIGINS = [
     f"https://{DOMAIN}",
     f"https://www.{DOMAIN}",
+    *(f"https://{domain}" for domain in ADDITIONAL_DOMAINS),
 ]
 
 if DOMAIN == "*":
