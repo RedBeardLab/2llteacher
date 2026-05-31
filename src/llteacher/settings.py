@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "courses",
     "homeworks",
     "llm",
+    "rag",
 ]
 
 MIDDLEWARE = [
@@ -202,3 +203,8 @@ LLM_API_TIMEOUT = int(os.getenv("LLM_API_TIMEOUT", "30"))  # seconds
 LLM_API_CONNECTION_TIMEOUT = int(
     os.getenv("LLM_API_CONNECTION_TIMEOUT", "10")
 )  # seconds
+
+# SQLite vector search extension. The sqliteai-vector package provides the
+# platform-specific binary; LLTeacher loads it for every SQLite connection.
+SQLITE_VECTOR_ENABLED = os.getenv("SQLITE_VECTOR_ENABLED", "True").lower() == "true"
+SQLITE_VECTOR_REQUIRED = os.getenv("SQLITE_VECTOR_REQUIRED", "True").lower() == "true"

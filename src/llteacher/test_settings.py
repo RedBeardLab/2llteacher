@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "courses",
     "homeworks",
     "llm",
+    "rag",
 ]
 
 # Disable template debugging for faster tests
