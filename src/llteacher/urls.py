@@ -16,4 +16,5 @@ urlpatterns = [
     path("courses/", include("courses.urls")),
     path("homeworks/", include("homeworks.urls")),
     path("llm/", include("llm.urls")),
+    path("materials/", include("rag.urls", namespace="materials")),
 ]

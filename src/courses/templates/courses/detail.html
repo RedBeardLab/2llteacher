@@ -258,5 +258,70 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- Course Materials Section -->
+    {% if 'student' in data.user_roles or 'teacher' in data.user_roles or 'teacher_assistant' in data.user_roles %}
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> Course Materials</h2>
+            </div>
+
+            {% if 'teacher' in data.user_roles %}
+            <form method="post" action="{% url 'courses:material-upload' data.course_id %}" enctype="multipart/form-data" class="mb-3">
+                {% csrf_token %}
+                <div class="input-group">
+                    <input type="file" name="files" class="form-control" accept=".pdf,application/pdf" multiple required>
+                    <button type="submit" class="btn btn-primary text-nowrap">
+                        <i class="bi bi-upload"></i> Upload PDFs
+                    </button>
+                </div>
+            </form>
+            {% endif %}
+
+            {% if data.materials|length == 0 %}
+            <div class="alert alert-info">
+                No course materials have been uploaded yet.
+            </div>
+            {% else %}
+            <div class="list-group">
+                {% for material in data.materials %}
+                <div class="list-group-item">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-lg">
+                            <a href="{{ material.pdf_url }}" target="_blank" rel="noopener" class="fw-semibold text-decoration-none">
+                                <i class="bi bi-box-arrow-up-right"></i> {{ material.title }}
+                            </a>
+                            <div class="text-muted small">
+                                {{ material.original_filename }} · {{ material.size|filesizeformat }} · Uploaded {{ material.created_at }}
+                            </div>
+                        </div>
+                        {% if 'teacher' in data.user_roles %}
+                        <div class="col-lg-auto">
+                            <div class="d-flex gap-2 flex-wrap justify-content-lg-end">
+                                <form method="post" action="{% url 'courses:material-edit' course_id=data.course_id material_id=material.id %}" class="d-flex gap-2 align-items-center flex-nowrap">
+                                    {% csrf_token %}
+                                    <input type="text" name="title" value="{{ material.title }}" class="form-control form-control-sm" maxlength="255" required aria-label="Material title">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">
+                                        <i class="bi bi-check-lg"></i> Save
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'courses:material-delete' course_id=data.course_id material_id=material.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap" onclick="return confirm('Delete this course material permanently?');">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
