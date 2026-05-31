@@ -8,7 +8,12 @@ from django.urls import reverse
 from django.utils.datastructures import MultiValueDict
 
 from accounts.models import Student, Teacher, TeacherAssistant
-from courses.models import Course, CourseEnrollment, CourseTeacher, CourseTeacherAssistant
+from courses.models import (
+    Course,
+    CourseEnrollment,
+    CourseTeacher,
+    CourseTeacherAssistant,
+)
 from rag.forms import (
     MAX_PDF_UPLOAD_SIZE,
     CourseMaterialUploadForm,
@@ -25,9 +30,7 @@ def pdf_file(name: str = "lecture notes.pdf", data: bytes = b"%PDF-1.4\n"):
 
 class CourseMaterialFormTests(TestCase):
     def test_valid_pdf_under_limit_is_accepted(self):
-        form = CourseMaterialUploadForm(
-            files=MultiValueDict({"files": [pdf_file()]})
-        )
+        form = CourseMaterialUploadForm(files=MultiValueDict({"files": [pdf_file()]}))
 
         self.assertTrue(form.is_valid(), form.errors)
 

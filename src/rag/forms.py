@@ -57,7 +57,7 @@ class CourseMaterialUploadForm(forms.Form):
                 "multiple": True,
                 "class": "form-control",
             }
-        )
+        ),
     )
 
     def clean_files(self) -> list[Any]:

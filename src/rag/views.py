@@ -19,8 +19,13 @@ from django.views import View
 from courses.models import Course, CourseTeacher
 from llteacher.permissions.decorators import TeacherRequest, teacher_required
 
-from .forms import CourseMaterialTitleForm, CourseMaterialUploadForm, title_from_filename
+from .forms import (
+    CourseMaterialTitleForm,
+    CourseMaterialUploadForm,
+    title_from_filename,
+)
 from .models import CourseMaterial, CourseMaterialBlob
+from .tasks import index_course_material
 
 
 def teacher_can_manage_course_materials(teacher, course: Course) -> bool:
@@ -65,6 +70,10 @@ class CourseMaterialUploadView(View):
                 uploaded_by=teacher,
             )
             CourseMaterialBlob.objects.create(material=material, data=pdf_data)
+            index_course_material(
+                material_id=str(material.id),
+                course_id=str(course.id),
+            )
             created_count += 1
 
         messages.success(

@@ -89,3 +89,7 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "America/Los_Angeles"
 USE_I18N = True
 USE_TZ = True
+
+# Run Huey tasks synchronously in tests
+HUEY["immediate"] = True  # type: ignore[index]
+HUEY["filename"] = ":memory:"  # type: ignore[index]

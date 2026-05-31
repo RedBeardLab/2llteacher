@@ -24,6 +24,12 @@ else:
     print('Superuser already exists')
 " || echo "Superuser creation skipped"
 
+# Start Huey consumer in the background
+echo "Starting Huey consumer..."
+uv run huey_consumer.py rag.huey.huey --workers 2 --logfile - &
+HUEY_PID=$!
+echo "Huey consumer started (PID: $HUEY_PID)"
+
 # Start the application
 echo "Starting LLTeacher application..."
 exec "$@"

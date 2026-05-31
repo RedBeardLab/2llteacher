@@ -77,6 +77,7 @@ docker run -d \
 - **Static Files**: Pre-collected during build
 - **Database Migrations**: Automatic on startup
 - **Volume Persistence**: Database stored in `/data` volume
+- **Huey Worker**: Background consumer for RAG indexing tasks (2 workers)
 
 ## Troubleshooting
 
