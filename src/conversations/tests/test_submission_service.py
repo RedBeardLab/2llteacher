@@ -125,6 +125,19 @@ class TestSubmissionService(SubmissionServiceTestCase):
         self.assertEqual(data.student_id, self.student.id)
         self.assertIn(self.student_user.username, data.student_name)
 
+    def test_get_submission_data_with_teacher_conversation(self):
+        """get_submission_data should handle teacher-owned conversations."""
+        teacher_conv = Conversation.objects.create(
+            user=self.teacher_user, section=self.section
+        )
+        submission = Submission.objects.create(conversation=teacher_conv)
+
+        data = SubmissionService.get_submission_data(submission.id)
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data.id, submission.id)
+        self.assertEqual(data.conversation_id, teacher_conv.id)
+
     def test_get_student_submissions(self):
         """Test retrieving all submissions for a student."""
         # Create two submissions for different sections

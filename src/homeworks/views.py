@@ -994,9 +994,41 @@ class HomeworkDetailView(View):
                 pass
 
         if homework_detail.sections:
+            # Gather teacher/TA test conversations per section
+            teacher_conversations_map: dict[UUID, list[dict]] = {}
+            if "teacher" in user_roles or "teacher_assistant" in user_roles:
+                from conversations.models import Conversation as ConvModel
+
+                section_ids = [s.id for s in homework_detail.sections]
+                test_convs = (
+                    ConvModel.objects.filter(
+                        user=user,
+                        section_id__in=section_ids,
+                        is_deleted=False,
+                    )
+                    .select_related("section")
+                    .prefetch_related("messages")
+                )
+                for conv in test_convs:
+                    section_id = conv.section.id
+                    if section_id not in teacher_conversations_map:
+                        teacher_conversations_map[section_id] = []
+                    teacher_conversations_map[section_id].append(
+                        {
+                            "id": conv.id,
+                            "created_at": conv.created_at,
+                            "updated_at": conv.updated_at,
+                            "message_count": conv.message_count,
+                            "label": f"Test conversation {conv.created_at.strftime('%Y-%m-%d %H:%M')}",
+                        }
+                    )
+
             for section_data in homework_detail.sections:
                 # Get progress data for this section if available
                 progress: SectionData | None = section_progress_map.get(section_data.id)
+
+                # Get teacher test conversations for this section
+                convs = teacher_conversations_map.get(section_data.id)
 
                 sections.append(
                     SectionData(
@@ -1011,6 +1043,7 @@ class HomeworkDetailView(View):
                         status=progress.status if progress else None,
                         conversation_id=progress.conversation_id if progress else None,
                         answer_count=progress.answer_count if progress else 0,
+                        conversations=convs,
                     )
                 )
 
