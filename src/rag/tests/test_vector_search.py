@@ -105,3 +105,11 @@ class SearchSimilarTests(TestCase):
 
         results = search_similar([0.1, 0.2, 0.1], self.course.id, top_k=5)
         self.assertEqual(results[0].content, "Close match.")
+
+    def test_returns_material_checksum(self):
+        material = self._make_material()
+        self._make_chunk(material, "Some content.", [0.1, 0.2, 0.3], chunk_index=0)
+
+        results = search_similar([0.1, 0.2, 0.2], self.course.id, top_k=5)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].material_checksum, "abc")

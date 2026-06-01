@@ -1089,6 +1089,295 @@ class LLMService:
         return "\n".join(parts)
 
     @staticmethod
+    def get_retrieve_knowledge_function() -> FunctionDefinition:
+        return FunctionDefinition(
+            name="retrieve_knowledge",
+            description=(
+                "Call this function when you need additional context from the course "
+                "materials to answer the student's question. Use it when the student asks "
+                "about specific topics, concepts, or content that may be covered in the "
+                "course PDF materials."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query to find relevant course material. "
+                        "Use the student's question or key concepts as the query.",
+                    }
+                },
+                "required": ["query"],
+            },
+        )
+
+    @staticmethod
+    def get_chat_config(course_id: UUID) -> Optional[LLMConfigData]:
+        from .models import LLMConfig, GlobalLLMDefault
+
+        config = LLMConfig.objects.filter(
+            course_id=course_id, is_active=True
+        ).first()
+        if config:
+            return LLMConfigData.from_model(config)
+        default = GlobalLLMDefault.objects.filter(is_active=True).first()
+        if default:
+            from .models import LLMConfig as _LLMConfig
+
+            if hasattr(default, "create_course_config"):
+                llm_config = default.create_course_config(
+                    lambda: None
+                )  # placeholder
+                if llm_config:
+                    return LLMConfigData.from_model(llm_config)
+            return LLMConfigData(
+                id=default.id,
+                name=default.name,
+                model_name=default.model_name,
+                api_key=default.api_key,
+                base_prompt=default.base_prompt,
+                temperature=default.temperature,
+                max_completion_tokens=default.max_completion_tokens,
+                is_default=True,
+                is_active=default.is_active,
+            )
+        return None
+
+    @staticmethod
+    def _build_chat_system_message(chat) -> str:
+        course = chat.course
+        llm_config = LLMService.get_chat_config(course.id)
+        parts = []
+        if llm_config and llm_config.base_prompt:
+            parts.append(llm_config.base_prompt)
+
+        parts.append("")
+        parts.append(f"Course: {course.name}")
+        if course.description:
+            parts.append(f"Course Description: {course.description}")
+        parts.append("")
+        parts.append(
+            "You are an AI tutor helping a student with this course. "
+            "You have access to a retrieve_knowledge tool that searches the uploaded "
+            "course PDFs for relevant content. For ANY question about course content, "
+            "concepts, or topics covered in this course, you MUST call this tool first "
+            "to retrieve relevant material before you answer. Base your answer on the "
+            "retrieved material. If the material doesn't contain a good match, tell the "
+            "student what you found and supplement with your general knowledge. "
+            "Guide the student without giving away complete answers when they are "
+            "working through problems. "
+            "When you reference the retrieved material in your answer, ALWAYS include "
+            "a clickable markdown link to the source PDF with the page number. "
+            "The retrieved chunks include links like: "
+            "[Material Title](/materials/uuid/pdf/checksum.pdf#page=42). "
+            "Use these links in your citations so the student can click to open the "
+            "relevant page of the PDF."
+        )
+        return "\n".join(parts)
+
+    @staticmethod
+    def _generate_chat_response(
+        llm_config: LLMConfigData,
+        messages: list[dict],
+        available_functions: List[FunctionDefinition],
+    ) -> LLMResponseWithTools:
+        start_time = time.perf_counter()
+        try:
+            client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=llm_config.api_key,
+                timeout=httpx.Timeout(
+                    connect=settings.LLM_API_CONNECTION_TIMEOUT,
+                    read=settings.LLM_API_TIMEOUT,
+                    write=10.0,
+                    pool=5.0,
+                ),
+            )
+
+            tools = [func.to_openai_format() for func in available_functions]
+
+            logger.info(
+                "LLM chat request",
+                extra={
+                    "event_type": "llm_request",
+                    "model_name": llm_config.model_name,
+                    "response_mode": "non_streaming",
+                    "messages_count": len(messages),
+                    "tools_count": len(tools),
+                },
+            )
+
+            response = client.chat.completions.create(
+                model=llm_config.model_name,
+                messages=messages,
+                temperature=llm_config.temperature,
+                max_completion_tokens=llm_config.max_completion_tokens,
+                tools=tools if tools else None,
+            )
+
+            if response.choices and len(response.choices) > 0:
+                choice = response.choices[0]
+                response_text = choice.message.content or ""
+                tokens_used = response.usage.total_tokens if response.usage else 0
+
+                function_calls = []
+                if (
+                    hasattr(choice.message, "tool_calls")
+                    and choice.message.tool_calls
+                ):
+                    for tool_call in choice.message.tool_calls:
+                        payload = LLMService._get_function_tool_call_payload(
+                            tool_call
+                        )
+                        if payload is None:
+                            continue
+                        function_name, function_arguments = payload
+                        try:
+                            arguments = json.loads(function_arguments)
+                            function_calls.append(
+                                FunctionCall(
+                                    id=tool_call.id,
+                                    name=function_name,
+                                    arguments=arguments,
+                                )
+                            )
+                        except json.JSONDecodeError as e:
+                            logger.error(
+                                f"Failed to parse function arguments: {function_arguments}, error: {e}"
+                            )
+
+                finish_reason = None
+                if choice.finish_reason:
+                    try:
+                        finish_reason = FinishReason(choice.finish_reason)
+                    except ValueError:
+                        pass
+
+                return LLMResponseWithTools(
+                    response_text=response_text if response_text else None,
+                    function_calls=function_calls,
+                    tokens_used=tokens_used,
+                    success=True,
+                    finish_reason=finish_reason,
+                )
+
+            return LLMResponseWithTools(
+                tokens_used=0,
+                success=False,
+                error="No response generated from OpenAI API",
+            )
+
+        except Exception as e:
+            logger.error(f"OpenAI API error: {str(e)}")
+            return LLMResponseWithTools(
+                tokens_used=0, success=False, error=str(e)
+            )
+
+    @staticmethod
+    @traced
+    def _stream_chat_response(
+        llm_config: LLMConfigData,
+        messages: list[dict],
+        available_functions: List[FunctionDefinition],
+    ) -> Iterator[tuple[str, List[FunctionCall], FinishReason | None]]:
+        start_time = time.perf_counter()
+
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=llm_config.api_key,
+            timeout=httpx.Timeout(
+                connect=settings.LLM_API_CONNECTION_TIMEOUT,
+                read=settings.LLM_API_TIMEOUT,
+                write=10.0,
+                pool=5.0,
+            ),
+        )
+
+        tools = [func.to_openai_format() for func in available_functions]
+
+        stream = client.chat.completions.create(
+            model=llm_config.model_name,
+            messages=messages,
+            temperature=llm_config.temperature,
+            max_completion_tokens=llm_config.max_completion_tokens,
+            stream=True,
+            tools=tools if tools else None,
+        )
+
+        finish_reason = None
+        first_token_time = None
+        token_count = 0
+        tool_calls_accumulator = {}
+        query_prepared_time = time.perf_counter()
+
+        for chunk in stream:
+            if not (chunk.choices and len(chunk.choices) > 0):
+                continue
+
+            choice = chunk.choices[0]
+
+            if hasattr(choice.delta, "content") and choice.delta.content:
+                if first_token_time is None:
+                    first_token_time = time.perf_counter()
+                token_count += 1
+                yield choice.delta.content, [], None
+
+            if hasattr(choice.delta, "tool_calls") and choice.delta.tool_calls:
+                for tool_call_delta in choice.delta.tool_calls:
+                    index = tool_call_delta.index
+                    if index not in tool_calls_accumulator:
+                        tool_calls_accumulator[index] = {
+                            "id": "",
+                            "name": "",
+                            "arguments": "",
+                        }
+                    if hasattr(tool_call_delta, "id") and tool_call_delta.id:
+                        tool_calls_accumulator[index]["id"] = tool_call_delta.id
+                    if (
+                        hasattr(tool_call_delta, "function")
+                        and tool_call_delta.function
+                    ):
+                        if (
+                            hasattr(tool_call_delta.function, "name")
+                            and tool_call_delta.function.name
+                        ):
+                            tool_calls_accumulator[index][
+                                "name"
+                            ] = tool_call_delta.function.name
+                        if (
+                            hasattr(tool_call_delta.function, "arguments")
+                            and tool_call_delta.function.arguments
+                        ):
+                            tool_calls_accumulator[index][
+                                "arguments"
+                            ] += tool_call_delta.function.arguments
+
+            if hasattr(choice, "finish_reason") and choice.finish_reason:
+                try:
+                    finish_reason = FinishReason(choice.finish_reason)
+                except ValueError:
+                    finish_reason = None
+
+        function_calls = []
+        for index in sorted(tool_calls_accumulator.keys()):
+            data = tool_calls_accumulator[index]
+            try:
+                arguments = json.loads(data["arguments"])
+                function_calls.append(
+                    FunctionCall(
+                        id=data["id"],
+                        name=data["name"],
+                        arguments=arguments,
+                    )
+                )
+            except json.JSONDecodeError as e:
+                logger.error(
+                    f"Failed to parse function arguments in stream: {data['arguments']}, error: {e}"
+                )
+
+        yield "", function_calls, finish_reason
+
+    @staticmethod
     @traced
     def get_default_config_for_course(course_id: UUID) -> Optional[LLMConfigData]:
         """

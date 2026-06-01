@@ -4,7 +4,7 @@ from accounts.models import Teacher, User
 from courses.models import Course
 from llm.models import GlobalLLMDefault
 from rag.huey import huey
-from rag.tasks import _resolve_embedding_api_key
+from rag.services.api_key import resolve_embedding_api_key
 
 
 class ResolveApiKeyTests(TestCase):
@@ -16,7 +16,7 @@ class ResolveApiKeyTests(TestCase):
         )
 
     def test_returns_empty_string_when_no_config_exists(self):
-        key = _resolve_embedding_api_key(str(self.course.id))
+        key = resolve_embedding_api_key(str(self.course.id))
         self.assertEqual(key, "")
 
     def test_returns_key_from_global_default(self):
@@ -26,7 +26,7 @@ class ResolveApiKeyTests(TestCase):
             api_key="global-key",
             is_active=True,
         )
-        key = _resolve_embedding_api_key(str(self.course.id))
+        key = resolve_embedding_api_key(str(self.course.id))
         self.assertEqual(key, "global-key")
 
     def test_returns_key_from_course_config(self):
@@ -45,7 +45,7 @@ class ResolveApiKeyTests(TestCase):
             is_active=True,
             course=self.course,
         )
-        key = _resolve_embedding_api_key(str(self.course.id))
+        key = resolve_embedding_api_key(str(self.course.id))
         self.assertEqual(key, "course-key")
 
 

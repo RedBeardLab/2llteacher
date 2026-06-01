@@ -15,6 +15,7 @@ class ScoredChunk:
         page_end: int,
         level: str,
         score: float,
+        material_checksum: str = "",
     ) -> None:
         self.chunk_id = chunk_id
         self.material_id = material_id
@@ -24,6 +25,7 @@ class ScoredChunk:
         self.page_end = page_end
         self.level = level
         self.score = score
+        self.material_checksum = material_checksum
 
 
 def search_similar(
@@ -42,18 +44,19 @@ def search_similar(
     chunks = CourseMaterialChunk.objects.filter(
         material_id__in=material_ids,
         level=level,
-    ).only(
-        "id", "material_id", "content", "page_start", "page_end", "level", "embedding"
+    ).select_related("material").only(
+        "id", "material_id", "content", "page_start", "page_end", "level", "embedding",
+        "material__checksum",
     )
 
-    material_cache: dict[str, str] = {}
+    material_cache: dict[str, tuple[str, str]] = {}
     for mid in material_ids:
         mid_str = str(mid)
         try:
-            title = CourseMaterial.objects.values_list("title", flat=True).get(id=mid)
-            material_cache[mid_str] = title
+            mat = CourseMaterial.objects.only("title", "checksum").get(id=mid)
+            material_cache[mid_str] = (mat.title, mat.checksum)
         except CourseMaterial.DoesNotExist:
-            material_cache[mid_str] = "Unknown"
+            material_cache[mid_str] = ("Unknown", "")
 
     scored: list[ScoredChunk] = []
     for chunk in chunks:
@@ -70,17 +73,19 @@ def search_similar(
             continue
 
         distance = sum((a - b) ** 2 for a, b in zip(stored_vec, query_embedding))
+        title, checksum = material_cache.get(mid_str, ("Unknown", ""))
 
         scored.append(
             ScoredChunk(
                 chunk_id=str(chunk.id),
                 material_id=mid_str,
-                material_title=material_cache.get(mid_str, "Unknown"),
+                material_title=title,
                 content=chunk.content,
                 page_start=chunk.page_start,
                 page_end=chunk.page_end,
                 level=chunk.level,
                 score=float(distance),
+                material_checksum=checksum,
             )
         )
 

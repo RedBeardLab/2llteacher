@@ -8,28 +8,12 @@ from rag.services.embeddings import Embedder
 from rag.services.indexer import MaterialIndexer
 from rag.services.pdf_extractor import extract_pages
 from rag.services.chunker import chunk_hierarchical
-from llm.models import LLMConfig, GlobalLLMDefault
-
-
-def _resolve_embedding_api_key(course_id: str) -> str:
-    config = (
-        LLMConfig.objects.filter(course_id=course_id, is_active=True)
-        .exclude(api_key="")
-        .first()
-    )
-    if config and config.api_key:
-        return config.api_key
-    default = (
-        GlobalLLMDefault.objects.filter(is_active=True).exclude(api_key="").first()
-    )
-    if default and default.api_key:
-        return default.api_key
-    return ""
+from rag.services.api_key import resolve_embedding_api_key
 
 
 @huey.task(retries=3, retry_delay=60)
 def index_course_material(material_id: str, course_id: str) -> None:
-    api_key = _resolve_embedding_api_key(course_id)
+    api_key = resolve_embedding_api_key(course_id)
     if not api_key:
         from rag.models import CourseMaterial
 

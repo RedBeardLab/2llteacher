@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "homeworks",
     "llm",
     "rag",
+    "chat",
 ]
 
 MIDDLEWARE = [
