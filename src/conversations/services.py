@@ -476,7 +476,9 @@ class ConversationService:
 
         try:
             # Get conversation
-            conversation = Conversation.objects.get(id=request.conversation_id)
+            conversation = Conversation.objects.select_related(
+                "section__solution", "section__homework"
+            ).get(id=request.conversation_id)
 
             # Validate request
             validation_error = ConversationService.validate_message_request(request)

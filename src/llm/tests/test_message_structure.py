@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 
 from llm.models import LLMConfig
 from llm.services import LLMService
-from homeworks.models import Homework, Section
+from homeworks.models import Homework, Section, SectionSolution
 from conversations.models import Conversation, Message
 from accounts.models import Student, Teacher
 
@@ -332,3 +332,85 @@ class TestMessageStructureWithoutContextRepetition(TestCase):
                 user_message,
                 f"User message at index {i} should not repeat section content",
             )
+
+    @patch("llm.services.OpenAI")
+    def test_system_message_includes_solution_when_available(self, mock_openai_class):
+        """
+        Test that the system message includes the section solution
+        when one exists, marked as reference for the AI tutor.
+        """
+        # Create a section with a solution
+        solution = SectionSolution.objects.create(
+            content="A variable is created with the = operator. For example: x = 5"
+        )
+        section_with_solution = Section.objects.create(
+            homework=self.homework,
+            title="Creating Variables",
+            content="How do you create a variable in Python?",
+            order=2,
+            solution=solution,
+        )
+
+        conversation = Conversation.objects.create(
+            user=self.student_user, section=section_with_solution
+        )
+
+        # Setup mock
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        mock_completion = MagicMock()
+        mock_completion.choices = [MagicMock()]
+        mock_completion.choices[0].message.content = "Let me help you with that."
+        mock_completion.choices[0].message.tool_calls = None
+        mock_completion.choices[0].finish_reason = "stop"
+        mock_completion.usage.total_tokens = 30
+        mock_client.chat.completions.create.return_value = mock_completion
+
+        _response = LLMService.get_response(
+            conversation,
+            "How do I create a variable?",
+            "student",
+            available_functions=[LLMService.get_stopping_rule_function()],
+        )
+
+        call_args = mock_client.chat.completions.create.call_args
+        messages_sent = call_args.kwargs["messages"]
+        system_message = messages_sent[0]["content"]
+
+        self.assertIn("Section Solution", system_message)
+        self.assertIn(
+            "A variable is created with the = operator",
+            system_message,
+        )
+
+    @patch("llm.services.OpenAI")
+    def test_system_message_excludes_solution_when_not_available(
+        self, mock_openai_class
+    ):
+        """
+        Test that the system message does not include a solution section
+        when no solution exists for the section.
+        """
+        # Setup mock
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        mock_completion = MagicMock()
+        mock_completion.choices = [MagicMock()]
+        mock_completion.choices[0].message.content = "I'm here to help!"
+        mock_completion.choices[0].message.tool_calls = None
+        mock_completion.choices[0].finish_reason = "stop"
+        mock_completion.usage.total_tokens = 30
+        mock_client.chat.completions.create.return_value = mock_completion
+
+        _response = LLMService.get_response(
+            self.conversation,
+            "What is a variable?",
+            "student",
+            available_functions=[LLMService.get_stopping_rule_function()],
+        )
+
+        call_args = mock_client.chat.completions.create.call_args
+        messages_sent = call_args.kwargs["messages"]
+        system_message = messages_sent[0]["content"]
+
+        self.assertNotIn("Section Solution", system_message)

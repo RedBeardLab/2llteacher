@@ -145,6 +145,7 @@ class ConversationContext:
     ]  # List of {"role": "user/assistant", "content": "..."}
     current_message: str
     message_type: str
+    section_solution: str | None = None
 
 
 @dataclass
@@ -1050,13 +1051,15 @@ class LLMService:
                 messages.append({"role": "assistant", "content": msg.content})
             # Skip system messages for OpenAI context
 
+        section = conversation.section
         return ConversationContext(
-            section_title=conversation.section.title,
-            section_content=conversation.section.content,
-            homework_title=conversation.section.homework.title,
+            section_title=section.title,
+            section_content=section.content,
+            homework_title=section.homework.title,
             messages=messages,
             current_message=content,
             message_type=message_type,
+            section_solution=section.solution.content if section.solution else None,
         )
 
     @staticmethod
@@ -1078,13 +1081,22 @@ class LLMService:
         """
         parts = [
             llm_config.base_prompt,
-            "",  # Empty line for separation
+            "",
             f"Homework: {context.homework_title}",
             f"Section: {context.section_title}",
             f"Section Content: {context.section_content}",
-            "",  # Empty line for separation
-            "Please respond as an AI tutor helping the student with this section. Guide them without giving away the complete answer.",
+            "",
         ]
+
+        if context.section_solution:
+            parts.append(
+                f"Section Solution (for reference, do not give away): {context.section_solution}"
+            )
+            parts.append("")
+
+        parts.append(
+            "Please respond as an AI tutor helping the student with this section. Guide them without giving away the complete answer."
+        )
 
         return "\n".join(parts)
 
