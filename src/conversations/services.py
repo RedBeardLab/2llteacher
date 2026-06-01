@@ -819,7 +819,7 @@ class SubmissionService:
         conversation_id: UUID
         section_id: UUID
         section_title: str
-        student_id: UUID
+        student_id: UUID | None
         student_name: str
         submitted_at: datetime
 
@@ -904,8 +904,9 @@ class SubmissionService:
                 "conversation__user__student_profile", "conversation__section"
             ).get(id=submission_id)
 
-            # Get student's name
+            # Get student's name and profile
             user = submission.conversation.user
+            student_profile = getattr(user, "student_profile", None)
             student_name = f"{user.first_name} {user.last_name}"
             if not student_name.strip():
                 student_name = user.username
@@ -916,7 +917,7 @@ class SubmissionService:
                 conversation_id=submission.conversation.id,
                 section_id=submission.conversation.section.id,
                 section_title=submission.conversation.section.title,
-                student_id=submission.conversation.user.student_profile.id,
+                student_id=student_profile.id if student_profile else None,
                 student_name=student_name,
                 submitted_at=submission.submitted_at,
             )

@@ -90,6 +90,8 @@ class SectionData:
     status: SectionStatus | None = None
     conversation_id: UUID | None = None
     answer_count: int = 0
+    # Teacher test conversations (populated in view for teachers/TAs)
+    conversations: list[dict] | None = None
 
     @property
     def has_solution(self) -> bool:
@@ -678,6 +680,8 @@ class HomeworkService:
 
             # Populate conversation map
             for conv in conversations:
+                if not hasattr(conv.user, "student_profile"):
+                    continue
                 student_id = conv.user.student_profile.id
                 homework_id = conv.section.homework.id
                 key = (student_id, homework_id)
@@ -883,6 +887,8 @@ class HomeworkService:
             submission_map = {sub.conversation.id: sub for sub in submissions}
 
             for conv in conversations:
+                if not hasattr(conv.user, "student_profile"):
+                    continue
                 student_id = conv.user.student_profile.id
                 homework_id = conv.section.homework.id
                 key = (student_id, homework_id)
@@ -897,6 +903,8 @@ class HomeworkService:
                 tuple[UUID, UUID], datetime
             ] = {}
             for answer in section_answers:
+                if not hasattr(answer.user, "student_profile"):
+                    continue
                 student_id = answer.user.student_profile.id
                 homework_id = answer.section.homework.id
                 key = (student_id, homework_id)

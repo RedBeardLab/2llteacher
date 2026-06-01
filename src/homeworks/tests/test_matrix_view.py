@@ -650,3 +650,29 @@ class HomeworkMatrixViewTest(TestCase):
             "TA with student profile should not appear in matrix",
         )
         self.assertEqual(matrix_data.total_students, 2)
+
+    def test_matrix_with_teacher_test_conversations_ignored(self):
+        """Teacher test conversations should not crash get_course_homework_matrix."""
+        Conversation.objects.create(user=self.teacher_user, section=self.section1_1)
+
+        matrix_data = HomeworkService.get_course_homework_matrix(self.course.id)
+
+        self.assertIsNotNone(matrix_data)
+        self.assertEqual(matrix_data.total_students, 2)
+        for student_row in matrix_data.student_rows:
+            for cell in student_row.homework_cells:
+                self.assertEqual(cell.submitted_sections, 0)
+                self.assertEqual(cell.total_conversations, 0)
+
+    def test_all_homework_matrix_with_teacher_conversations(self):
+        """Teacher test conversations should not crash get_all_homework_matrix."""
+        Conversation.objects.create(user=self.teacher_user, section=self.section1_1)
+
+        matrix_data = HomeworkService.get_all_homework_matrix(self.teacher.id)
+
+        self.assertIsNotNone(matrix_data)
+        self.assertEqual(matrix_data.total_students, 2)
+        for student_row in matrix_data.student_rows:
+            for cell in student_row.homework_cells:
+                self.assertEqual(cell.submitted_sections, 0)
+                self.assertEqual(cell.total_conversations, 0)

@@ -405,6 +405,14 @@ class SubmissionModelTest(TestCase):
         submission = Submission.objects.create(**self.submission_data)
         self.assertEqual(submission.student, self.student)
 
+    def test_submission_student_property_with_teacher_conversation(self):
+        """Submission.student should return None for teacher test conversations."""
+        teacher_conv = Conversation.objects.create(
+            user=self.teacher_user, section=self.section
+        )
+        submission = Submission.objects.create(conversation=teacher_conv)
+        self.assertIsNone(submission.student)
+
     def test_submission_clean_method_validation(self):
         """Test submission clean method validation."""
         # Create first submission

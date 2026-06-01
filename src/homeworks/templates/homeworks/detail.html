@@ -158,6 +158,36 @@
                     </zero-md>
                     </div>
 
+                    {% if 'teacher' in data.user_roles and section.section_type != 'non_interactive' %}
+                    <div class="mb-3">
+                        <a href="{% url 'conversations:start' section_id=section.id %}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-play-circle"></i> Try Conversation
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if 'teacher_assistant' in data.user_roles and section.section_type != 'non_interactive' %}
+                    <div class="mb-3">
+                        <a href="{% url 'conversations:start' section_id=section.id %}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-play-circle"></i> Test Conversation
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if section.conversations %}
+                    <div class="mb-3">
+                        <h6 class="text-muted mb-2">Previous Conversations</h6>
+                        <div class="list-group">
+                            {% for conv in section.conversations %}
+                            <a href="{% url 'conversations:detail' conversation_id=conv.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2">
+                                <span>{{ conv.label }}</span>
+                                <span class="badge bg-secondary rounded-pill">{{ conv.message_count }} messages</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
                     {% if 'student' in data.user_roles %}
                     <div class="mb-3">
                         {% if data.widget_progress and not data.widget_progress.all_pre_answered %}

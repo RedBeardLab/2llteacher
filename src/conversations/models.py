@@ -126,7 +126,7 @@ class Submission(models.Model):
     @property
     def student(self):
         """Get the student through the conversation."""
-        return self.conversation.user.student_profile
+        return getattr(self.conversation.user, "student_profile", None)
 
     def clean(self):
         """Ensure only one submission per student per section."""
