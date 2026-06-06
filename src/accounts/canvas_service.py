@@ -52,9 +52,7 @@ class CanvasOAuth2Service:
 
         base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
         client_id = self._settings.CANVAS_CLIENT_ID
-        redirect_uri = request.build_absolute_uri(
-            reverse("accounts:canvas_callback")
-        )
+        redirect_uri = request.build_absolute_uri(reverse("accounts:canvas_callback"))
         scopes = getattr(self._settings, "CANVAS_OAUTH_SCOPES", "")
 
         params = (
