@@ -127,7 +127,7 @@ class CanvasOAuth2Service:
                 params={
                     "enrollment_type": "teacher",
                     "enrollment_state": "active",
-                    "per_page": 100,
+                    "per_page": "100",
                     "include[]": "term",
                 },
                 timeout=10,
