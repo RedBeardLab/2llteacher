@@ -197,6 +197,15 @@ LOGGING = {
     },
 }
 
+# Canvas LMS OAuth2 Configuration
+CANVAS_BASE_URL = os.getenv("CANVAS_BASE_URL", "https://canvas.uw.edu")
+CANVAS_CLIENT_ID = os.getenv("CANVAS_CLIENT_ID", "")
+CANVAS_CLIENT_SECRET = os.getenv("CANVAS_CLIENT_SECRET", "")
+CANVAS_OAUTH_SCOPES = os.getenv(
+    "CANVAS_OAUTH_SCOPES",
+    "url:GET|/api/v1/users/self",
+)
+
 # LLM API Timeout Configuration
 LLM_API_TIMEOUT = int(os.getenv("LLM_API_TIMEOUT", "30"))  # seconds
 LLM_API_CONNECTION_TIMEOUT = int(

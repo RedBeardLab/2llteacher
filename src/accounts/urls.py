@@ -14,6 +14,16 @@ urlpatterns = [
     path("login/", views.UserLoginView.as_view(), name="login"),
     path("logout/", views.logout_view, name="logout"),
     path("profile/", views.ProfileManagementView.as_view(), name="profile"),
+    path(
+        "canvas-login/",
+        views.CanvasLoginView.as_view(),
+        name="canvas_login",
+    ),
+    path(
+        "canvas-callback/",
+        views.CanvasCallbackView.as_view(),
+        name="canvas_callback",
+    ),
     # Password reset URLs using Django's built-in views
     path(
         "password-reset/",

@@ -12,6 +12,7 @@ from uuid import UUID
 from django.views import View
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
 from django.db import transaction
@@ -26,6 +27,7 @@ from llteacher.tracing import record_exception
 from .forms import RegistrationForm, LoginForm, ProfileForm
 from .models import Student, User
 from .email_service import EmailVerificationService
+from .canvas_service import CanvasOAuth2Service
 
 logger = logging.getLogger(__name__)
 
@@ -439,16 +441,97 @@ class ResendVerificationView(View):
 
         return render(request, "accounts/email_verification_sent.html")
 
-    def _get_completed_sections_count(self, student_profile) -> int:
-        """
-        Get the number of sections completed by a student.
 
-        Args:
-            student_profile: Student profile object
+class CanvasLoginView(View):
+    """Redirect user to Canvas for OAuth2 authentication."""
 
-        Returns:
-            Integer count of completed sections
-        """
-        # In a real implementation, we would query the submissions table
-        # Since we don't have direct access to it in the accounts app, we'll use 0 as a placeholder
-        return 0
+    service_factory = CanvasOAuth2Service
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._service = self.service_factory()
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        if request.user.is_authenticated:
+            messages.info(request, "You are already logged in.")
+            return redirect("/")
+
+        if not self._service._settings.CANVAS_CLIENT_ID:
+            messages.error(
+                request, "Canvas login is not configured. Please use email/password instead."
+            )
+            return redirect("accounts:login")
+
+        auth_url = self._service.get_authorization_url(request)
+        return redirect(auth_url)
+
+
+@dataclass
+class CanvasCallbackError:
+    error: str
+
+
+CanvasCallbackResult = CanvasCallbackError | None
+
+
+class CanvasCallbackView(View):
+    """Handle the OAuth2 callback from Canvas."""
+
+    service_factory = CanvasOAuth2Service
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._service = self.service_factory()
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        if request.user.is_authenticated:
+            messages.info(request, "You are already logged in.")
+            return redirect("/")
+
+        result = self._process_callback(request)
+
+        if isinstance(result, CanvasCallbackError):
+            messages.error(request, result.error)
+            return redirect("accounts:login")
+
+        return redirect("/")
+
+    def _process_callback(self, request: HttpRequest) -> CanvasCallbackResult:
+        code = request.GET.get("code", "")
+        state = request.GET.get("state", "")
+
+        if not self._service.verify_state(request, state):
+            logger.warning("Canvas OAuth2 state verification failed")
+            return CanvasCallbackError(
+                error="Authentication failed. Please try again."
+            )
+
+        redirect_uri = request.build_absolute_uri(
+            reverse("accounts:canvas_callback")
+        )
+
+        token_result = self._service.exchange_code(code, redirect_uri)
+        if not token_result.success:
+            logger.error("Canvas token exchange failed: %s", token_result.error)
+            return CanvasCallbackError(
+                error="Failed to authenticate with Canvas. Please try again."
+            )
+
+        try:
+            user_info = self._service.get_user_info(token_result.access_token)
+        except Exception:
+            logger.exception("Failed to fetch Canvas user info")
+            return CanvasCallbackError(
+                error="Could not retrieve your account information from Canvas. Please try again."
+            )
+
+        user, _created = self._service.get_or_create_user(user_info)
+
+        user.backend = "django.contrib.auth.backends.ModelBackend"
+        login(request, user)
+
+        messages.success(
+            request,
+            "You have been signed in with UW Canvas.",
+        )
+        return None
