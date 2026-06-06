@@ -11,12 +11,6 @@
                     <h2 class="text-center mb-0">Login</h2>
                 </div>
                 <div class="card-body">
-                    <div class="d-grid mb-4">
-                        <a href="{% url 'accounts:canvas_login' %}" class="btn btn-dark btn-lg">
-                            <i class="bi bi-box-arrow-in-right"></i> Sign in with UW Canvas
-                        </a>
-                    </div>
-                    <hr class="my-4">
                     <form method="post">
                         {% csrf_token %}
                         
