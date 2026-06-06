@@ -458,7 +458,8 @@ class CanvasLoginView(View):
 
         if not self._service._settings.CANVAS_CLIENT_ID:
             messages.error(
-                request, "Canvas login is not configured. Please use email/password instead."
+                request,
+                "Canvas login is not configured. Please use email/password instead.",
             )
             return redirect("accounts:login")
 
@@ -502,13 +503,9 @@ class CanvasCallbackView(View):
 
         if not self._service.verify_state(request, state):
             logger.warning("Canvas OAuth2 state verification failed")
-            return CanvasCallbackError(
-                error="Authentication failed. Please try again."
-            )
+            return CanvasCallbackError(error="Authentication failed. Please try again.")
 
-        redirect_uri = request.build_absolute_uri(
-            reverse("accounts:canvas_callback")
-        )
+        redirect_uri = request.build_absolute_uri(reverse("accounts:canvas_callback"))
 
         token_result = self._service.exchange_code(code, redirect_uri)
         if not token_result.success:
