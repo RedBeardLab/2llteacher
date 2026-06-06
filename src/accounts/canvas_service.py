@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Optional
+from datetime import datetime, timedelta
 import secrets
 import logging
 
@@ -8,10 +9,13 @@ from django.conf import settings as django_settings
 from django.http import HttpRequest
 from django.db import transaction
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import User, Student, CanvasProfile
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_TOKEN_EXPIRY_SECONDS = 3600
 
 
 @dataclass
@@ -19,6 +23,7 @@ class CanvasTokenResult:
     success: bool
     access_token: str = ""
     refresh_token: str = ""
+    expires_in: int = 0
     error: Optional[str] = None
 
 
@@ -93,10 +98,66 @@ class CanvasOAuth2Service:
                 success=True,
                 access_token=data.get("access_token", ""),
                 refresh_token=data.get("refresh_token", ""),
+                expires_in=data.get("expires_in", DEFAULT_TOKEN_EXPIRY_SECONDS),
             )
         except requests.RequestException as e:
             logger.exception("Failed to exchange Canvas auth code")
             return CanvasTokenResult(success=False, error=str(e))
+
+    def refresh_access_token(self, refresh_token: str) -> CanvasTokenResult:
+        base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
+        try:
+            response = self._session.post(
+                f"{base_url}/login/oauth2/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "client_id": self._settings.CANVAS_CLIENT_ID,
+                    "client_secret": self._settings.CANVAS_CLIENT_SECRET,
+                    "refresh_token": refresh_token,
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return CanvasTokenResult(
+                success=True,
+                access_token=data.get("access_token", ""),
+                expires_in=data.get("expires_in", DEFAULT_TOKEN_EXPIRY_SECONDS),
+            )
+        except requests.RequestException as e:
+            logger.exception("Failed to refresh Canvas access token")
+            return CanvasTokenResult(success=False, error=str(e))
+
+    def get_or_refresh_token(self, user: User) -> str | None:
+        try:
+            profile = user.canvas_profile
+        except CanvasProfile.DoesNotExist:
+            return None
+
+        if not profile.access_token:
+            return None
+
+        if (
+            profile.token_expires_at
+            and timezone.now() < profile.token_expires_at
+        ):
+            return profile.access_token
+
+        if not profile.refresh_token:
+            return None
+
+        result = self.refresh_access_token(profile.refresh_token)
+        if not result.success:
+            logger.error("Failed to refresh Canvas token for user %s", user.id)
+            return None
+
+        profile.access_token = result.access_token
+        profile.token_expires_at = timezone.now() + timedelta(
+            seconds=result.expires_in or DEFAULT_TOKEN_EXPIRY_SECONDS
+        )
+        profile.save(update_fields=["access_token", "token_expires_at"])
+
+        return profile.access_token
 
     def get_user_info(self, access_token: str) -> CanvasUserInfo:
         base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
@@ -127,7 +188,7 @@ class CanvasOAuth2Service:
                 params={
                     "enrollment_type": "teacher",
                     "enrollment_state": "active",
-                    "per_page": 100,
+                    "per_page": "100",
                     "include[]": "term",
                 },
                 timeout=10,
@@ -148,18 +209,37 @@ class CanvasOAuth2Service:
             return []
 
     def get_teacher_courses_for_user(self, user: User) -> list[CanvasCourseInfo]:
-        try:
-            profile = user.canvas_profile
-            return self.get_teacher_courses(profile.access_token)
-        except CanvasProfile.DoesNotExist:
+        token = self.get_or_refresh_token(user)
+        if not token:
             return []
+        return self.get_teacher_courses(token)
+
+    @staticmethod
+    def _compute_token_expiry(expires_in: int) -> datetime:
+        return timezone.now() + timedelta(
+            seconds=expires_in or DEFAULT_TOKEN_EXPIRY_SECONDS
+        )
 
     @transaction.atomic
-    def get_or_create_user(self, info: CanvasUserInfo) -> tuple[User, bool]:
+    def get_or_create_user(
+        self,
+        info: CanvasUserInfo,
+        access_token: str = "",
+        refresh_token: str = "",
+        expires_in: int = 0,
+    ) -> tuple[User, bool]:
+        token_expires_at = self._compute_token_expiry(expires_in)
+
         try:
             profile = CanvasProfile.objects.select_related("user").get(
                 canvas_user_id=info.canvas_user_id
             )
+            profile.access_token = access_token
+            profile.refresh_token = refresh_token
+            profile.token_expires_at = token_expires_at
+            profile.save(update_fields=[
+                "access_token", "refresh_token", "token_expires_at"
+            ])
             return profile.user, False
         except CanvasProfile.DoesNotExist:
             pass
@@ -170,6 +250,9 @@ class CanvasOAuth2Service:
                 CanvasProfile.objects.create(
                     user=user,
                     canvas_user_id=info.canvas_user_id,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    token_expires_at=token_expires_at,
                 )
                 return user, False
             except User.DoesNotExist:
@@ -199,6 +282,9 @@ class CanvasOAuth2Service:
         CanvasProfile.objects.create(
             user=user,
             canvas_user_id=info.canvas_user_id,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expires_at=token_expires_at,
         )
 
         return user, True

@@ -525,7 +525,12 @@ class CanvasCallbackView(View):
                 error="Could not retrieve your account information from Canvas. Please try again."
             )
 
-        user, _created = self._service.get_or_create_user(user_info)
+        user, _created = self._service.get_or_create_user(
+            user_info,
+            access_token=token_result.access_token,
+            refresh_token=token_result.refresh_token,
+            expires_in=token_result.expires_in,
+        )
 
         user.backend = "django.contrib.auth.backends.ModelBackend"
         login(request, user)

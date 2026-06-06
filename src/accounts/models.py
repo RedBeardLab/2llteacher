@@ -76,6 +76,7 @@ class CanvasProfile(models.Model):
     canvas_user_id = models.CharField(max_length=64, unique=True)
     access_token = models.CharField(max_length=255, blank=True)
     refresh_token = models.CharField(max_length=255, blank=True)
+    token_expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
