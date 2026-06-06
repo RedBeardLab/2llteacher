@@ -31,7 +31,14 @@ build-backend = "uv_build"
 module-name = ["llteacher", "accounts", "conversations", "homeworks", "llm"]
 
 [tool.uv]
-dev-dependencies = ["pytest", "pytest-django", "ruff", "mypy", "coverage"]
+dev-dependencies = [
+    "pytest",
+    "pytest-django",
+    "ruff",
+    "mypy",
+    "coverage",
+    "types-requests>=2.33.0.20260518",
+]
 
 [tool.coverage.run]
 source = ["src"]
