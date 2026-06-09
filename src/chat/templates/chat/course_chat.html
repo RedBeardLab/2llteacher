@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Course Chat - {{ course.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .conversation-container {
+    max-height: 65vh;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+  .message-container:last-child {
+    margin-bottom: 0 !important;
+  }
+  .streaming-cursor::after {
+    content: "\u258a";
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+  .typing-indicator {
+    display: none;
+    padding: 0.5rem 1rem;
+    color: #6c757d;
+  }
+  .typing-indicator.show {
+    display: block;
+  }
+  .chat-sidebar {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .chat-sidebar .list-group-item.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+  }
+  .chat-sidebar .list-group-item .chat-title {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chat-sidebar .list-group-item .chat-date {
+    font-size: 0.75rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-12">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'courses:list' %}">Courses</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'courses:detail' course_id=course.id %}">{{ course.name }}</a></li>
+          <li class="breadcrumb-item active">Course Chat</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Chat Sidebar -->
+    <div class="col-md-3 mb-3">
+      <div class="card shadow chat-sidebar">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+          <span><i class="bi bi-chat-dots"></i> Chats</span>
+          <form method="post" action="{% url 'chat:chat_create' course_id=course.id %}" style="display:inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-light btn-sm">
+              <i class="bi bi-plus-lg"></i> New
+            </button>
+          </form>
+        </div>
+        <div class="list-group list-group-flush">
+          {% for c in chats %}
+          <a href="{% url 'chat:course_chat_detail' course_id=course.id chat_id=c.id %}"
+             class="list-group-item list-group-item-action {% if c.id == active_chat.id %}active{% endif %}">
+            <div class="chat-title">
+              {% if c.title %}{{ c.title }}{% else %}<em>New chat</em>{% endif %}
+            </div>
+            <div class="chat-date">{{ c.updated_at|date:"M d, H:i" }}</div>
+          </a>
+          {% empty %}
+          <div class="list-group-item text-muted text-center py-4">
+            <i class="bi bi-chat-square-text"></i><br>
+            No chats yet
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="col-md-9">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+          <h5 class="mb-0">
+            <i class="bi bi-chat-dots"></i>
+            {% if active_chat.title %}{{ active_chat.title }}{% else %}New chat{% endif %}
+          </h5>
+          <small>{{ chat_messages|length }} messages</small>
+        </div>
+        <div class="card-body">
+          <div class="conversation-container" id="message-container">
+            {% for msg in chat_messages %}
+            <div class="message-container mb-3" data-message-id="{{ msg.id }}">
+              <div class="message-header">
+                {% if msg.message_type == "student" %}
+                <span class="badge bg-primary">You</span>
+                {% else %}
+                <span class="badge bg-success">AI Tutor</span>
+                {% endif %}
+                <small class="text-muted">{{ msg.timestamp|date:"M d, Y H:i" }}</small>
+              </div>
+              <div class="message-content p-3 rounded">
+                <zero-md src="data:text/markdown;charset=utf-8,{{ msg.content|urlencode }}">
+                  <template data-append>
+                    <style>.markdown-body { background-color: transparent !important; }</style>
+                  </template>
+                </zero-md>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="typing-indicator" id="typing-indicator">
+            <i class="bi bi-hourglass-split"></i> AI is thinking...
+          </div>
+
+          <div class="mt-4">
+            <div class="card bg-light">
+              <div class="card-body">
+                <form id="message-form">
+                  {% csrf_token %}
+                  <div class="form-group">
+                    <textarea class="form-control" id="content" rows="3"
+                      placeholder="Ask a question about the course material..." required></textarea>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center mt-3">
+                    <small class="text-muted">Press Enter to send, Shift+Enter for new line</small>
+                    <button type="submit" class="btn btn-primary" id="send-button">
+                      <i class="bi bi-send"></i> Send
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <a href="{% url 'courses:detail' course_id=course.id %}" class="btn btn-secondary">
+          <i class="bi bi-arrow-left"></i> Back to Course
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="module" src="https://cdn.jsdelivr.net/npm/zero-md@3?register"></script>
+<script src="{% static 'js/course-chat.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const streamUrl = '{{ stream_url|escapejs }}';
+  const csrfToken = '{{ csrf_token|escapejs }}';
+  new CourseChatClient(streamUrl, csrfToken);
+});
+</script>
+{% endblock %}

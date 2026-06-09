@@ -45,6 +45,8 @@ docker run -d \
 | `SECRET_KEY` | `django-insecure-change-this-in-production` | Django secret key |
 | `DATABASE_PATH` | `/data/llteacher.sqlite` | SQLite database path |
 | `DJANGO_SETTINGS_MODULE` | `llteacher.production` | Django settings module |
+| `SQLITE_VECTOR_ENABLED` | `true` | Load the sqlite-vector extension for SQLite connections |
+| `SQLITE_VECTOR_REQUIRED` | `true` | Fail startup if sqlite-vector cannot be loaded |
 
 ## Production Deployment
 
@@ -75,6 +77,7 @@ docker run -d \
 - **Static Files**: Pre-collected during build
 - **Database Migrations**: Automatic on startup
 - **Volume Persistence**: Database stored in `/data` volume
+- **Huey Worker**: Background consumer for RAG indexing tasks (2 workers)
 
 ## Troubleshooting
 

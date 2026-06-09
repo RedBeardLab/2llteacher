@@ -13,6 +13,7 @@ import logging
 from django.views import View
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -358,6 +359,18 @@ class TAItem:
 
 
 @dataclass
+class CourseMaterialItem:
+    """Data structure for a material in the course detail view."""
+
+    id: UUID
+    title: str
+    original_filename: str
+    size: int
+    created_at: str
+    pdf_url: str
+
+
+@dataclass
 class CourseDetailData:
     """Data structure for the course detail view."""
 
@@ -368,6 +381,7 @@ class CourseDetailData:
     homeworks: list[HomeworkItem]
     enrolled_students: list[EnrolledStudentItem] | None
     teacher_assistants: list[TAItem] | None
+    materials: list[CourseMaterialItem]
     user_roles: list[CourseRole]
     instructors: list[InstructorItem]
     is_enrolled: bool
@@ -468,6 +482,7 @@ class CourseDetailView(View):
         """
         from homeworks.models import Homework
         from homeworks.services import HomeworkService, SectionStatus
+        from rag.models import CourseMaterial
 
         # Auto-publish any scheduled homework before building the list
         try:
@@ -534,6 +549,38 @@ class CourseDetailView(View):
         is_enrolled = student_profile is not None and course.is_student_enrolled(
             student_profile
         )
+
+        materials = []
+        if (
+            CourseRole.TEACHER in user_roles
+            or CourseRole.TEACHER_ASSISTANT in user_roles
+            or CourseRole.STUDENT in user_roles
+        ):
+            for material in CourseMaterial.objects.filter(course=course).only(
+                "id",
+                "course_id",
+                "title",
+                "original_filename",
+                "size",
+                "checksum",
+                "created_at",
+            ):
+                materials.append(
+                    CourseMaterialItem(
+                        id=material.id,
+                        title=material.title,
+                        original_filename=material.original_filename,
+                        size=material.size,
+                        created_at=material.created_at.strftime("%B %d, %Y"),
+                        pdf_url=reverse(
+                            "materials:pdf",
+                            kwargs={
+                                "material_id": material.id,
+                                "checksum": material.checksum,
+                            },
+                        ),
+                    )
+                )
 
         enrolled_students = None
         if (
@@ -606,6 +653,7 @@ class CourseDetailView(View):
             homeworks=homeworks,
             enrolled_students=enrolled_students,
             teacher_assistants=teacher_assistants,
+            materials=materials,
             user_roles=user_roles,
             instructors=instructors,
             is_enrolled=is_enrolled,
