@@ -375,7 +375,11 @@ class CanvasLoginViewTests(TestCase):
         self.client = Client()
         self.url = reverse("accounts:canvas_login")
 
-    @override_settings(CANVAS_CLIENT_ID="test_client_id")
+    @override_settings(
+        CANVAS_CLIENT_ID="test_client_id",
+        CANVAS_BASE_URL="https://canvas.uw.edu",
+        CANVAS_OAUTH_SCOPES="url:GET|/api/v1/users/self",
+    )
     def test_redirects_to_canvas_authorization_url(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 302)
@@ -384,7 +388,6 @@ class CanvasLoginViewTests(TestCase):
         self.assertIn("response_type=code", response.url)
         self.assertIn("state=", response.url)
         self.assertIn("redirect_uri=", response.url)
-        self.assertIn("scope=", response.url)
         self.assertIn(
             "url:GET%7C/api/v1/users/self", response.url
         )

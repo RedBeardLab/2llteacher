@@ -31,6 +31,11 @@ class Course(models.Model):
         related_name="courses",
     )
 
+    # Canvas LMS integration
+    canvas_course_id = models.CharField(
+        max_length=64, blank=True, null=True, unique=True
+    )
+
     # Metadata
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

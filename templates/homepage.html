@@ -37,6 +37,14 @@
                             <button type="submit" class="btn btn-primary btn-lg">Login</button>
                         </div>
                     </form>
+                    <hr class="my-4">
+                    {% if show_canvas_button %}
+                    <div class="d-grid">
+                        <a href="{% url 'accounts:canvas_login' %}" class="btn btn-dark btn-lg">
+                            <i class="bi bi-box-arrow-in-right"></i> Login with Canvas
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="card-footer bg-light text-center">
                     <p class="mb-2">Don't have an account?</p>

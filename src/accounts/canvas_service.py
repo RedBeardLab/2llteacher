@@ -42,6 +42,31 @@ class CanvasCourseInfo:
     code: str
 
 
+@dataclass
+class CanvasModuleItem:
+    item_id: str
+    title: str
+    type: str
+    url: str | None = None
+    page_url: str | None = None
+
+
+@dataclass
+class CanvasModule:
+    module_id: str
+    name: str
+    items: list[CanvasModuleItem]
+
+
+@dataclass
+class CanvasFile:
+    file_id: str
+    display_name: str
+    filename: str
+    url: str | None = None
+    size: int = 0
+
+
 class CanvasOAuth2Service:
     def __init__(
         self,
@@ -213,6 +238,83 @@ class CanvasOAuth2Service:
         if not token:
             return []
         return self.get_teacher_courses(token)
+
+    def get_course_modules(
+        self, canvas_course_id: str, access_token: str
+    ) -> list[CanvasModule]:
+        base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
+        try:
+            response = self._session.get(
+                f"{base_url}/api/v1/courses/{canvas_course_id}/modules",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={"include[]": "items", "per_page": "50"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            data = response.json()
+            modules = []
+            for module_data in data:
+                items = []
+                for item_data in module_data.get("items", []):
+                    items.append(CanvasModuleItem(
+                        item_id=str(item_data["id"]),
+                        title=item_data.get("title", ""),
+                        type=item_data.get("type", ""),
+                        url=item_data.get("url"),
+                        page_url=item_data.get("page_url"),
+                    ))
+                modules.append(CanvasModule(
+                    module_id=str(module_data["id"]),
+                    name=module_data.get("name", ""),
+                    items=items,
+                ))
+            return modules
+        except requests.RequestException:
+            logger.exception("Failed to fetch Canvas modules")
+            return []
+
+    def get_course_files(
+        self, canvas_course_id: str, access_token: str
+    ) -> list[CanvasFile]:
+        base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
+        try:
+            response = self._session.get(
+                f"{base_url}/api/v1/courses/{canvas_course_id}/files",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={"per_page": "100"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return [
+                CanvasFile(
+                    file_id=str(f["id"]),
+                    display_name=f.get("display_name", ""),
+                    filename=f.get("filename", ""),
+                    url=f.get("url"),
+                    size=f.get("size", 0),
+                )
+                for f in data
+            ]
+        except requests.RequestException:
+            logger.exception("Failed to fetch Canvas files")
+            return []
+
+    def get_course_modules_for_user(
+        self, user: User, canvas_course_id: str
+    ) -> list[CanvasModule]:
+        token = self.get_or_refresh_token(user)
+        if not token:
+            return []
+        return self.get_course_modules(canvas_course_id, token)
+
+    def get_course_files_for_user(
+        self, user: User, canvas_course_id: str
+    ) -> list[CanvasFile]:
+        token = self.get_or_refresh_token(user)
+        if not token:
+            return []
+        return self.get_course_files(canvas_course_id, token)
 
     @staticmethod
     def _compute_token_expiry(expires_in: int) -> datetime:

@@ -3,6 +3,7 @@ Main views for the llteacher project.
 """
 
 from django.shortcuts import render, redirect
+from django.conf import settings
 
 
 def homepage(request):
@@ -32,4 +33,6 @@ def homepage(request):
                 # Student has no courses, redirect to course list
                 return redirect("/courses/")
 
-    return render(request, "homepage.html")
+    return render(request, "homepage.html", {
+        "show_canvas_button": bool(settings.CANVAS_CLIENT_ID),
+    })

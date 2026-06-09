@@ -8,6 +8,8 @@ following the testable-first architecture with typed data contracts.
 from dataclasses import dataclass
 from typing import Any, assert_type, cast
 from uuid import UUID
+import logging
+
 from django.views import View
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
@@ -25,7 +27,15 @@ from llteacher.permissions.decorators import (
 from .enums import CourseRole
 from .models import Course, CourseEnrollment, CourseTeacher, CourseTeacherAssistant
 from .forms import CourseForm
+from accounts.canvas_service import (
+    CanvasOAuth2Service,
+    CanvasCourseInfo,
+    CanvasModule,
+    CanvasFile,
+)
 from accounts.models import User, TeacherAssistant
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -227,6 +237,7 @@ class CourseFormData:
 
     form: CourseForm
     action: str  # 'create' or 'edit'
+    canvas_courses: list[CanvasCourseInfo] | None = None
 
 
 class CourseCreateView(View):
@@ -237,28 +248,59 @@ class CourseCreateView(View):
     assigns the teacher as the course owner.
     """
 
+    canvas_service_factory = CanvasOAuth2Service
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._canvas_service = self.canvas_service_factory()
+
     @method_decorator(login_required, name="dispatch")
     @method_decorator(teacher_required, name="dispatch")
     def dispatch(self, *args, **kwargs):
         """Ensure user is a logged-in teacher."""
         return super().dispatch(*args, **kwargs)
 
+    def _get_canvas_courses(self, user) -> list[CanvasCourseInfo] | None:
+        if not hasattr(user, "canvas_profile"):
+            return None
+        try:
+            return self._canvas_service.get_teacher_courses_for_user(user)
+        except Exception:
+            logger.exception("Failed to fetch Canvas courses")
+            return None
+
     def get(self, request: TeacherRequest) -> HttpResponse:
         """Handle GET requests to display the create form."""
         form = CourseForm()
-        data = CourseFormData(form=form, action="create")
+        canvas_courses = self._get_canvas_courses(request.user)
+        data = CourseFormData(
+            form=form, action="create", canvas_courses=canvas_courses
+        )
 
         return render(request, "courses/form.html", {"data": data})
 
     def post(self, request: TeacherRequest) -> HttpResponse:
         """Handle POST requests to process the form submission."""
-        form = CourseForm(request.POST)
+        post_data = request.POST.copy()
+
+        canvas_course_id = post_data.get("canvas_course", "")
+        if canvas_course_id and not post_data.get("name"):
+            canvas_courses = self._get_canvas_courses(request.user)
+            if canvas_courses:
+                for cc in canvas_courses:
+                    if cc.canvas_course_id == canvas_course_id:
+                        post_data["name"] = cc.name
+                        break
+
+        form = CourseForm(post_data)
 
         if form.is_valid():
-            # Save the course
             course = form.save()
 
-            # Add the teacher as the owner
+            if canvas_course_id:
+                course.canvas_course_id = canvas_course_id
+                course.save(update_fields=["canvas_course_id"])
+
             CourseTeacher.objects.create(
                 course=course,
                 teacher=request.user.teacher_profile,
@@ -268,8 +310,10 @@ class CourseCreateView(View):
             messages.success(request, f"Course '{course.name}' created successfully!")
             return redirect("courses:list")
 
-        # Form has errors, re-render with errors
-        data = CourseFormData(form=form, action="create")
+        canvas_courses = self._get_canvas_courses(request.user)
+        data = CourseFormData(
+            form=form, action="create", canvas_courses=canvas_courses
+        )
         return render(request, "courses/form.html", {"data": data})
 
 
@@ -326,6 +370,9 @@ class CourseDetailData:
     user_roles: list[CourseRole]
     instructors: list[InstructorItem]
     is_enrolled: bool
+    canvas_course_id: str | None = None
+    canvas_modules: list[CanvasModule] | None = None
+    canvas_files: list[CanvasFile] | None = None
 
 
 class CourseDetailView(View):
@@ -335,6 +382,12 @@ class CourseDetailView(View):
     For teachers: Shows course info, homeworks, and enrolled students
     For students: Shows course info and homeworks (only if enrolled)
     """
+
+    canvas_service_factory = CanvasOAuth2Service
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._canvas_service = self.canvas_service_factory()
 
     @method_decorator(login_required, name="dispatch")
     def dispatch(self, *args, **kwargs):
@@ -526,6 +579,24 @@ class CourseDetailView(View):
                     )
                 )
 
+        canvas_modules = None
+        canvas_files = None
+        if (
+            course.canvas_course_id
+            and CourseRole.TEACHER in user_roles
+            and teacher_profile is not None
+            and hasattr(teacher_profile.user, "canvas_profile")
+        ):
+            try:
+                canvas_modules = self._canvas_service.get_course_modules_for_user(
+                    teacher_profile.user, course.canvas_course_id
+                )
+                canvas_files = self._canvas_service.get_course_files_for_user(
+                    teacher_profile.user, course.canvas_course_id
+                )
+            except Exception:
+                logger.exception("Failed to fetch Canvas materials")
+
         return CourseDetailData(
             course_id=course.id,
             course_name=course.name,
@@ -537,6 +608,9 @@ class CourseDetailView(View):
             user_roles=user_roles,
             instructors=instructors,
             is_enrolled=is_enrolled,
+            canvas_course_id=course.canvas_course_id,
+            canvas_modules=canvas_modules,
+            canvas_files=canvas_files,
         )
 
 

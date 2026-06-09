@@ -501,7 +501,13 @@ class CanvasCallbackView(View):
         state = request.GET.get("state", "")
 
         if not self._service.verify_state(request, state):
-            logger.warning("Canvas OAuth2 state verification failed")
+            logger.warning(
+                "Canvas OAuth2 state verification failed. "
+                "state_param=%s session_has_key=%s session_keys=%s",
+                state,
+                "canvas_oauth_state" in request.session,
+                list(request.session.keys()),
+            )
             return CanvasCallbackError(
                 error="Authentication failed. Please try again."
             )

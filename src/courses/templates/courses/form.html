@@ -62,6 +62,32 @@
       </div>
     </div>
 
+    {% if data.canvas_courses is not None %}
+    <div class="card mb-4">
+      <div class="card-header bg-light">
+        <h5 class="mb-0">
+          <i class="bi bi-box-arrow-in-right"></i> Link to UW Canvas Course
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label for="canvas_course" class="form-label">Canvas Course</label>
+          <select name="canvas_course" id="canvas_course" class="form-control">
+            <option value="">— Not linked —</option>
+            {% for c in data.canvas_courses %}
+            <option value="{{ c.canvas_course_id }}">
+              {{ c.name }} ({{ c.code }})
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">
+            Select a Canvas course to link. Course name and code will be auto-filled.
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="d-flex justify-content-between">
       <a href="{% url 'courses:list' %}" class="btn btn-secondary">
         <i class="bi bi-x-circle"></i> Cancel

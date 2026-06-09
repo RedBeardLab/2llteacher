@@ -5,7 +5,9 @@ This module tests the views in the courses app, focusing on testing
 the behavior of the course list view and course enrollment.
 """
 
-from django.test import TestCase, RequestFactory
+from unittest.mock import Mock, patch
+
+from django.test import TestCase, RequestFactory, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
@@ -15,9 +17,10 @@ from courses.models import (
     CourseTeacher,
     CourseTeacherAssistant,
 )
-from courses.views import CourseListView, CourseListData
+from courses.views import CourseListView, CourseListData, CourseCreateView, CourseDetailView
 from courses.enums import CourseRole
-from accounts.models import Teacher, Student, TeacherAssistant
+from accounts.models import Teacher, Student, TeacherAssistant, CanvasProfile
+from accounts.canvas_service import CanvasOAuth2Service, CanvasCourseInfo, CanvasModule, CanvasModuleItem, CanvasFile
 from homeworks.models import Section
 from conversations.models import Conversation, Submission, SectionAnswer
 
@@ -2031,3 +2034,273 @@ class CourseHomeworkCreateSectionTypeTests(TestCase):
 
         hw = Homework.objects.get(title="HW", course=self.course)
         self.assertEqual(hw.sections.first().section_type, "conversation")
+
+
+class CourseCreateViewCanvasTests(TestCase):
+    """Tests for Canvas course picker in CourseCreateView."""
+
+    def setUp(self):
+        self.client = Client()
+        self.teacher_user = User.objects.create_user(
+            username="canvas_teacher",
+            email="canvas_teacher@uw.edu",
+            password="password123",
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+        self.student_user = User.objects.create_user(
+            username="canvas_student",
+            email="canvas_student@uw.edu",
+            password="password123",
+        )
+        self.student = Student.objects.create(user=self.student_user)
+        self.url = reverse("courses:create")
+
+        # Set up a mock canvas service
+        self.mock_canvas_service = Mock(spec=CanvasOAuth2Service)
+
+    def _patch_service(self):
+        return patch.object(CourseCreateView, "canvas_service_factory", return_value=self.mock_canvas_service)
+
+    def _login_teacher(self):
+        self.client.login(username="canvas_teacher", password="password123")
+
+    def _login_student(self):
+        self.client.login(username="canvas_student", password="password123")
+
+    def test_get_no_canvas_courses_when_no_canvas_profile(self):
+        """Teacher without Canvas profile has no canvas_courses in context."""
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIsNone(data.canvas_courses)
+
+    def test_get_has_canvas_courses_when_canvas_profile_exists(self):
+        """Teacher with Canvas profile sees canvas_courses in context."""
+        CanvasProfile.objects.create(
+            user=self.teacher_user,
+            canvas_user_id="100",
+            access_token="tok",
+            refresh_token="ref",
+        )
+        self.mock_canvas_service.get_teacher_courses_for_user.return_value = [
+            CanvasCourseInfo(
+                canvas_course_id="1", name="Intro to CS", code="CSE101"
+            ),
+            CanvasCourseInfo(
+                canvas_course_id="2", name="Data Structures", code="CSE201"
+            ),
+        ]
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIsNotNone(data.canvas_courses)
+        self.assertEqual(len(data.canvas_courses), 2)
+        self.assertEqual(data.canvas_courses[0].name, "Intro to CS")
+
+    def test_get_canvas_courses_not_shown_for_students(self):
+        """Student does not see canvas_courses in context."""
+        self._login_student()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_canvas_service_error_still_renders(self):
+        """Canvas service error does not crash the view."""
+        CanvasProfile.objects.create(
+            user=self.teacher_user,
+            canvas_user_id="100",
+            access_token="tok",
+            refresh_token="ref",
+        )
+        self.mock_canvas_service.get_teacher_courses_for_user.side_effect = Exception("API down")
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIsNone(data.canvas_courses)
+
+    def test_post_selects_canvas_course(self):
+        """Selecting a Canvas course pre-fills name and code."""
+        CanvasProfile.objects.create(
+            user=self.teacher_user,
+            canvas_user_id="100",
+            access_token="tok",
+            refresh_token="ref",
+        )
+        self.mock_canvas_service.get_teacher_courses_for_user.return_value = [
+            CanvasCourseInfo(
+                canvas_course_id="42", name="Physics 101", code="PHYS101"
+            ),
+        ]
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.post(
+                self.url,
+                {
+                    "canvas_course": "42",
+                    "code": "PHYS101",
+                    "description": "Intro physics",
+                },
+            )
+        self.assertEqual(response.status_code, 302)
+        course = Course.objects.get(code="PHYS101")
+        self.assertEqual(course.name, "Physics 101")
+        self.assertEqual(course.canvas_course_id, "42")
+
+    def test_post_without_canvas_selection_works_normally(self):
+        """No canvas_course selection creates a course without canvas_course_id."""
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.post(
+                self.url,
+                {
+                    "name": "Standalone Course",
+                    "code": "STD101",
+                    "description": "No Canvas link",
+                },
+            )
+        self.assertEqual(response.status_code, 302)
+        course = Course.objects.get(code="STD101")
+        self.assertIsNone(course.canvas_course_id)
+
+
+class CourseDetailViewCanvasTests(TestCase):
+    """Tests for Canvas materials in CourseDetailView."""
+
+    def setUp(self):
+        self.client = Client()
+        self.teacher_user = User.objects.create_user(
+            username="detail_teacher",
+            email="detail_teacher@uw.edu",
+            password="password123",
+        )
+        self.teacher = Teacher.objects.create(user=self.teacher_user)
+        self.student_user = User.objects.create_user(
+            username="detail_student",
+            email="detail_student@uw.edu",
+            password="password123",
+        )
+        self.student = Student.objects.create(user=self.student_user)
+
+        self.course = Course.objects.create(
+            name="Linked Course",
+            code="LNK101",
+            description="A linked course",
+            is_active=True,
+            canvas_course_id="99",
+        )
+        CourseTeacher.objects.create(
+            course=self.course, teacher=self.teacher, role="owner"
+        )
+        CourseEnrollment.objects.create(
+            course=self.course, student=self.student, is_active=True
+        )
+
+        self.url = reverse("courses:detail", kwargs={"course_id": self.course.id})
+        self.mock_canvas_service = Mock(spec=CanvasOAuth2Service)
+        CanvasProfile.objects.create(
+            user=self.teacher_user,
+            canvas_user_id="200",
+            access_token="tok",
+            refresh_token="ref",
+        )
+
+    def _patch_service(self):
+        return patch.object(
+            CourseDetailView, "canvas_service_factory", return_value=self.mock_canvas_service
+        )
+
+    def _login_teacher(self):
+        self.client.login(username="detail_teacher", password="password123")
+
+    def _login_student(self):
+        self.client.login(username="detail_student", password="password123")
+
+    def test_teacher_sees_canvas_materials(self):
+        """Teacher on linked course sees modules and files."""
+        self.mock_canvas_service.get_course_modules_for_user.return_value = [
+            CanvasModule(
+                module_id="1",
+                name="Week 1",
+                items=[
+                    CanvasModuleItem(
+                        item_id="10", title="Syllabus", type="Page"
+                    ),
+                ],
+            ),
+        ]
+        self.mock_canvas_service.get_course_files_for_user.return_value = [
+            CanvasFile(
+                file_id="100",
+                display_name="lecture1.pdf",
+                filename="lecture1.pdf",
+                url="https://canvas/files/100",
+                size=1024,
+            ),
+        ]
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertEqual(data.canvas_course_id, "99")
+        self.assertIsNotNone(data.canvas_modules)
+        self.assertEqual(len(data.canvas_modules), 1)
+        self.assertEqual(data.canvas_modules[0].name, "Week 1")
+        self.assertIsNotNone(data.canvas_files)
+        self.assertEqual(len(data.canvas_files), 1)
+        self.assertEqual(data.canvas_files[0].display_name, "lecture1.pdf")
+
+    def test_student_does_not_see_canvas_materials(self):
+        """Student on linked course does not get Canvas materials."""
+        self._login_student()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        # Student can see canvas_course_id but modules/files are None (not fetched)
+        self.assertEqual(data.canvas_course_id, "99")
+        self.assertIsNone(data.canvas_modules)
+        self.assertIsNone(data.canvas_files)
+
+    def test_course_without_canvas_link_has_no_materials(self):
+        """Course without canvas_course_id does not fetch materials."""
+        unlinked = Course.objects.create(
+            name="Unlinked",
+            code="UNL101",
+            description="No Canvas link",
+            is_active=True,
+            canvas_course_id=None,
+        )
+        CourseTeacher.objects.create(
+            course=unlinked, teacher=self.teacher, role="owner"
+        )
+        url = reverse("courses:detail", kwargs={"course_id": unlinked.id})
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIsNone(data.canvas_course_id)
+        self.assertIsNone(data.canvas_modules)
+        self.assertIsNone(data.canvas_files)
+        # Verify Canvas service was NEVER called
+        self.mock_canvas_service.get_course_modules_for_user.assert_not_called()
+        self.mock_canvas_service.get_course_files_for_user.assert_not_called()
+
+    def test_canvas_api_error_does_not_crash(self):
+        """Canvas API error does not crash the view; materials are None."""
+        self.mock_canvas_service.get_course_modules_for_user.side_effect = Exception("API error")
+        self.mock_canvas_service.get_course_files_for_user.side_effect = Exception("API error")
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIsNone(data.canvas_modules)
+        self.assertIsNone(data.canvas_files)

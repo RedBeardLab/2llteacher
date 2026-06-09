@@ -15,7 +15,7 @@ SECRET_KEY = "django-insecure-your-secret-key-here"
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS: list[str] = []
+ALLOWED_HOSTS: list[str] = ["127.0.0.1", "localhost", "local.docker"]
 
 # Application definition
 INSTALLED_APPS = [
@@ -198,12 +198,12 @@ LOGGING = {
 }
 
 # Canvas LMS OAuth2 Configuration
-CANVAS_BASE_URL = os.getenv("CANVAS_BASE_URL", "https://canvas.uw.edu")
-CANVAS_CLIENT_ID = os.getenv("CANVAS_CLIENT_ID", "")
-CANVAS_CLIENT_SECRET = os.getenv("CANVAS_CLIENT_SECRET", "")
+CANVAS_BASE_URL = os.getenv("CANVAS_BASE_URL", "http://canvas.docker")
+CANVAS_CLIENT_ID = os.getenv("CANVAS_CLIENT_ID", "10000000000002")
+CANVAS_CLIENT_SECRET = os.getenv("CANVAS_CLIENT_SECRET", "H28F462VTY29Ct7wYuBfBnMEkZcA8ActxXAZZQaJvRTwf72ZERfVkLMrGXwMth8T")
 CANVAS_OAUTH_SCOPES = os.getenv(
     "CANVAS_OAUTH_SCOPES",
-    "url:GET|/api/v1/users/self",
+    "url:GET|/api/v1/courses/:id url:GET|/api/v1/courses/:course_id/modules url:GET|/api/v1/courses/:course_id/files url:GET|/api/v1/users/:user_id/profile",
 )
 
 # LLM API Timeout Configuration
