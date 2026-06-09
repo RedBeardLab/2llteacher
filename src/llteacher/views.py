@@ -3,7 +3,7 @@ Main views for the llteacher project.
 """
 
 from django.shortcuts import render, redirect
-from django.conf import settings
+from accounts.canvas_service import CanvasOAuth2Service
 
 
 def homepage(request):
@@ -34,5 +34,5 @@ def homepage(request):
                 return redirect("/courses/")
 
     return render(request, "homepage.html", {
-        "show_canvas_button": bool(settings.CANVAS_CLIENT_ID),
+        "show_canvas_button": CanvasOAuth2Service.is_canvas_configured(),
     })

@@ -456,7 +456,7 @@ class CanvasLoginView(View):
             messages.info(request, "You are already logged in.")
             return redirect("/")
 
-        if not self._service._settings.CANVAS_CLIENT_ID:
+        if not CanvasOAuth2Service.is_canvas_configured():
             messages.error(
                 request, "Canvas login is not configured. Please use email/password instead."
             )

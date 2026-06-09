@@ -97,6 +97,11 @@ class CanvasOAuth2Service:
             params += f"&scope={scopes}"
         return f"{base_url}/login/oauth2/auth?{params}"
 
+    @staticmethod
+    def is_canvas_configured(settings_module: Any = None) -> bool:
+        settings = settings_module or django_settings
+        return bool(getattr(settings, "CANVAS_CLIENT_ID", None))
+
     def verify_state(self, request: HttpRequest, state: str) -> bool:
         expected = request.session.pop("canvas_oauth_state", None)
         if not expected or not state:

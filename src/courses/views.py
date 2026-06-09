@@ -264,7 +264,8 @@ class CourseCreateView(View):
         if not hasattr(user, "canvas_profile"):
             return None
         try:
-            return self._canvas_service.get_teacher_courses_for_user(user)
+            courses = self._canvas_service.get_teacher_courses_for_user(user)
+            return courses if courses else None
         except Exception:
             logger.exception("Failed to fetch Canvas courses")
             return None
