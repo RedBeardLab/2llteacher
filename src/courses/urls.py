@@ -4,6 +4,7 @@ URL patterns for the courses app.
 
 from django.urls import path
 from . import views
+from rag import views as rag_views
 
 app_name = "courses"
 
@@ -12,6 +13,21 @@ urlpatterns = [
     path("create/", views.CourseCreateView.as_view(), name="create"),
     path("<uuid:course_id>/", views.CourseDetailView.as_view(), name="detail"),
     path("<uuid:course_id>/enroll/", views.CourseEnrollView.as_view(), name="enroll"),
+    path(
+        "<uuid:course_id>/materials/upload/",
+        rag_views.CourseMaterialUploadView.as_view(),
+        name="material-upload",
+    ),
+    path(
+        "<uuid:course_id>/materials/<uuid:material_id>/edit/",
+        rag_views.CourseMaterialEditView.as_view(),
+        name="material-edit",
+    ),
+    path(
+        "<uuid:course_id>/materials/<uuid:material_id>/delete/",
+        rag_views.CourseMaterialDeleteView.as_view(),
+        name="material-delete",
+    ),
     path(
         "<uuid:course_id>/homework/create/",
         views.CourseHomeworkCreateView.as_view(),

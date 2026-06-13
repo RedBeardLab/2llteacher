@@ -31,6 +31,8 @@ INSTALLED_APPS = [
     "courses",
     "homeworks",
     "llm",
+    "rag",
+    "chat",
 ]
 
 MIDDLEWARE = [
@@ -211,3 +213,29 @@ LLM_API_TIMEOUT = int(os.getenv("LLM_API_TIMEOUT", "30"))  # seconds
 LLM_API_CONNECTION_TIMEOUT = int(
     os.getenv("LLM_API_CONNECTION_TIMEOUT", "10")
 )  # seconds
+
+# SQLite vector search extension. The sqliteai-vector package provides the
+# platform-specific binary; LLTeacher loads it for every SQLite connection.
+SQLITE_VECTOR_ENABLED = os.getenv("SQLITE_VECTOR_ENABLED", "True").lower() == "true"
+SQLITE_VECTOR_REQUIRED = os.getenv("SQLITE_VECTOR_REQUIRED", "True").lower() == "true"
+
+# Huey — lightweight task queue backed by SQLite
+HUEY: dict = {
+    "name": "llteacher",
+    "filename": str(BASE_DIR / "huey.sqlite3"),
+    "immediate": False,
+    "consumer": {
+        "workers": 2,
+        "loglevel": "INFO",
+    },
+}
+
+# Embedding API (OpenAI-compatible via OpenRouter)
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
+
+# Chunking configuration
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
+PAGE_GROUP_SIZE = int(os.getenv("PAGE_GROUP_SIZE", "3"))
+PAGE_GROUP_STRIDE = int(os.getenv("PAGE_GROUP_STRIDE", "2"))
