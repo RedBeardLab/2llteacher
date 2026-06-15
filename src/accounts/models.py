@@ -66,27 +66,6 @@ class TeacherAssistant(models.Model):
         return f"TeacherAssistant: {self.user.username}"
 
 
-class CanvasProfile(models.Model):
-    """Stores Canvas LMS OAuth2 credentials linked to a User."""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name="canvas_profile"
-    )
-    canvas_user_id = models.CharField(max_length=64, unique=True)
-    access_token = models.CharField(max_length=255, blank=True)
-    refresh_token = models.CharField(max_length=255, blank=True)
-    token_expires_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "accounts_canvas_profile"
-
-    def __str__(self):
-        return f"Canvas({self.canvas_user_id}) -> {self.user.username}"
-
-
 class EmailVerification(models.Model):
     """Email verification tokens for user registration."""
 

@@ -51,11 +51,11 @@ class CourseMaterialUploadView(View):
         if not form.is_valid():
             for errors in form.errors.values():
                 for error in errors:
-                    messages.error(request, error)
+                    messages.error(request, str(error))
             return redirect("courses:detail", course_id=course.id)
 
         created_count = 0
-        for uploaded_file in form.cleaned_data["files"]:
+        for uploaded_file in form.cleaned_data["pdf_files"]:
             uploaded_file.seek(0)
             pdf_data = uploaded_file.read()
             checksum = hashlib.sha256(pdf_data).hexdigest()
@@ -110,7 +110,7 @@ class CourseMaterialEditView(View):
         if not form.is_valid():
             for errors in form.errors.values():
                 for error in errors:
-                    messages.error(request, error)
+                    messages.error(request, str(error))
             return redirect("courses:detail", course_id=course.id)
 
         material.title = form.cleaned_data["title"]
@@ -166,15 +166,15 @@ class CourseMaterialPdfView(View):
 
         etag = f'"{material.checksum}"'
         if request.headers.get("If-None-Match") == etag:
-            response = HttpResponseNotModified()
+            response: HttpResponse = HttpResponseNotModified()
         else:
             blob = get_object_or_404(CourseMaterialBlob, material=material)
             response = HttpResponse(blob.data, content_type="application/pdf")
 
         filename = material.original_filename or "material.pdf"
         response.headers["Content-Type"] = "application/pdf"
-        response.headers["Content-Disposition"] = content_disposition_header(
-            False, filename
+        response.headers["Content-Disposition"] = (
+            content_disposition_header(False, filename) or "attachment"
         )
         response.headers["ETag"] = etag
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"

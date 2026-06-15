@@ -17,10 +17,23 @@ from courses.models import (
     CourseTeacher,
     CourseTeacherAssistant,
 )
-from courses.views import CourseListView, CourseListData, CourseCreateView, CourseDetailView
+from courses.views import (
+    CourseListView,
+    CourseListData,
+    CourseCreateView,
+    CourseDetailView,
+)
 from courses.enums import CourseRole
-from accounts.models import Teacher, Student, TeacherAssistant, CanvasProfile
-from accounts.canvas_service import CanvasOAuth2Service, CanvasCourseInfo, CanvasModule, CanvasModuleItem, CanvasFile
+from accounts.models import Teacher, Student, TeacherAssistant
+from canvas.canvas_service import (
+    CanvasOAuth2Service,
+    CanvasCourseInfo,
+    CanvasModule,
+    CanvasModuleItem,
+    CanvasFile,
+)
+from canvas.models import CanvasProfile, CanvasFileSync
+from rag.models import CourseMaterial, CourseMaterialBlob
 from homeworks.models import Section
 from conversations.models import Conversation, Submission, SectionAnswer
 
@@ -2059,7 +2072,11 @@ class CourseCreateViewCanvasTests(TestCase):
         self.mock_canvas_service = Mock(spec=CanvasOAuth2Service)
 
     def _patch_service(self):
-        return patch.object(CourseCreateView, "canvas_service_factory", return_value=self.mock_canvas_service)
+        return patch.object(
+            CourseCreateView,
+            "canvas_service_factory",
+            return_value=self.mock_canvas_service,
+        )
 
     def _login_teacher(self):
         self.client.login(username="canvas_teacher", password="password123")
@@ -2085,9 +2102,7 @@ class CourseCreateViewCanvasTests(TestCase):
             refresh_token="ref",
         )
         self.mock_canvas_service.get_teacher_courses_for_user.return_value = [
-            CanvasCourseInfo(
-                canvas_course_id="1", name="Intro to CS", code="CSE101"
-            ),
+            CanvasCourseInfo(canvas_course_id="1", name="Intro to CS", code="CSE101"),
             CanvasCourseInfo(
                 canvas_course_id="2", name="Data Structures", code="CSE201"
             ),
@@ -2116,7 +2131,9 @@ class CourseCreateViewCanvasTests(TestCase):
             access_token="tok",
             refresh_token="ref",
         )
-        self.mock_canvas_service.get_teacher_courses_for_user.side_effect = Exception("API down")
+        self.mock_canvas_service.get_teacher_courses_for_user.side_effect = Exception(
+            "API down"
+        )
         self._login_teacher()
         with self._patch_service():
             response = self.client.get(self.url)
@@ -2133,9 +2150,7 @@ class CourseCreateViewCanvasTests(TestCase):
             refresh_token="ref",
         )
         self.mock_canvas_service.get_teacher_courses_for_user.return_value = [
-            CanvasCourseInfo(
-                canvas_course_id="42", name="Physics 101", code="PHYS101"
-            ),
+            CanvasCourseInfo(canvas_course_id="42", name="Physics 101", code="PHYS101"),
         ]
         self._login_teacher()
         with self._patch_service():
@@ -2203,6 +2218,7 @@ class CourseDetailViewCanvasTests(TestCase):
 
         self.url = reverse("courses:detail", kwargs={"course_id": self.course.id})
         self.mock_canvas_service = Mock(spec=CanvasOAuth2Service)
+        self.mock_canvas_service.get_course_modules_for_user.return_value = []
         CanvasProfile.objects.create(
             user=self.teacher_user,
             canvas_user_id="200",
@@ -2212,7 +2228,9 @@ class CourseDetailViewCanvasTests(TestCase):
 
     def _patch_service(self):
         return patch.object(
-            CourseDetailView, "canvas_service_factory", return_value=self.mock_canvas_service
+            CourseDetailView,
+            "canvas_service_factory",
+            return_value=self.mock_canvas_service,
         )
 
     def _login_teacher(self):
@@ -2228,9 +2246,7 @@ class CourseDetailViewCanvasTests(TestCase):
                 module_id="1",
                 name="Week 1",
                 items=[
-                    CanvasModuleItem(
-                        item_id="10", title="Syllabus", type="Page"
-                    ),
+                    CanvasModuleItem(item_id="10", title="Syllabus", type="Page"),
                 ],
             ),
         ]
@@ -2295,8 +2311,12 @@ class CourseDetailViewCanvasTests(TestCase):
 
     def test_canvas_api_error_does_not_crash(self):
         """Canvas API error does not crash the view; materials are None."""
-        self.mock_canvas_service.get_course_modules_for_user.side_effect = Exception("API error")
-        self.mock_canvas_service.get_course_files_for_user.side_effect = Exception("API error")
+        self.mock_canvas_service.get_course_modules_for_user.side_effect = Exception(
+            "API error"
+        )
+        self.mock_canvas_service.get_course_files_for_user.side_effect = Exception(
+            "API error"
+        )
         self._login_teacher()
         with self._patch_service():
             response = self.client.get(self.url)
@@ -2304,3 +2324,162 @@ class CourseDetailViewCanvasTests(TestCase):
         data = response.context["data"]
         self.assertIsNone(data.canvas_modules)
         self.assertIsNone(data.canvas_files)
+
+    def test_synced_and_indexed_ids_empty_when_no_syncs(self):
+        """File in Canvas but never imported: synced/indexed sets are empty."""
+        self.mock_canvas_service.get_course_modules_for_user.return_value = []
+        self.mock_canvas_service.get_course_files_for_user.return_value = [
+            CanvasFile(
+                file_id="100",
+                display_name="lecture1.pdf",
+                filename="lecture1.pdf",
+                url="https://canvas/files/100",
+                size=1024,
+            ),
+        ]
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIsNotNone(data.canvas_files)
+        self.assertIsNotNone(data.synced_canvas_file_ids)
+        self.assertIsNotNone(data.indexed_canvas_file_ids)
+        self.assertEqual(len(data.synced_canvas_file_ids), 0)
+        self.assertEqual(len(data.indexed_canvas_file_ids), 0)
+
+    def test_synced_includes_pending_file(self):
+        """File synced but not indexed is in synced set but not indexed set."""
+        self.mock_canvas_service.get_course_files_for_user.return_value = [
+            CanvasFile(
+                file_id="100",
+                display_name="lecture1.pdf",
+                filename="lecture1.pdf",
+                url="https://canvas/files/100",
+                size=1024,
+            ),
+        ]
+        material = CourseMaterial.objects.create(
+            course=self.course,
+            title="lecture1",
+            original_filename="lecture1.pdf",
+            size=1024,
+            checksum="abc123",
+        )
+        CourseMaterialBlob.objects.create(material=material, data=b"%PDF")
+        CanvasFileSync.objects.create(
+            course=self.course,
+            canvas_file_id="100",
+            display_name="lecture1.pdf",
+            filename="lecture1.pdf",
+            size=1024,
+            checksum="abc123",
+            material=material,
+        )
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIn("100", data.synced_canvas_file_ids)
+        self.assertNotIn("100", data.indexed_canvas_file_ids)
+
+    def test_indexed_includes_completed_file(self):
+        """File synced AND indexed is in both synced and indexed sets."""
+        self.mock_canvas_service.get_course_files_for_user.return_value = [
+            CanvasFile(
+                file_id="100",
+                display_name="lecture1.pdf",
+                filename="lecture1.pdf",
+                url="https://canvas/files/100",
+                size=1024,
+            ),
+        ]
+        material = CourseMaterial.objects.create(
+            course=self.course,
+            title="lecture1",
+            original_filename="lecture1.pdf",
+            size=1024,
+            checksum="abc123",
+            processing_status="completed",
+        )
+        CourseMaterialBlob.objects.create(material=material, data=b"%PDF")
+        CanvasFileSync.objects.create(
+            course=self.course,
+            canvas_file_id="100",
+            display_name="lecture1.pdf",
+            filename="lecture1.pdf",
+            size=1024,
+            checksum="abc123",
+            material=material,
+        )
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIn("100", data.synced_canvas_file_ids)
+        self.assertIn("100", data.indexed_canvas_file_ids)
+
+    def test_indexed_excludes_pending_mixed_status(self):
+        """Multiple files: indexed set only includes completed ones."""
+        self.mock_canvas_service.get_course_files_for_user.return_value = [
+            CanvasFile(
+                file_id=f"{i}00",
+                display_name=f"file{i}.pdf",
+                filename=f"file{i}.pdf",
+                url=f"https://canvas/files/{i}00",
+                size=1024,
+            )
+            for i in range(1, 4)
+        ]
+        for i, status in [(1, "completed"), (2, "pending"), (3, "failed")]:
+            material = CourseMaterial.objects.create(
+                course=self.course,
+                title=f"file{i}",
+                original_filename=f"file{i}.pdf",
+                size=1024,
+                checksum=f"abc{i}",
+                processing_status=status,
+            )
+            CourseMaterialBlob.objects.create(material=material, data=b"%PDF")
+            CanvasFileSync.objects.create(
+                course=self.course,
+                canvas_file_id=f"{i}00",
+                display_name=f"file{i}.pdf",
+                filename=f"file{i}.pdf",
+                size=1024,
+                checksum=f"abc{i}",
+                material=material,
+            )
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        # All three are synced
+        self.assertIn("100", data.synced_canvas_file_ids)
+        self.assertIn("200", data.synced_canvas_file_ids)
+        self.assertIn("300", data.synced_canvas_file_ids)
+        # Only completed one is indexed
+        self.assertIn("100", data.indexed_canvas_file_ids)
+        self.assertNotIn("200", data.indexed_canvas_file_ids)
+        self.assertNotIn("300", data.indexed_canvas_file_ids)
+
+    def test_no_canvas_files_returns_none_for_sync_and_indexed(self):
+        """When canvas_files is None, both sync and indexed sets are None."""
+        self.mock_canvas_service.get_course_modules_for_user.side_effect = Exception(
+            "API error"
+        )
+        self.mock_canvas_service.get_course_files_for_user.side_effect = Exception(
+            "API error"
+        )
+        self._login_teacher()
+        with self._patch_service():
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        data = response.context["data"]
+        self.assertIsNone(data.canvas_modules)
+        self.assertIsNone(data.canvas_files)
+        self.assertIsNone(data.synced_canvas_file_ids)
+        self.assertIsNone(data.indexed_canvas_file_ids)

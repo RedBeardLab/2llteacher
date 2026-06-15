@@ -5,16 +5,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('chat', '0001_initial'),
-        ('rag', '0002_coursematerialchunk_coursematerial_error_message_and_more'),
+        ("chat", "0001_initial"),
+        ("rag", "0002_coursematerialchunk_coursematerial_error_message_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='chatmessagecontext',
-            name='chunk',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='rag.coursematerialchunk'),
+            model_name="chatmessagecontext",
+            name="chunk",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                to="rag.coursematerialchunk",
+            ),
         ),
     ]

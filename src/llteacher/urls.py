@@ -18,4 +18,5 @@ urlpatterns = [
     path("llm/", include("llm.urls")),
     path("chat/", include("chat.urls")),
     path("materials/", include("rag.urls", namespace="materials")),
+    path("canvas/", include("canvas.urls")),
 ]

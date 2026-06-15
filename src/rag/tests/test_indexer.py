@@ -100,7 +100,7 @@ class MaterialIndexerTests(TestCase):
         for chunk in CourseMaterialChunk.objects.filter(material=self.material):
             self.assertIsNotNone(chunk.embedding)
 
-    def test_status_transitions_to_failed_on_error(self):
+    def test_raises_on_error(self):
         class FailingExtractor:
             def __call__(self, pdf_data):
                 raise ValueError("Bad PDF")
@@ -108,10 +108,8 @@ class MaterialIndexerTests(TestCase):
         indexer = MaterialIndexer(
             extractor=FailingExtractor(), chunker=FakeChunker(), embedder=FakeEmbedder()
         )
-        indexer.index(str(self.material.id))
-        self.material.refresh_from_db()
-        self.assertEqual(self.material.processing_status, "failed")
-        self.assertIn("Bad PDF", self.material.error_message)
+        with self.assertRaises(ValueError):
+            indexer.index(str(self.material.id))
 
     def test_no_chunks_created_on_failure(self):
         class FailingExtractor:
@@ -121,7 +119,8 @@ class MaterialIndexerTests(TestCase):
         indexer = MaterialIndexer(
             extractor=FailingExtractor(), chunker=FakeChunker(), embedder=FakeEmbedder()
         )
-        indexer.index(str(self.material.id))
+        with self.assertRaises(RuntimeError):
+            indexer.index(str(self.material.id))
         self.assertEqual(
             CourseMaterialChunk.objects.filter(material=self.material).count(), 0
         )

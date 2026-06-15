@@ -1,0 +1,157 @@
+[2026-06-09 21:35:00,783] INFO:huey.consumer:MainThread:Huey consumer started with 2 thread, PID 4184 at 2026-06-10 04:35:00.783910
+[2026-06-09 21:35:00,784] INFO:huey.consumer:MainThread:Scheduler runs every 1 second(s).
+[2026-06-09 21:35:00,784] INFO:huey.consumer:MainThread:Periodic tasks are enabled.
+[2026-06-09 21:35:00,784] INFO:huey.consumer:MainThread:The following commands are available:
++ rag.tasks.index_course_material
+[2026-06-09 21:35:22,155] INFO:huey:Worker-1:Executing rag.tasks.index_course_material: a5db8ef7-1415-4ffa-8706-4bba871d053a @2026-06-10 04:35:21.431585 2 retries
+[2026-06-09 21:35:22,161] INFO:huey:Worker-2:Executing rag.tasks.index_course_material: 31982951-ece8-48b7-9ef1-7ed10d750fc9 @2026-06-10 04:35:21.431793 2 retries
+[2026-06-09 21:35:22,220] ERROR:huey:Worker-1:Unhandled exception in task a5db8ef7-1415-4ffa-8706-4bba871d053a.
+Traceback (most recent call last):
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/shortcuts.py", line 90, in get_object_or_404
+    return queryset.get(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/db/models/query.py", line 635, in get
+    raise self.model.DoesNotExist(
+rag.models.CourseMaterial.DoesNotExist: CourseMaterial matching query does not exist.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/huey/api.py", line 451, in _execute
+    task_value = task.execute()
+                 ^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/huey/api.py", line 962, in execute
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/src/rag/tasks.py", line 47, in index_course_material
+    indexer.index(material_id)
+  File "/Users/simone/personal/2_llteacher/src/rag/services/indexer.py", line 38, in index
+    material = get_object_or_404(CourseMaterial, id=material_id)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/shortcuts.py", line 92, in get_object_or_404
+    raise Http404(
+django.http.response.Http404: No CourseMaterial matches the given query.
+[2026-06-09 21:35:22,220] ERROR:huey:Worker-2:Unhandled exception in task 31982951-ece8-48b7-9ef1-7ed10d750fc9.
+Traceback (most recent call last):
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/shortcuts.py", line 90, in get_object_or_404
+    return queryset.get(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/db/models/query.py", line 635, in get
+    raise self.model.DoesNotExist(
+rag.models.CourseMaterial.DoesNotExist: CourseMaterial matching query does not exist.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/huey/api.py", line 451, in _execute
+    task_value = task.execute()
+                 ^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/huey/api.py", line 962, in execute
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/src/rag/tasks.py", line 47, in index_course_material
+    indexer.index(material_id)
+  File "/Users/simone/personal/2_llteacher/src/rag/services/indexer.py", line 38, in index
+    material = get_object_or_404(CourseMaterial, id=material_id)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/shortcuts.py", line 92, in get_object_or_404
+    raise Http404(
+django.http.response.Http404: No CourseMaterial matches the given query.
+[2026-06-09 21:35:22,222] INFO:huey:Worker-1:Requeueing a5db8ef7-1415-4ffa-8706-4bba871d053a, 1 retries
+[2026-06-09 21:35:22,222] INFO:huey:Worker-1:Added task a5db8ef7-1415-4ffa-8706-4bba871d053a to schedule, eta 2026-06-10 04:36:22.222827
+[2026-06-09 21:35:22,223] INFO:huey:Worker-2:Requeueing 31982951-ece8-48b7-9ef1-7ed10d750fc9, 1 retries
+[2026-06-09 21:35:22,223] INFO:huey:Worker-2:Added task 31982951-ece8-48b7-9ef1-7ed10d750fc9 to schedule, eta 2026-06-10 04:36:22.223043
+[2026-06-09 21:35:22,223] INFO:huey:Worker-1:Executing rag.tasks.index_course_material: 647973af-e30a-41e9-8638-d471edf27a1e @2026-06-10 04:35:21.454669 2 retries
+[2026-06-09 21:35:22,223] INFO:huey:Worker-2:Executing rag.tasks.index_course_material: aabcb5de-98a0-48a8-acf3-25e1c6fcf380 @2026-06-10 04:35:21.454824 2 retries
+[2026-06-09 21:35:22,247] ERROR:huey:Worker-2:Unhandled exception in task aabcb5de-98a0-48a8-acf3-25e1c6fcf380.
+Traceback (most recent call last):
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/shortcuts.py", line 90, in get_object_or_404
+    return queryset.get(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/db/models/query.py", line 635, in get
+    raise self.model.DoesNotExist(
+rag.models.CourseMaterial.DoesNotExist: CourseMaterial matching query does not exist.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/huey/api.py", line 451, in _execute
+    task_value = task.execute()
+                 ^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/huey/api.py", line 962, in execute
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/src/rag/tasks.py", line 47, in index_course_material
+    indexer.index(material_id)
+  File "/Users/simone/personal/2_llteacher/src/rag/services/indexer.py", line 38, in index
+    material = get_object_or_404(CourseMaterial, id=material_id)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/shortcuts.py", line 92, in get_object_or_404
+    raise Http404(
+django.http.response.Http404: No CourseMaterial matches the given query.
+[2026-06-09 21:35:22,247] ERROR:huey:Worker-1:Unhandled exception in task 647973af-e30a-41e9-8638-d471edf27a1e.
+Traceback (most recent call last):
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/shortcuts.py", line 90, in get_object_or_404
+    return queryset.get(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/db/models/query.py", line 635, in get
+    raise self.model.DoesNotExist(
+rag.models.CourseMaterial.DoesNotExist: CourseMaterial matching query does not exist.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/huey/api.py", line 451, in _execute
+    task_value = task.execute()
+                 ^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/huey/api.py", line 962, in execute
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/src/rag/tasks.py", line 47, in index_course_material
+    indexer.index(material_id)
+  File "/Users/simone/personal/2_llteacher/src/rag/services/indexer.py", line 38, in index
+    material = get_object_or_404(CourseMaterial, id=material_id)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/simone/personal/2_llteacher/.venv/lib/python3.12/site-packages/django/shortcuts.py", line 92, in get_object_or_404
+    raise Http404(
+django.http.response.Http404: No CourseMaterial matches the given query.
+[2026-06-09 21:35:22,248] INFO:huey:Worker-2:Requeueing aabcb5de-98a0-48a8-acf3-25e1c6fcf380, 1 retries
+[2026-06-09 21:35:22,248] INFO:huey:Worker-1:Requeueing 647973af-e30a-41e9-8638-d471edf27a1e, 1 retries
+[2026-06-09 21:35:22,248] INFO:huey:Worker-2:Added task aabcb5de-98a0-48a8-acf3-25e1c6fcf380 to schedule, eta 2026-06-10 04:36:22.248133
+[2026-06-09 21:35:22,248] INFO:huey:Worker-1:Added task 647973af-e30a-41e9-8638-d471edf27a1e to schedule, eta 2026-06-10 04:36:22.248268
+[2026-06-09 21:36:48,826] INFO:huey:Worker-1:Executing rag.tasks.index_course_material: 309aef86-bff9-48d1-a7d1-7e56e50e996c 3 retries
+[2026-06-09 21:36:50,261] INFO:huey:Worker-1:rag.tasks.index_course_material: 309aef86-bff9-48d1-a7d1-7e56e50e996c 3 retries executed in 1.434s
+[2026-06-09 21:39:26,862] INFO:huey:Worker-1:Executing rag.tasks.index_course_material: 30b38bb1-dd63-439b-8840-a2d2f57ed977 3 retries
+[2026-06-09 21:39:27,613] INFO:huey:Worker-1:rag.tasks.index_course_material: 30b38bb1-dd63-439b-8840-a2d2f57ed977 3 retries executed in 0.751s
+[2026-06-09 23:10:15,919] INFO:huey:Worker-1:Executing rag.tasks.index_course_material: aa1542f2-f005-4869-986e-ce6846a4b9f4 3 retries
+[2026-06-09 23:10:17,246] INFO:huey:Worker-1:rag.tasks.index_course_material: aa1542f2-f005-4869-986e-ce6846a4b9f4 3 retries executed in 1.326s
+[2026-06-10 15:47:57,326] INFO:huey.consumer:MainThread:Received SIGTERM
+[2026-06-10 15:47:57,326] INFO:huey.consumer:MainThread:Received SIGTERM
+[2026-06-10 15:47:57,339] INFO:huey.consumer:MainThread:Shutting down
+[2026-06-10 15:47:57,339] INFO:huey.consumer:MainThread:Consumer exiting.
+[2026-06-10 15:49:01,194] INFO:huey.consumer:MainThread:Huey consumer started with 2 thread, PID 35857 at 2026-06-10 22:49:01.194892
+[2026-06-10 15:49:01,194] INFO:huey.consumer:MainThread:Scheduler runs every 1 second(s).
+[2026-06-10 15:49:01,195] INFO:huey.consumer:MainThread:Periodic tasks are enabled.
+[2026-06-10 15:49:01,195] INFO:huey.consumer:MainThread:The following commands are available:
++ rag.tasks.index_course_material
+[2026-06-10 16:25:28,455] INFO:huey:Worker-2:Executing rag.tasks.index_course_material: 9bc70283-ba00-4e29-aa87-d3640eb8b613 3 retries
+[2026-06-10 16:25:30,922] INFO:huey:Worker-2:rag.tasks.index_course_material: 9bc70283-ba00-4e29-aa87-d3640eb8b613 3 retries executed in 2.467s
+[2026-06-10 16:39:27,745] INFO:huey:Worker-2:Executing rag.tasks.index_course_material: 7525328f-869f-4f12-b769-b5a73d456ecf 3 retries
+[2026-06-10 16:39:29,883] INFO:huey:Worker-2:rag.tasks.index_course_material: 7525328f-869f-4f12-b769-b5a73d456ecf 3 retries executed in 2.137s
+[2026-06-10 16:39:46,365] INFO:huey.consumer:MainThread:Received SIGINT
+[2026-06-10 16:39:46,411] INFO:huey.consumer:MainThread:Shutting down gracefully...
+[2026-06-10 16:39:48,784] INFO:huey.consumer:MainThread:All workers have stopped.
+[2026-06-10 16:39:48,784] INFO:huey.consumer:MainThread:Consumer exiting.
+[2026-06-10 16:40:24,754] INFO:huey.consumer:MainThread:Huey consumer started with 2 thread, PID 51132 at 2026-06-10 23:40:24.754384
+[2026-06-10 16:40:24,754] INFO:huey.consumer:MainThread:Scheduler runs every 1 second(s).
+[2026-06-10 16:40:24,754] INFO:huey.consumer:MainThread:Periodic tasks are enabled.
+[2026-06-10 16:40:24,754] INFO:huey.consumer:MainThread:The following commands are available:
++ rag.tasks.index_course_material
+[2026-06-10 16:40:31,320] INFO:huey:Worker-1:Executing rag.tasks.index_course_material: 23ec617c-96d1-49ce-ba8d-f2857eac8d05 3 retries
+[2026-06-10 16:40:48,907] INFO:huey:Worker-1:rag.tasks.index_course_material: 23ec617c-96d1-49ce-ba8d-f2857eac8d05 3 retries executed in 17.587s
+[2026-06-10 16:56:31,656] INFO:huey:Worker-2:Executing rag.tasks.index_course_material: 3ba87f81-9857-46ff-a1fa-810fcfc48fb2 3 retries
+[2026-06-10 16:56:48,541] INFO:huey:Worker-2:rag.tasks.index_course_material: 3ba87f81-9857-46ff-a1fa-810fcfc48fb2 3 retries executed in 16.884s
+[2026-06-11 08:44:55,010] INFO:huey.consumer:MainThread:Received SIGINT
+[2026-06-11 08:44:55,020] INFO:huey.consumer:MainThread:Shutting down gracefully...
+[2026-06-11 08:44:59,111] INFO:huey.consumer:MainThread:All workers have stopped.
+[2026-06-11 08:44:59,112] INFO:huey.consumer:MainThread:Consumer exiting.

@@ -31,9 +31,7 @@ class ChatMessage(models.Model):
     MESSAGE_TYPE_SYSTEM = "system"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    chat = models.ForeignKey(
-        Chat, on_delete=models.CASCADE, related_name="messages"
-    )
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name="messages")
     content = models.TextField(validators=[MinLengthValidator(1)])
     message_type = models.CharField(max_length=50)
     tool_call_id = models.CharField(max_length=100, null=True, blank=True)

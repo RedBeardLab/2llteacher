@@ -1,6 +1,7 @@
 import logging
 import struct
-from typing import Callable
+from collections.abc import Callable
+from typing import Protocol
 
 from django.shortcuts import get_object_or_404
 
@@ -13,7 +14,7 @@ PageExtractor = Callable[[bytes], list[PageText]]
 Chunker = Callable[[list[PageText]], list[Chunk]]
 
 
-class Embedder:
+class Embedder(Protocol):
     def embed(self, texts: list[str]) -> list[list[float]]: ...
 
 
@@ -40,40 +41,31 @@ class MaterialIndexer:
         material.error_message = ""
         material.save(update_fields=["processing_status", "error_message"])
 
-        try:
-            blob = material.blob
-            pages = self._extract(blob.data)
-            chunks = self._chunk(pages)
+        blob = material.blob
+        pages = self._extract(blob.data)
+        chunks = self._chunk(pages)
 
-            chunk_texts = [c.content for c in chunks]
-            embeddings = self._embedder.embed(chunk_texts)
+        chunk_texts = [c.content for c in chunks]
+        embeddings = self._embedder.embed(chunk_texts)
 
-            CourseMaterialChunk.objects.filter(material=material).delete()
+        CourseMaterialChunk.objects.filter(material=material).delete()
 
-            chunk_records = [
-                CourseMaterialChunk(
-                    material=material,
-                    level=c.level,
-                    chunk_index=ci,
-                    page_group_index=c.page_group_index,
-                    content=c.content,
-                    page_start=c.page_start,
-                    page_end=c.page_end,
-                    embedding=_embedding_to_blob(embeddings[ci]),
-                    token_count=len(c.content.split()),
-                )
-                for ci, c in enumerate(chunks)
-            ]
-            CourseMaterialChunk.objects.bulk_create(chunk_records)
+        chunk_records = [
+            CourseMaterialChunk(
+                material=material,
+                level=c.level,
+                chunk_index=ci,
+                page_group_index=c.page_group_index,
+                content=c.content,
+                page_start=c.page_start,
+                page_end=c.page_end,
+                embedding=_embedding_to_blob(embeddings[ci]),
+                token_count=len(c.content.split()),
+            )
+            for ci, c in enumerate(chunks)
+        ]
+        CourseMaterialChunk.objects.bulk_create(chunk_records)
 
-            material.processing_status = ProcessingStatus.COMPLETED
-            material.pages = len(pages)
-            material.save(update_fields=["processing_status", "pages"])
-
-        except Exception:
-            logger.exception("Failed to index material %s", material_id)
-            material.processing_status = ProcessingStatus.FAILED
-            import traceback
-
-            material.error_message = traceback.format_exc()
-            material.save(update_fields=["processing_status", "error_message"])
+        material.processing_status = ProcessingStatus.COMPLETED
+        material.pages = len(pages)
+        material.save(update_fields=["processing_status", "pages"])

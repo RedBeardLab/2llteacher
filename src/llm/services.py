@@ -1127,19 +1127,13 @@ class LLMService:
     def get_chat_config(course_id: UUID) -> Optional[LLMConfigData]:
         from .models import LLMConfig, GlobalLLMDefault
 
-        config = LLMConfig.objects.filter(
-            course_id=course_id, is_active=True
-        ).first()
+        config = LLMConfig.objects.filter(course_id=course_id, is_active=True).first()
         if config:
             return LLMConfigData.from_model(config)
         default = GlobalLLMDefault.objects.filter(is_active=True).first()
         if default:
-            from .models import LLMConfig as _LLMConfig
-
             if hasattr(default, "create_course_config"):
-                llm_config = default.create_course_config(
-                    lambda: None
-                )  # placeholder
+                llm_config = default.create_course_config(lambda: None)  # placeholder
                 if llm_config:
                     return LLMConfigData.from_model(llm_config)
             return LLMConfigData(
@@ -1193,7 +1187,6 @@ class LLMService:
         messages: list[dict],
         available_functions: List[FunctionDefinition],
     ) -> LLMResponseWithTools:
-        start_time = time.perf_counter()
         try:
             client = OpenAI(
                 base_url="https://openrouter.ai/api/v1",
@@ -1219,12 +1212,19 @@ class LLMService:
                 },
             )
 
+            from openai.types.chat import ChatCompletionMessageParam
+            from openai.types.chat import ChatCompletionToolUnionParam
+            from openai._types import Omit
+
+            tools_param: list[ChatCompletionToolUnionParam] | Omit = cast(
+                list[ChatCompletionToolUnionParam], tools
+            ) if tools else Omit()
             response = client.chat.completions.create(
                 model=llm_config.model_name,
-                messages=messages,
+                messages=cast(list[ChatCompletionMessageParam], messages),
                 temperature=llm_config.temperature,
                 max_completion_tokens=llm_config.max_completion_tokens,
-                tools=tools if tools else None,
+                tools=tools_param,
             )
 
             if response.choices and len(response.choices) > 0:
@@ -1233,14 +1233,9 @@ class LLMService:
                 tokens_used = response.usage.total_tokens if response.usage else 0
 
                 function_calls = []
-                if (
-                    hasattr(choice.message, "tool_calls")
-                    and choice.message.tool_calls
-                ):
+                if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
                     for tool_call in choice.message.tool_calls:
-                        payload = LLMService._get_function_tool_call_payload(
-                            tool_call
-                        )
+                        payload = LLMService._get_function_tool_call_payload(tool_call)
                         if payload is None:
                             continue
                         function_name, function_arguments = payload
@@ -1281,9 +1276,7 @@ class LLMService:
 
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
-            return LLMResponseWithTools(
-                tokens_used=0, success=False, error=str(e)
-            )
+            return LLMResponseWithTools(tokens_used=0, success=False, error=str(e))
 
     @staticmethod
     @traced
@@ -1292,7 +1285,6 @@ class LLMService:
         messages: list[dict],
         available_functions: List[FunctionDefinition],
     ) -> Iterator[tuple[str, List[FunctionCall], FinishReason | None]]:
-        start_time = time.perf_counter()
 
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -1307,22 +1299,29 @@ class LLMService:
 
         tools = [func.to_openai_format() for func in available_functions]
 
+        from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
+        from openai.types.chat import ChatCompletionToolUnionParam
+        from openai._types import Omit
+
+        tools_param: list[ChatCompletionToolUnionParam] | Omit = cast(
+            list[ChatCompletionToolUnionParam], tools
+        ) if tools else Omit()
         stream = client.chat.completions.create(
             model=llm_config.model_name,
-            messages=messages,
+            messages=cast(list[ChatCompletionMessageParam], messages),
             temperature=llm_config.temperature,
             max_completion_tokens=llm_config.max_completion_tokens,
             stream=True,
-            tools=tools if tools else None,
+            tools=tools_param,
         )
 
         finish_reason = None
         first_token_time = None
         token_count = 0
         tool_calls_accumulator = {}
-        query_prepared_time = time.perf_counter()
 
         for chunk in stream:
+            assert isinstance(chunk, ChatCompletionChunk)
             if not (chunk.choices and len(chunk.choices) > 0):
                 continue
 
@@ -1353,16 +1352,16 @@ class LLMService:
                             hasattr(tool_call_delta.function, "name")
                             and tool_call_delta.function.name
                         ):
-                            tool_calls_accumulator[index][
-                                "name"
-                            ] = tool_call_delta.function.name
+                            tool_calls_accumulator[index]["name"] = (
+                                tool_call_delta.function.name
+                            )
                         if (
                             hasattr(tool_call_delta.function, "arguments")
                             and tool_call_delta.function.arguments
                         ):
-                            tool_calls_accumulator[index][
-                                "arguments"
-                            ] += tool_call_delta.function.arguments
+                            tool_calls_accumulator[index]["arguments"] += (
+                                tool_call_delta.function.arguments
+                            )
 
             if hasattr(choice, "finish_reason") and choice.finish_reason:
                 try:

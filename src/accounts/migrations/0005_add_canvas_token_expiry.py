@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0004_add_canvas_profile'),
+        ("accounts", "0004_add_canvas_profile"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='canvasprofile',
-            name='token_expires_at',
+            model_name="canvasprofile",
+            name="token_expires_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
     ]

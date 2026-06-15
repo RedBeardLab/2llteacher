@@ -1,8 +1,8 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 
-from accounts.models import User, Teacher, Student
-from courses.models import Course, CourseTeacher, CourseEnrollment
+from accounts.models import User
+from courses.models import Course
 from chat.models import Chat, ChatMessage, ChatMessageContext
 
 
@@ -12,7 +12,9 @@ class ChatModelTest(TestCase):
         self.course = Course.objects.create(name="Test Course", code="TC101")
 
     def test_chat_str(self):
-        chat = Chat.objects.create(user=self.user, course=self.course, title="Test Chat")
+        chat = Chat.objects.create(
+            user=self.user, course=self.course, title="Test Chat"
+        )
         self.assertIn("Test Course", str(chat))
 
     def test_chat_defaults(self):
@@ -50,34 +52,36 @@ class ChatModelTest(TestCase):
     def test_chat_meta_ordering(self):
         c1 = Chat.objects.create(user=self.user, course=self.course)
         c2 = Chat.objects.create(user=self.user, course=self.course)
-        self.assertQuerySetEqual(
-            Chat.objects.all(), [c2, c1], transform=lambda c: c
-        )
+        self.assertQuerySetEqual(Chat.objects.all(), [c2, c1], transform=lambda c: c)
 
     def test_message_meta_ordering(self):
         chat = Chat.objects.create(user=self.user, course=self.course)
-        m1 = ChatMessage.objects.create(
-            chat=chat, content="A", message_type="student"
-        )
-        m2 = ChatMessage.objects.create(
-            chat=chat, content="B", message_type="ai"
-        )
+        m1 = ChatMessage.objects.create(chat=chat, content="A", message_type="student")
+        m2 = ChatMessage.objects.create(chat=chat, content="B", message_type="ai")
         self.assertQuerySetEqual(
             ChatMessage.objects.all(), [m1, m2], transform=lambda m: m
         )
 
     def test_context_meta_ordering_by_score(self):
         chat = Chat.objects.create(user=self.user, course=self.course)
-        msg = ChatMessage.objects.create(
-            chat=chat, content="test", message_type="ai"
-        )
+        msg = ChatMessage.objects.create(chat=chat, content="test", message_type="ai")
         c1 = ChatMessageContext.objects.create(
-            message=msg, material_title="A", page_start=1, page_end=1,
-            content="x", score=0.5, query="q",
+            message=msg,
+            material_title="A",
+            page_start=1,
+            page_end=1,
+            content="x",
+            score=0.5,
+            query="q",
         )
         c2 = ChatMessageContext.objects.create(
-            message=msg, material_title="B", page_start=2, page_end=2,
-            content="y", score=0.1, query="q",
+            message=msg,
+            material_title="B",
+            page_start=2,
+            page_end=2,
+            content="y",
+            score=0.1,
+            query="q",
         )
         self.assertQuerySetEqual(
             ChatMessageContext.objects.all(), [c2, c1], transform=lambda c: c

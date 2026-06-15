@@ -62,9 +62,6 @@ class ChatService:
     def process_message_stream(chat: Chat, content: str) -> Iterator[str]:
         from llm.services import (
             LLMService,
-            FunctionDefinition,
-            LLMResponseWithTools,
-            FinishReason,
         )
 
         user_msg = ChatMessage.objects.create(
@@ -96,6 +93,7 @@ class ChatService:
             return
 
         if response.has_function_calls:
+            assert response.function_calls is not None
             fc = response.function_calls[0]
 
             query = fc.arguments.get("query", "")
@@ -124,9 +122,13 @@ class ChatService:
             )
             context_texts = []
             for c in chunks:
-                pdf_url = reverse("materials:pdf", kwargs={
-                    "material_id": c.material_id, "checksum": c.material_checksum,
-                })
+                pdf_url = reverse(
+                    "materials:pdf",
+                    kwargs={
+                        "material_id": c.material_id,
+                        "checksum": c.material_checksum,
+                    },
+                )
                 context_texts.append(
                     f"From [{c.material_title}]({pdf_url}#page={c.page_start}) "
                     f"(p.{c.page_start}-{c.page_end}):\n{c.content}"
@@ -141,7 +143,11 @@ class ChatService:
 
             accumulated = ""
             try:
-                for token_text, tool_calls, finish_reason in LLMService._stream_chat_response(
+                for (
+                    token_text,
+                    tool_calls,
+                    finish_reason,
+                ) in LLMService._stream_chat_response(
                     llm_config,
                     messages_with_rag,
                     available_functions=[],
@@ -203,16 +209,20 @@ class ChatService:
         from django.db.models import Prefetch
         from llm.services import LLMService
 
-        messages = chat.messages.order_by("timestamp").select_related(
-            "chat__course"
-        ).prefetch_related(
-            Prefetch(
-                "contexts",
-                queryset=ChatMessageContext.objects.select_related("chunk__material"),
+        messages = (
+            chat.messages.order_by("timestamp")
+            .select_related("chat__course")
+            .prefetch_related(
+                Prefetch(
+                    "contexts",
+                    queryset=ChatMessageContext.objects.select_related(
+                        "chunk__material"
+                    ),
+                )
             )
         )
         system_message = LLMService._build_chat_system_message(chat)
-        result = [{"role": "system", "content": system_message}]
+        result: list[dict] = [{"role": "system", "content": system_message}]
 
         for msg in messages:
             if msg.message_type == ChatMessage.MESSAGE_TYPE_STUDENT:
@@ -238,10 +248,13 @@ class ChatService:
                     context_texts = []
                     for c in msg.contexts.all():
                         if c.chunk:
-                            pdf_url = reverse("materials:pdf", kwargs={
-                                "material_id": c.chunk.material_id,
-                                "checksum": c.chunk.material.checksum,
-                            })
+                            pdf_url = reverse(
+                                "materials:pdf",
+                                kwargs={
+                                    "material_id": c.chunk.material_id,
+                                    "checksum": c.chunk.material.checksum,
+                                },
+                            )
                             context_texts.append(
                                 f"From [{c.material_title}]({pdf_url}#page={c.page_start}) "
                                 f"(p.{c.page_start}-{c.page_end}):\n{c.content}"
@@ -277,9 +290,7 @@ class ChatService:
                 api_key=api_key,
                 timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0),
             )
-            embedder = Embedder(
-                client=client, model=settings.EMBEDDING_MODEL
-            )
+            embedder = Embedder(client=client, model=settings.EMBEDDING_MODEL)
             query_embedding = embedder.embed([query])[0]
             return search_similar(
                 query_embedding, UUID(course_id), level="chunk", top_k=5
@@ -314,9 +325,7 @@ class ChatService:
                 client = OpenAI(
                     base_url="https://openrouter.ai/api/v1",
                     api_key=llm_config.api_key,
-                    timeout=_httpx.Timeout(
-                        connect=5.0, read=10.0, write=5.0, pool=5.0
-                    ),
+                    timeout=_httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0),
                 )
                 title_response = client.chat.completions.create(
                     model="openai/gpt-4o-mini",
@@ -330,11 +339,7 @@ class ChatService:
                     temperature=0.3,
                     max_completion_tokens=30,
                 )
-                title = (
-                    title_response.choices[0]
-                    .message.content.strip()
-                    .strip('"\'')
-                )
+                title = (title_response.choices[0].message.content or "").strip().strip("\"'")
                 if title:
                     chat.title = title[:200]
                     chat.save(update_fields=["title"])
@@ -343,3 +348,4 @@ class ChatService:
             except Exception as e:
                 logger.debug(f"Failed to generate chat title: {e}")
                 return None
+        return None

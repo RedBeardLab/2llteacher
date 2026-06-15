@@ -7,13 +7,14 @@ from django.utils import timezone
 
 import requests
 
-from accounts.models import User, CanvasProfile
-from accounts.canvas_service import (
+from accounts.models import User
+from canvas.models import CanvasProfile
+from canvas.canvas_service import (
     CanvasOAuth2Service,
     CanvasTokenResult,
     CanvasUserInfo,
 )
-from accounts.views import CanvasCallbackView
+from canvas.views import CanvasCallbackView
 
 
 class CanvasServiceGetOrCreateUserTests(TestCase):
@@ -32,9 +33,7 @@ class CanvasServiceGetOrCreateUserTests(TestCase):
         self.assertEqual(profile.access_token, expected_access)
         self.assertEqual(profile.refresh_token, expected_refresh)
         self.assertIsNotNone(profile.token_expires_at)
-        self.assertTrue(
-            profile.token_expires_at > timezone.now()
-        )
+        self.assertTrue(profile.token_expires_at > timezone.now())
 
     def test_creates_new_user_with_student_profile(self):
         info = CanvasUserInfo(
@@ -74,9 +73,7 @@ class CanvasServiceGetOrCreateUserTests(TestCase):
         self._assert_tokens_persisted(user, self.access_token, self.refresh_token)
 
     def test_links_existing_user_by_email(self):
-        user = User.objects.create_user(
-            username="link@uw.edu", email="link@uw.edu"
-        )
+        user = User.objects.create_user(username="link@uw.edu", email="link@uw.edu")
 
         info = CanvasUserInfo(
             canvas_user_id="300", name="Link User", email="link@uw.edu"
@@ -90,9 +87,7 @@ class CanvasServiceGetOrCreateUserTests(TestCase):
         self.assertFalse(created)
         self.assertEqual(result.id, user.id)
         self.assertTrue(
-            CanvasProfile.objects.filter(
-                canvas_user_id="300", user=user
-            ).exists()
+            CanvasProfile.objects.filter(canvas_user_id="300", user=user).exists()
         )
         self._assert_tokens_persisted(user, self.access_token, self.refresh_token)
 
@@ -234,9 +229,7 @@ class CanvasServiceGetOrRefreshTokenTests(TestCase):
 
         profile = CanvasProfile.objects.get(user=self.user)
         self.assertEqual(profile.access_token, "fresh_token")
-        self.assertTrue(
-            profile.token_expires_at > timezone.now()
-        )
+        self.assertTrue(profile.token_expires_at > timezone.now())
 
     def test_returns_none_when_refresh_fails(self):
         CanvasProfile.objects.create(
@@ -315,7 +308,7 @@ class CanvasServiceGetUserInfoTests(TestCase):
         mock_resp.json.return_value = {
             "id": 42,
             "name": "Test User",
-            "email": "test@uw.edu",
+            "primary_email": "test@uw.edu",
             "login_id": "testuser",
         }
         self.mock_session.get.return_value = mock_resp
@@ -373,12 +366,12 @@ class CanvasLoginViewTests(TestCase):
 
     def setUp(self):
         self.client = Client()
-        self.url = reverse("accounts:canvas_login")
+        self.url = reverse("canvas:canvas_login")
 
     @override_settings(
         CANVAS_CLIENT_ID="test_client_id",
         CANVAS_BASE_URL="https://canvas.uw.edu",
-        CANVAS_OAUTH_SCOPES="url:GET|/api/v1/users/self",
+        CANVAS_OAUTH_SCOPES="url:GET|/api/v1/users/:user_id/profile",
     )
     def test_redirects_to_canvas_authorization_url(self):
         response = self.client.get(self.url)
@@ -388,9 +381,7 @@ class CanvasLoginViewTests(TestCase):
         self.assertIn("response_type=code", response.url)
         self.assertIn("state=", response.url)
         self.assertIn("redirect_uri=", response.url)
-        self.assertIn(
-            "url:GET%7C/api/v1/users/self", response.url
-        )
+        self.assertIn("url:GET%7C/api/v1/users/:user_id/profile", response.url)
 
     def test_redirects_home_when_already_authenticated(self):
         user = User.objects.create_user(username="test@uw.edu", password="pw123")
@@ -405,7 +396,7 @@ class CanvasCallbackViewTests(TestCase):
 
     def setUp(self):
         self.client = Client()
-        self.url = reverse("accounts:canvas_callback")
+        self.url = reverse("canvas:canvas_callback")
         self.mock_service = Mock(spec=CanvasOAuth2Service)
         self.patcher = patch.object(
             CanvasCallbackView, "service_factory", return_value=self.mock_service

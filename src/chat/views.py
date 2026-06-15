@@ -2,7 +2,7 @@ import json
 import logging
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse, StreamingHttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -11,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from courses.models import Course
-from chat.models import Chat, ChatMessage
+from chat.models import Chat
 from chat.services import ChatService
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,7 @@ class ChatDetailView(View):
             active_chat = get_object_or_404(Chat, id=chat_id, course=course)
             if active_chat.user != request.user or active_chat.is_deleted:
                 from django.http import Http404
+
                 raise Http404
         elif chats:
             active_chat = chats[0]
@@ -54,17 +55,24 @@ class ChatDetailView(View):
             active_chat = ChatService.start_chat(request.user, course)
             chats = [active_chat]
 
-        chat_messages_list = active_chat.messages.order_by("timestamp").select_related("chat__course")
+        chat_messages_list = active_chat.messages.order_by("timestamp").select_related(
+            "chat__course"
+        )
 
-        return render(request, "chat/course_chat.html", {
-            "chats": chats,
-            "active_chat": active_chat,
-            "course": course,
-            "chat_messages": chat_messages_list,
-            "stream_url": reverse("chat:stream", kwargs={
-                "course_id": course_id, "chat_id": active_chat.id
-            }),
-        })
+        return render(
+            request,
+            "chat/course_chat.html",
+            {
+                "chats": chats,
+                "active_chat": active_chat,
+                "course": course,
+                "chat_messages": chat_messages_list,
+                "stream_url": reverse(
+                    "chat:stream",
+                    kwargs={"course_id": course_id, "chat_id": active_chat.id},
+                ),
+            },
+        )
 
 
 @method_decorator(login_required, name="dispatch")
@@ -87,7 +95,9 @@ class ChatStreamView(View):
     def post(self, request: HttpRequest, course_id, chat_id):
         course = get_object_or_404(Course, id=course_id)
         _check_chat_access(request.user, course)
-        chat = get_object_or_404(Chat, id=chat_id, course=course, user=request.user, is_deleted=False)
+        chat = get_object_or_404(
+            Chat, id=chat_id, course=course, user=request.user, is_deleted=False
+        )
 
         try:
             body = json.loads(request.body)
@@ -103,7 +113,7 @@ class ChatStreamView(View):
                 yield from ChatService.process_message_stream(chat, content)
             except Exception as e:
                 logger.error(f"Chat stream error: {e}", exc_info=True)
-                yield f"event: error\ndata: Internal error\n\n"
+                yield "event: error\ndata: Internal error\n\n"
 
         response = StreamingHttpResponse(
             event_stream(),

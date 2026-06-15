@@ -49,7 +49,7 @@ def validate_pdf_upload(uploaded_file: Any) -> None:
 
 
 class CourseMaterialUploadForm(forms.Form):
-    files = MultipleFileField(
+    pdf_files = MultipleFileField(
         allow_empty_file=True,
         widget=MultipleFileInput(
             attrs={
@@ -60,8 +60,8 @@ class CourseMaterialUploadForm(forms.Form):
         ),
     )
 
-    def clean_files(self) -> list[Any]:
-        files = self.cleaned_data["files"]
+    def clean_pdf_files(self) -> list[Any]:
+        files = self.cleaned_data["pdf_files"]
         if not files:
             raise ValidationError("Select at least one PDF to upload.")
 

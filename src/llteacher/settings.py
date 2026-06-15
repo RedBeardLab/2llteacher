@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "llm",
     "rag",
     "chat",
+    "canvas",
 ]
 
 MIDDLEWARE = [
@@ -202,7 +203,10 @@ LOGGING = {
 # Canvas LMS OAuth2 Configuration
 CANVAS_BASE_URL = os.getenv("CANVAS_BASE_URL", "http://canvas.docker")
 CANVAS_CLIENT_ID = os.getenv("CANVAS_CLIENT_ID", "10000000000002")
-CANVAS_CLIENT_SECRET = os.getenv("CANVAS_CLIENT_SECRET", "H28F462VTY29Ct7wYuBfBnMEkZcA8ActxXAZZQaJvRTwf72ZERfVkLMrGXwMth8T")
+CANVAS_CLIENT_SECRET = os.getenv(
+    "CANVAS_CLIENT_SECRET",
+    "H28F462VTY29Ct7wYuBfBnMEkZcA8ActxXAZZQaJvRTwf72ZERfVkLMrGXwMth8T",
+)
 # List teacher's Canvas courses for the course creation dropdown
 # Falls back to manual ID entry if this scope isn't available in your Canvas build
 CANVAS_OAUTH_SCOPE_LIST_COURSES = "url:GET|/api/v1/courses"
@@ -212,10 +216,14 @@ CANVAS_OAUTH_SCOPE_MODULES = "url:GET|/api/v1/courses/:course_id/modules"
 CANVAS_OAUTH_SCOPE_FILES = "url:GET|/api/v1/courses/:course_id/files"
 # Fetch user identity (name, email, login_id) during OAuth signup
 CANVAS_OAUTH_SCOPE_PROFILE = "url:GET|/api/v1/users/:user_id/profile"
+# Fetch individual file metadata (needed to get download URL with verifier)
+CANVAS_OAUTH_SCOPE_FILE_SHOW = "url:GET|/api/v1/files/:id"
+# Generate temporary download URLs for Canvas files via OAuth
+CANVAS_OAUTH_SCOPE_FILE_PUBLIC_URL = "url:GET|/api/v1/files/:id/public_url"
 # Combined scopes string passed in the OAuth authorization request
 CANVAS_OAUTH_SCOPES = os.getenv(
     "CANVAS_OAUTH_SCOPES",
-    f"{CANVAS_OAUTH_SCOPE_LIST_COURSES} {CANVAS_OAUTH_SCOPE_MODULES} {CANVAS_OAUTH_SCOPE_FILES} {CANVAS_OAUTH_SCOPE_PROFILE}",
+    f"{CANVAS_OAUTH_SCOPE_LIST_COURSES} {CANVAS_OAUTH_SCOPE_MODULES} {CANVAS_OAUTH_SCOPE_FILES} {CANVAS_OAUTH_SCOPE_PROFILE} {CANVAS_OAUTH_SCOPE_FILE_SHOW} {CANVAS_OAUTH_SCOPE_FILE_PUBLIC_URL}",
 )
 
 # LLM API Timeout Configuration

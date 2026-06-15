@@ -11,7 +11,8 @@ from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import User, Student, CanvasProfile
+from accounts.models import User, Student
+from .models import CanvasProfile
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +83,7 @@ class CanvasOAuth2Service:
 
         base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
         client_id = self._settings.CANVAS_CLIENT_ID
-        redirect_uri = request.build_absolute_uri(
-            reverse("accounts:canvas_callback")
-        )
+        redirect_uri = request.build_absolute_uri(reverse("canvas:canvas_callback"))
         scopes = getattr(self._settings, "CANVAS_OAUTH_SCOPES", "")
 
         params = (
@@ -122,6 +121,7 @@ class CanvasOAuth2Service:
                 },
                 timeout=10,
             )
+            response.raise_for_status()
             response.raise_for_status()
             data = response.json()
             return CanvasTokenResult(
@@ -167,10 +167,7 @@ class CanvasOAuth2Service:
         if not profile.access_token:
             return None
 
-        if (
-            profile.token_expires_at
-            and timezone.now() < profile.token_expires_at
-        ):
+        if profile.token_expires_at and timezone.now() < profile.token_expires_at:
             return profile.access_token
 
         if not profile.refresh_token:
@@ -193,7 +190,7 @@ class CanvasOAuth2Service:
         base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
         try:
             response = self._session.get(
-                f"{base_url}/api/v1/users/self",
+                f"{base_url}/api/v1/users/self/profile",
                 headers={"Authorization": f"Bearer {access_token}"},
                 timeout=10,
             )
@@ -202,7 +199,7 @@ class CanvasOAuth2Service:
             return CanvasUserInfo(
                 canvas_user_id=str(data.get("id", "")),
                 name=data.get("name", ""),
-                email=data.get("email", ""),
+                email=data.get("primary_email", ""),
                 login_id=data.get("login_id", ""),
             )
         except requests.RequestException:
@@ -261,18 +258,22 @@ class CanvasOAuth2Service:
             for module_data in data:
                 items = []
                 for item_data in module_data.get("items", []):
-                    items.append(CanvasModuleItem(
-                        item_id=str(item_data["id"]),
-                        title=item_data.get("title", ""),
-                        type=item_data.get("type", ""),
-                        url=item_data.get("url"),
-                        page_url=item_data.get("page_url"),
-                    ))
-                modules.append(CanvasModule(
-                    module_id=str(module_data["id"]),
-                    name=module_data.get("name", ""),
-                    items=items,
-                ))
+                    items.append(
+                        CanvasModuleItem(
+                            item_id=str(item_data["id"]),
+                            title=item_data.get("title", ""),
+                            type=item_data.get("type", ""),
+                            url=item_data.get("url"),
+                            page_url=item_data.get("page_url"),
+                        )
+                    )
+                modules.append(
+                    CanvasModule(
+                        module_id=str(module_data["id"]),
+                        name=module_data.get("name", ""),
+                        items=items,
+                    )
+                )
             return modules
         except requests.RequestException:
             logger.exception("Failed to fetch Canvas modules")
@@ -304,6 +305,22 @@ class CanvasOAuth2Service:
         except requests.RequestException:
             logger.exception("Failed to fetch Canvas files")
             return []
+
+    def get_file_public_url(
+        self, file_id: str, access_token: str
+    ) -> str | None:
+        base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
+        try:
+            response = self._session.get(
+                f"{base_url}/api/v1/files/{file_id}/public_url",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            return response.json().get("public_url")
+        except requests.RequestException:
+            logger.exception("Failed to fetch public URL for file %s", file_id)
+            return None
 
     def get_course_modules_for_user(
         self, user: User, canvas_course_id: str
@@ -344,9 +361,9 @@ class CanvasOAuth2Service:
             profile.access_token = access_token
             profile.refresh_token = refresh_token
             profile.token_expires_at = token_expires_at
-            profile.save(update_fields=[
-                "access_token", "refresh_token", "token_expires_at"
-            ])
+            profile.save(
+                update_fields=["access_token", "refresh_token", "token_expires_at"]
+            )
             return profile.user, False
         except CanvasProfile.DoesNotExist:
             pass

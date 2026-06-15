@@ -12,7 +12,6 @@ from uuid import UUID
 from django.views import View
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render, redirect
-from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
 from django.db import transaction
@@ -27,7 +26,6 @@ from llteacher.tracing import record_exception
 from .forms import RegistrationForm, LoginForm, ProfileForm
 from .models import Student, User
 from .email_service import EmailVerificationService
-from .canvas_service import CanvasOAuth2Service
 
 logger = logging.getLogger(__name__)
 
@@ -440,109 +438,3 @@ class ResendVerificationView(View):
             )
 
         return render(request, "accounts/email_verification_sent.html")
-
-
-class CanvasLoginView(View):
-    """Redirect user to Canvas for OAuth2 authentication."""
-
-    service_factory = CanvasOAuth2Service
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._service = self.service_factory()
-
-    def get(self, request: HttpRequest) -> HttpResponse:
-        if request.user.is_authenticated:
-            messages.info(request, "You are already logged in.")
-            return redirect("/")
-
-        if not CanvasOAuth2Service.is_canvas_configured():
-            messages.error(
-                request, "Canvas login is not configured. Please use email/password instead."
-            )
-            return redirect("accounts:login")
-
-        auth_url = self._service.get_authorization_url(request)
-        return redirect(auth_url)
-
-
-@dataclass
-class CanvasCallbackError:
-    error: str
-
-
-CanvasCallbackResult = CanvasCallbackError | None
-
-
-class CanvasCallbackView(View):
-    """Handle the OAuth2 callback from Canvas."""
-
-    service_factory = CanvasOAuth2Service
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._service = self.service_factory()
-
-    def get(self, request: HttpRequest) -> HttpResponse:
-        if request.user.is_authenticated:
-            messages.info(request, "You are already logged in.")
-            return redirect("/")
-
-        result = self._process_callback(request)
-
-        if isinstance(result, CanvasCallbackError):
-            messages.error(request, result.error)
-            return redirect("accounts:login")
-
-        return redirect("/")
-
-    def _process_callback(self, request: HttpRequest) -> CanvasCallbackResult:
-        code = request.GET.get("code", "")
-        state = request.GET.get("state", "")
-
-        if not self._service.verify_state(request, state):
-            logger.warning(
-                "Canvas OAuth2 state verification failed. "
-                "state_param=%s session_has_key=%s session_keys=%s",
-                state,
-                "canvas_oauth_state" in request.session,
-                list(request.session.keys()),
-            )
-            return CanvasCallbackError(
-                error="Authentication failed. Please try again."
-            )
-
-        redirect_uri = request.build_absolute_uri(
-            reverse("accounts:canvas_callback")
-        )
-
-        token_result = self._service.exchange_code(code, redirect_uri)
-        if not token_result.success:
-            logger.error("Canvas token exchange failed: %s", token_result.error)
-            return CanvasCallbackError(
-                error="Failed to authenticate with Canvas. Please try again."
-            )
-
-        try:
-            user_info = self._service.get_user_info(token_result.access_token)
-        except Exception:
-            logger.exception("Failed to fetch Canvas user info")
-            return CanvasCallbackError(
-                error="Could not retrieve your account information from Canvas. Please try again."
-            )
-
-        user, _created = self._service.get_or_create_user(
-            user_info,
-            access_token=token_result.access_token,
-            refresh_token=token_result.refresh_token,
-            expires_in=token_result.expires_in,
-        )
-
-        user.backend = "django.contrib.auth.backends.ModelBackend"
-        login(request, user)
-
-        messages.success(
-            request,
-            "You have been signed in with UW Canvas.",
-        )
-        return None

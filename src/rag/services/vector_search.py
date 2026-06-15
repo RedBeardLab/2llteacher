@@ -41,12 +41,22 @@ def search_similar(
     if not material_ids:
         return []
 
-    chunks = CourseMaterialChunk.objects.filter(
-        material_id__in=material_ids,
-        level=level,
-    ).select_related("material").only(
-        "id", "material_id", "content", "page_start", "page_end", "level", "embedding",
-        "material__checksum",
+    chunks = (
+        CourseMaterialChunk.objects.filter(
+            material_id__in=material_ids,
+            level=level,
+        )
+        .select_related("material")
+        .only(
+            "id",
+            "material_id",
+            "content",
+            "page_start",
+            "page_end",
+            "level",
+            "embedding",
+            "material__checksum",
+        )
     )
 
     material_cache: dict[str, tuple[str, str]] = {}

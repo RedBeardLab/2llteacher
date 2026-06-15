@@ -27,4 +27,4 @@ def _get_huey() -> Huey:
 
 huey = _get_huey()
 
-import rag.tasks  # noqa: F401 — register Huey tasks
+import rag.tasks  # noqa: E402, F401 — register Huey tasks

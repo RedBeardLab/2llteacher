@@ -1,8 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
-from django.utils import timezone
-from .models import User, Teacher, Student, TeacherAssistant, EmailVerification, CanvasProfile
+from .models import User, Teacher, Student, TeacherAssistant, EmailVerification
 
 
 @admin.register(EmailVerification)
@@ -72,47 +71,3 @@ admin.site.register(User, UserAdmin)
 admin.site.register(Teacher)
 admin.site.register(Student)
 admin.site.register(TeacherAssistant)
-
-
-@admin.register(CanvasProfile)
-class CanvasProfileAdmin(admin.ModelAdmin):
-    """Admin interface for CanvasProfile model."""
-
-    list_display = [
-        "user",
-        "canvas_user_id",
-        "has_token",
-        "token_status",
-        "created_at",
-    ]
-    list_filter = [
-        "created_at",
-    ]
-    search_fields = [
-        "user__username",
-        "user__email",
-        "canvas_user_id",
-    ]
-    readonly_fields = [
-        "id",
-        "user",
-        "canvas_user_id",
-        "access_token",
-        "refresh_token",
-        "token_expires_at",
-        "created_at",
-        "updated_at",
-    ]
-    ordering = ["-created_at"]
-
-    @admin.display(description="Has Token", boolean=True)
-    def has_token(self, obj):
-        return bool(obj.access_token)
-
-    @admin.display(description="Token Status")
-    def token_status(self, obj):
-        if not obj.access_token:
-            return format_html('<span style="color: gray;">—</span>')
-        if obj.token_expires_at and obj.token_expires_at < timezone.now():
-            return format_html('<span style="color: red;">Expired</span>')
-        return format_html('<span style="color: green;">Active</span>')

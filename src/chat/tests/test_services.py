@@ -1,11 +1,8 @@
-import json
-from unittest.mock import patch, MagicMock
-
 from django.test import TestCase
 
 from accounts.models import User, Teacher
-from courses.models import Course, CourseTeacher
-from chat.models import Chat, ChatMessage
+from courses.models import Course
+from chat.models import ChatMessage
 from chat.services import ChatService
 
 
@@ -62,9 +59,7 @@ class ChatServiceTest(TestCase):
             chat=chat, content="Hello", message_type=ChatMessage.MESSAGE_TYPE_STUDENT
         )
         messages = ChatService._build_chat_messages(chat)
-        user_msgs = [
-            m for m in messages if m["role"] == "user" and m.get("content")
-        ]
+        user_msgs = [m for m in messages if m["role"] == "user" and m.get("content")]
         self.assertEqual(len(user_msgs), 1)
 
     def test_build_chat_messages_with_tool_call(self):
@@ -76,7 +71,9 @@ class ChatServiceTest(TestCase):
             tool_call_id="call_xyz",
             tool_call_arguments='{"query": "p-value definition"}',
         )
-        ChatMessageContext = __import__("chat.models", fromlist=["ChatMessageContext"]).ChatMessageContext
+        ChatMessageContext = __import__(
+            "chat.models", fromlist=["ChatMessageContext"]
+        ).ChatMessageContext
         ChatMessageContext.objects.create(
             message=ai_msg,
             material_title="Chapter 5.pdf",

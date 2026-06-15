@@ -30,7 +30,7 @@ def pdf_file(name: str = "lecture notes.pdf", data: bytes = b"%PDF-1.4\n"):
 
 class CourseMaterialFormTests(TestCase):
     def test_valid_pdf_under_limit_is_accepted(self):
-        form = CourseMaterialUploadForm(files=MultiValueDict({"files": [pdf_file()]}))
+        form = CourseMaterialUploadForm(files=MultiValueDict({"pdf_files": [pdf_file()]}))
 
         self.assertTrue(form.is_valid(), form.errors)
 
@@ -38,7 +38,7 @@ class CourseMaterialFormTests(TestCase):
         upload = SimpleUploadedFile(
             "notes.txt", b"not a pdf", content_type="text/plain"
         )
-        form = CourseMaterialUploadForm(files=MultiValueDict({"files": [upload]}))
+        form = CourseMaterialUploadForm(files=MultiValueDict({"pdf_files": [upload]}))
 
         self.assertFalse(form.is_valid())
         self.assertIn("Only PDF files can be uploaded.", str(form.errors))
@@ -47,21 +47,21 @@ class CourseMaterialFormTests(TestCase):
         upload = SimpleUploadedFile(
             "notes.pdf", b"%PDF-1.4\n", content_type="application/octet-stream"
         )
-        form = CourseMaterialUploadForm(files=MultiValueDict({"files": [upload]}))
+        form = CourseMaterialUploadForm(files=MultiValueDict({"pdf_files": [upload]}))
 
         self.assertFalse(form.is_valid())
         self.assertIn("Only PDF files can be uploaded.", str(form.errors))
 
     def test_oversized_pdf_is_rejected(self):
         upload = pdf_file(data=b"x" * (MAX_PDF_UPLOAD_SIZE + 1))
-        form = CourseMaterialUploadForm(files=MultiValueDict({"files": [upload]}))
+        form = CourseMaterialUploadForm(files=MultiValueDict({"pdf_files": [upload]}))
 
         self.assertFalse(form.is_valid())
         self.assertIn("PDF files must be 25 MB or smaller.", str(form.errors))
 
     def test_empty_pdf_is_rejected(self):
         form = CourseMaterialUploadForm(
-            files=MultiValueDict({"files": [pdf_file(data=b"")]})
+            files=MultiValueDict({"pdf_files": [pdf_file(data=b"")]})
         )
 
         self.assertFalse(form.is_valid())
@@ -142,7 +142,7 @@ class CourseMaterialViewTests(TestCase):
         response = self.client.post(
             reverse("courses:material-upload", kwargs={"course_id": self.course.id}),
             data={
-                "files": [
+                "pdf_files": [
                     pdf_file("Week 01.pdf", b"%PDF-1.4\none"),
                     pdf_file("Week 02.pdf", b"%PDF-1.4\ntwo"),
                 ]
@@ -162,7 +162,7 @@ class CourseMaterialViewTests(TestCase):
         response = self.client.post(
             reverse("courses:material-upload", kwargs={"course_id": self.course.id}),
             data={
-                "files": [
+                "pdf_files": [
                     SimpleUploadedFile(
                         "notes.txt", b"not a pdf", content_type="text/plain"
                     )
@@ -187,7 +187,7 @@ class CourseMaterialViewTests(TestCase):
         self.client.login(username="otherteacher", password="password123")
         response = self.client.post(
             reverse("courses:material-upload", kwargs={"course_id": self.course.id}),
-            data={"files": [pdf_file()]},
+            data={"pdf_files": [pdf_file()]},
         )
 
         self.assertEqual(response.status_code, 403)
@@ -197,7 +197,7 @@ class CourseMaterialViewTests(TestCase):
         self.client.login(username="student", password="password123")
         response = self.client.post(
             reverse("courses:material-upload", kwargs={"course_id": self.course.id}),
-            data={"files": [pdf_file()]},
+            data={"pdf_files": [pdf_file()]},
         )
 
         self.assertEqual(response.status_code, 403)

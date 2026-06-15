@@ -55,14 +55,22 @@ class HueyInstanceTests(TestCase):
 
     def test_huey_uses_base_class_when_immediate(self):
         from django.test.utils import override_settings
-        with override_settings(HUEY={"name": "t", "filename": ":memory:", "immediate": True}):
+
+        with override_settings(
+            HUEY={"name": "t", "filename": ":memory:", "immediate": True}
+        ):
             from rag.huey import _get_huey
+
             instance = _get_huey()
             self.assertEqual(type(instance).__name__, "Huey")
 
     def test_huey_uses_sqlite_when_not_immediate(self):
         from django.test.utils import override_settings
-        with override_settings(HUEY={"name": "t", "filename": ":memory:", "immediate": False}):
+
+        with override_settings(
+            HUEY={"name": "t", "filename": ":memory:", "immediate": False}
+        ):
             from rag.huey import _get_huey
+
             instance = _get_huey()
             self.assertEqual(type(instance).__name__, "SqliteHuey")

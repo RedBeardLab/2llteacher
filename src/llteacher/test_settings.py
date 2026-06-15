@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "llm",
     "rag",
     "chat",
+    "canvas",
 ]
 
 # Disable template debugging for faster tests
@@ -92,5 +93,5 @@ USE_I18N = True
 USE_TZ = True
 
 # Run Huey tasks synchronously in tests
-HUEY["immediate"] = True  # type: ignore[index]
-HUEY["filename"] = ":memory:"  # type: ignore[index]
+HUEY["immediate"] = True  # type: ignore[index]  # noqa: F405
+HUEY["filename"] = ":memory:"  # type: ignore[index]  # noqa: F405

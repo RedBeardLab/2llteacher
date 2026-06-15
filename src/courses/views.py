@@ -28,7 +28,7 @@ from llteacher.permissions.decorators import (
 from .enums import CourseRole
 from .models import Course, CourseEnrollment, CourseTeacher, CourseTeacherAssistant
 from .forms import CourseForm
-from accounts.canvas_service import (
+from canvas.canvas_service import (
     CanvasOAuth2Service,
     CanvasCourseInfo,
     CanvasModule,
@@ -275,9 +275,7 @@ class CourseCreateView(View):
         """Handle GET requests to display the create form."""
         form = CourseForm()
         canvas_courses = self._get_canvas_courses(request.user)
-        data = CourseFormData(
-            form=form, action="create", canvas_courses=canvas_courses
-        )
+        data = CourseFormData(form=form, action="create", canvas_courses=canvas_courses)
 
         return render(request, "courses/form.html", {"data": data})
 
@@ -297,11 +295,26 @@ class CourseCreateView(View):
         form = CourseForm(post_data)
 
         if form.is_valid():
-            course = form.save()
+            course = form.save(commit=False)
 
             if canvas_course_id:
+                if Course.objects.filter(
+                    canvas_course_id=canvas_course_id
+                ).exists():
+                    form.add_error(
+                        "canvas_course",
+                        "This Canvas course is already linked to another course.",
+                    )
+                    canvas_courses = self._get_canvas_courses(request.user)
+                    data = CourseFormData(
+                        form=form, action="create", canvas_courses=canvas_courses
+                    )
+                    return render(
+                        request, "courses/form.html", {"data": data}
+                    )
                 course.canvas_course_id = canvas_course_id
-                course.save(update_fields=["canvas_course_id"])
+
+            course.save()
 
             CourseTeacher.objects.create(
                 course=course,
@@ -313,9 +326,7 @@ class CourseCreateView(View):
             return redirect("courses:list")
 
         canvas_courses = self._get_canvas_courses(request.user)
-        data = CourseFormData(
-            form=form, action="create", canvas_courses=canvas_courses
-        )
+        data = CourseFormData(form=form, action="create", canvas_courses=canvas_courses)
         return render(request, "courses/form.html", {"data": data})
 
 
@@ -388,6 +399,8 @@ class CourseDetailData:
     canvas_course_id: str | None = None
     canvas_modules: list[CanvasModule] | None = None
     canvas_files: list[CanvasFile] | None = None
+    synced_canvas_file_ids: set[str] | None = None
+    indexed_canvas_file_ids: set[str] | None = None
 
 
 class CourseDetailView(View):
@@ -645,6 +658,26 @@ class CourseDetailView(View):
             except Exception:
                 logger.exception("Failed to fetch Canvas materials")
 
+        synced_canvas_file_ids = None
+        indexed_canvas_file_ids = None
+        if canvas_files is not None:
+            from canvas.models import CanvasFileSync
+
+            synced_ids = set(
+                CanvasFileSync.objects.filter(
+                    course=course,
+                ).values_list("canvas_file_id", flat=True)
+            )
+            synced_canvas_file_ids = synced_ids
+
+            indexed_ids = set(
+                CanvasFileSync.objects.filter(
+                    course=course,
+                    material__processing_status="completed",
+                ).values_list("canvas_file_id", flat=True)
+            )
+            indexed_canvas_file_ids = indexed_ids
+
         return CourseDetailData(
             course_id=course.id,
             course_name=course.name,
@@ -660,6 +693,8 @@ class CourseDetailView(View):
             canvas_course_id=course.canvas_course_id,
             canvas_modules=canvas_modules,
             canvas_files=canvas_files,
+            synced_canvas_file_ids=synced_canvas_file_ids,
+            indexed_canvas_file_ids=indexed_canvas_file_ids,
         )
 
 
