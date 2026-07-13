@@ -28,7 +28,7 @@ requires = ["uv_build>=0.8.11,<0.9.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = ["llteacher", "accounts", "conversations", "homeworks", "llm"]
+module-name = ["llteacher", "accounts", "conversations", "courses", "homeworks", "llm"]
 
 [dependency-groups]
 dev = ["pytest", "pytest-django", "ruff", "mypy", "coverage"]
