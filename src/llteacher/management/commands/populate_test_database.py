@@ -1,3 +1,5 @@
+import os
+
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -14,19 +16,34 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = "Populate database with comprehensive test data for manual testing"
+    help = "Set up demo database with test data. Always resets existing data first."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--reset",
-            action="store_true",
-            help="Delete all existing test data before creating new data",
+            "--api-key",
+            dest="api_key",
+            default=None,
+            help="OpenRouter API key for LLM configs. Falls back to OPENROUTER_API_KEY env var.",
         )
 
+    def resolve_api_key(self, provided_key):
+        """Resolve API key from argument or environment variable."""
+        key = provided_key or os.environ.get("OPENROUTER_API_KEY")
+        if not key:
+            self.stdout.write(
+                self.style.WARNING(
+                    "No API key provided. Use --api-key or set OPENROUTER_API_KEY env var. "
+                    "Using placeholder key."
+                )
+            )
+            return "test-api-key-placeholder"
+        return key
+
     def handle(self, *args, **options):
-        if options["reset"]:
-            self.stdout.write("Resetting database...")
-            self.reset_database()
+        api_key = self.resolve_api_key(options["api_key"])
+
+        self.stdout.write("Resetting database...")
+        self.reset_database()
 
         self.stdout.write("Creating comprehensive test data...")
 
@@ -38,7 +55,7 @@ class Command(BaseCommand):
             courses = self.create_courses(users["teachers"], users["students"])
 
             # Create LLM configuration (scoped to courses)
-            llm_configs = self.create_llm_configs(courses)
+            llm_configs = self.create_llm_configs(courses, api_key)
 
             # Create homeworks with sections
             homeworks = self.create_homeworks(users["teachers"], courses, llm_configs)
@@ -153,7 +170,7 @@ class Command(BaseCommand):
         )
         return [course1, course2]
 
-    def create_llm_configs(self, courses):
+    def create_llm_configs(self, courses, api_key):
         """Create LLM configurations scoped to each course."""
         self.stdout.write("Creating LLM configurations...")
 
@@ -189,7 +206,7 @@ And explain the syntaz and how to add values."""
                 course=course,
                 name=f"Tutor Config for {course.name}",
                 model_name="gpt-5",
-                api_key="test-api-key-placeholder",
+                api_key=api_key,
                 base_prompt=base_prompt,
                 temperature=0.7,
                 max_completion_tokens=1000,
