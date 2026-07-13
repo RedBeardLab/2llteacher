@@ -27,13 +27,13 @@ This project uses [uv workspaces](https://docs.astral.sh/uv/concepts/projects/wo
 
 ## Setup
 
-1. Install uv: `pip install uv`
+1. Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 2. Install dependencies: `uv sync`
-3. Run migrations: `python manage.py migrate`
-4. Create superuser: `python manage.py createsuperuser`
+3. Run migrations: `uv run python manage.py migrate`
+4. Create superuser: `uv run python manage.py createsuperuser`
 5. **Configure API Key** (see Configuration section below)
-6. Populate test data: `python manage.py populate_test_database`
-7. Run development server: `python manage.py runserver`
+6. Populate test data: `uv run python manage.py populate_test_database`
+7. Run development server: `uv run python manage.py runserver`
 
 ## Configuration
 
