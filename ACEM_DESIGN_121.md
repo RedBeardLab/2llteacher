@@ -1,258 +1,283 @@
-# Implementation Plan: ALLOWED_EMAIL_DOMAINS as Environment Variable
+# Design Document: ALLOWED_EMAIL_DOMAINS as Environment Variable
 
-## 1. Overview
+## 1. Summary
 
-**Objective**: Make the `ALLOWED_EMAIL_DOMAINS` Django setting configurable via an environment variable instead of being hardcoded.
+Replace the hardcoded `ALLOWED_EMAIL_DOMAINS = ["uw.edu"]` in Django settings with a value parsed from the `ALLOWED_EMAIL_DOMAINS` environment variable, falling back to `["uw.edu"]` as the default. An empty-string value disables domain restrictions entirely.
 
-**Current state**: The setting is hardcoded as `["uw.edu"]` in two files (`settings.py` and `production.py`). The consuming code in `accounts/forms.py` reads it via `getattr(settings, "ALLOWED_EMAIL_DOMAINS", [])`.
+## 2. Current State
 
-## 2. Files to Modify
+| File | Line | Current Value |
+|---|---|---|
+| `src/llteacher/settings.py` | 117 | `ALLOWED_EMAIL_DOMAINS = ["uw.edu"]` |
+| `src/llteacher/production.py` | 153 | `ALLOWED_EMAIL_DOMAINS = ["uw.edu"]` |
 
-| File | Change |
-|------|--------|
-| `src/llteacher/settings.py` | Replace hardcoded list with `os.getenv()` + parser |
-| `src/llteacher/production.py` | Same change |
-| `src/accounts/forms.py` | Update hardcoded UW-specific error message to be domain-agnostic |
-| `src/accounts/utils.py` | Add a helper function to parse env var string into list |
-| (optional) `manage.py` | Add `load_dotenv()` call to enable `.env` file support |
-| (new) `.env.example` | Document the new env variable |
-| `src/accounts/tests/test_domain_validation.py` | Add tests for env var parsing |
+The setting is consumed in three places in `src/accounts/forms.py` via `getattr(settings, "ALLOWED_EMAIL_DOMAINS", [])`, and the utility `is_email_domain_allowed()` in `src/accounts/utils.py`. Error messages in forms are hardcoded with UW-specific text.
 
-## 3. Detailed Changes
+## 3. Design
 
-### 3.1 Add parser helper in `src/accounts/utils.py`
+### 3.1 Env Variable Format
 
-Add a function that converts the raw env var string into a list of domains:
+- **Variable name**: `ALLOWED_EMAIL_DOMAINS`
+- **Format**: Comma-separated list of domain strings (e.g. `uw.edu,washington.edu`)
+- **Default**: `uw.edu` (preserves existing behavior)
+- **Empty string**: Disables all domain restrictions (allows every domain)
+
+### 3.2 Parser Function: `parse_allowed_email_domains()`
+
+**Location**: `src/accounts/utils.py`
 
 ```python
 import os
 
+ALLOWED_EMAIL_DOMAINS_ENV_VAR = "ALLOWED_EMAIL_DOMAINS"
+_DEFAULT_ALLOWED_DOMAINS = ["uw.edu"]
 
-def parse_allowed_email_domains(env_var: str = "ALLOWED_EMAIL_DOMAINS") -> list[str]:
+
+def parse_allowed_email_domains() -> list[str]:
     """
-    Parse ALLOWED_EMAIL_DOMAINS from environment variable.
+    Read ALLOWED_EMAIL_DOMAINS from the environment and parse into a list.
 
-    The env var should be a comma-separated list of domains.
-    Whitespace around each domain is stripped. Empty strings
-    and the empty-string default produce an empty list.
+    Format: comma-separated domains, e.g. "uw.edu,washington.edu"
+    Empty string returns [] (all domains allowed).
+    Absent or unparseable returns the default ["uw.edu"].
 
     Returns:
-        List of allowed domains (lowercased).
+        list[str]: Parsed list of allowed domains.
     """
-    raw = os.getenv(env_var, "")
-    if not raw or not raw.strip():
+    raw = os.getenv(ALLOWED_EMAIL_DOMAINS_ENV_VAR)
+    if raw is None:
+        return _DEFAULT_ALLOWED_DOMAINS.copy()
+    stripped = raw.strip()
+    if not stripped:
         return []
-    domains = [d.strip().lower() for d in raw.split(",") if d.strip()]
+    domains = [d.strip().lower() for d in stripped.split(",") if d.strip()]
+    if not domains:
+        return _DEFAULT_ALLOWED_DOMAINS.copy()
     return domains
 ```
 
-This function:
-- Returns `[]` when the env var is unset, empty, or whitespace-only (same as the current `getattr(settings, ..., [])` default).
-- Strips whitespace from each domain.
-- Lowercases all domains (consistent with `is_email_domain_allowed`).
-- Filters out empty entries from malformed input like `"uw.edu,,example.com"`.
+**Edge cases handled**:
+| Input | Result |
+|---|---|
+| env var not set (`os.getenv` returns `None`) | `["uw.edu"]` |
+| `""` (empty string) | `[]` (all domains allowed) |
+| `"uw.edu"` | `["uw.edu"]` |
+| `"uw.edu,washington.edu"` | `["uw.edu", "washington.edu"]` |
+| `"  UW.EDU ,  "` (whitespace, trailing comma) | `["uw.edu"]` (blank entries filtered) |
+| `"  ,  ,  "` (only commas/whitespace) | `["uw.edu"]` (fallback to default) |
 
-### 3.2 Update `src/llteacher/settings.py` (line 117)
+### 3.3 Settings File Modifications
 
-**Before**:
+#### `src/llteacher/settings.py` (line 117)
+
+Replace:
 ```python
 ALLOWED_EMAIL_DOMAINS = ["uw.edu"]
 ```
-
-**After**:
+with:
 ```python
 from accounts.utils import parse_allowed_email_domains
 
 ALLOWED_EMAIL_DOMAINS = parse_allowed_email_domains()
 ```
 
-### 3.3 Update `src/llteacher/production.py` (line 153)
+#### `src/llteacher/production.py` (line 153)
 
-**Before**:
+Same replacement. Both settings files now derive the value from the environment.
+
+### 3.4 Form Error Messages
+
+The error messages in `src/accounts/forms.py` are currently UW-specific:
+
 ```python
-ALLOWED_EMAIL_DOMAINS = ["uw.edu"]
+# Line 121 (RegistrationForm.clean_email)
+"Email must be from University of Washington domain (@uw.edu or subdomain). "
+"Please use your UW email address."
+
+# Line 207 (ProfileForm.clean_email)
+"New email domain must be from University of Washington (@uw.edu or subdomain). "
+"Please use your UW email address."
 ```
 
-**After**:
-```python
-from accounts.utils import parse_allowed_email_domains
+Replace these with dynamic messages that reflect the actual configured domains. The `__init__` method of `RegistrationForm` already builds a human-readable domain list for the `title` attribute (`domain_text` at line 53-58). Extract that logic into a shared helper so both the title and the error message stay in sync.
 
-ALLOWED_EMAIL_DOMAINS = parse_allowed_email_domains()
+**New helper in `src/accounts/forms.py`**:
+
+```python
+def _format_allowed_domains_text(allowed_domains: list[str]) -> str:
+    """Build a human-readable string from the allowed domains list.
+    
+    E.g. ['uw.edu'] -> '@uw.edu or subdomain'
+    E.g. ['uw.edu', 'washington.edu'] -> '@uw.edu or @washington.edu (including subdomains)'
+    """
+    if len(allowed_domains) == 1:
+        return f"@{allowed_domains[0]} or subdomain"
+    domain_list = ", ".join(f"@{d}" for d in allowed_domains[:-1])
+    return f"{domain_list}, or @{allowed_domains[-1]} (including subdomains)"
 ```
 
-> **Circular import note**: Settings files are evaluated at Django startup, before any app is loaded. Importing from `accounts.utils` is safe because `utils.py` has no Django imports (only `os` and pure Python). No models, forms, or settings are referenced — only `os.getenv`. This avoids any circular dependency.
-
-### 3.4 Update hardcoded error message in `src/accounts/forms.py`
-
-The `ProfileForm.clean_email()` method (line 207) contains a hardcoded UW-specific error message:
+**Updated error message in `RegistrationForm.clean_email`** (line 120-123):
 
 ```python
-raise ValidationError(
-    "New email domain must be from University of Washington (@uw.edu or subdomain). "
-    "Please use your UW email address."
-)
-```
-
-This should be made domain-agnostic. Since the form already has access to `allowed_domains` at line 202, we can use that to build a dynamic message:
-
-```python
-if allowed_domains:
-    domain_list = ", ".join(f"@{d}" for d in allowed_domains)
-    msg = (
-        f"New email domain must be from one of the allowed domains: "
-        f"{domain_list} (including subdomains)."
+allowed_domains = getattr(settings, "ALLOWED_EMAIL_DOMAINS", [])
+if allowed_domains and email and not is_email_domain_allowed(email, allowed_domains):
+    domain_text = _format_allowed_domains_text(allowed_domains)
+    raise ValidationError(
+        f"Email must be from an allowed domain ({domain_text}). "
+        "Please use an email address from an allowed domain."
     )
-else:
-    msg = "New email domain is not allowed."
-raise ValidationError(msg)
 ```
 
-Similarly, update the `RegistrationForm.clean_email()` method if it has hardcoded error messages (currently at lines 114-118). Let's check — the RegistrationForm's `clean_email` uses `is_email_domain_allowed` and raises a generic message. Let me verify: looking at lines 106-118 of forms.py.
+**Updated error message in `ProfileForm.clean_email`** (line 206-209):
 
-### 3.5 (Optional) Enable `.env` file support in `manage.py`
+```python
+if allowed_domains and not is_email_domain_allowed(email, allowed_domains):
+    domain_text = _format_allowed_domains_text(allowed_domains)
+    raise ValidationError(
+        f"New email domain must be from an allowed domain ({domain_text}). "
+        "Please use an email address from an allowed domain."
+    )
+```
 
-`python-dotenv` is already listed as a dependency in `pyproject.toml` but never imported. Add a `load_dotenv()` call to `manage.py`:
+The `__init__` method of `RegistrationForm` can also be refactored to use `_format_allowed_domains_text` for the `title` attribute, eliminating the inline duplicate logic at lines 52-58.
+
+### 3.5 `load_dotenv()` Support
+
+`python-dotenv` is already a dependency in `pyproject.toml` but is never imported. Add `load_dotenv()` to `manage.py` so that `.env` files are loaded in development:
 
 ```python
 #!/usr/bin/env python
+"""Django's command-line utility for administrative tasks."""
+
 import os
 import sys
-
 from dotenv import load_dotenv
 
+
 def main():
-    load_dotenv()  # Load .env file if present
+    """Run administrative tasks."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
+    load_dotenv()  # Load .env file before Django settings are evaluated
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "llteacher.settings")
-    ...
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed and "
+            "available on your PYTHONPATH environment variable? Did you "
+            "forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == "__main__":
+    main()
 ```
 
-This allows developers to set `ALLOWED_EMAIL_DOMAINS` in a `.env` file locally without exporting it in their shell.
+This ensures that in local development, a `.env` file in the project root is loaded before the settings module is imported.
 
-> **Production note**: In Docker/container environments, env vars are passed through the container runtime, so `.env` is only for local development convenience. The production settings (production.py or Dockerfile) would still rely on OS-level environment variables.
+### 3.6 `.env.example`
 
-### 3.6 Create `.env.example`
-
-```
-# Email domain restrictions for user registration
-# Comma-separated list of allowed email domains (subdomains are also allowed)
-# Example: ALLOWED_EMAIL_DOMAINS=uw.edu,washington.edu
-# Leave empty or unset to allow all domains
-ALLOWED_EMAIL_DOMAINS=uw.edu
-```
-
-## 4. Usage Examples
+Create a new file `.env.example` at the project root with documentation:
 
 ```bash
-# Single domain
-export ALLOWED_EMAIL_DOMAINS=uw.edu
-
-# Multiple domains
-export ALLOWED_EMAIL_DOMAINS=uw.edu,washington.edu,example.org
-
-# Allow all domains (empty/unset)
-export ALLOWED_EMAIL_DOMAINS=
+# Allowed email domains for registration.
+# Comma-separated list of domains (supports subdomains).
+# Default: uw.edu
+# Set to empty to allow all domains.
+ALLOWED_EMAIL_DOMAINS=uw.edu,washington.edu
 ```
 
-## 5. Test Plan
+## 4. Files Changed
 
-### 5.1 Add new unit tests in `src/accounts/tests/test_domain_validation.py`
+| File | Action |
+|---|---|
+| `src/accounts/utils.py` | Add `parse_allowed_email_domains()` and `ALLOWED_EMAIL_DOMAINS_ENV_VAR` constant |
+| `src/llteacher/settings.py` | Replace hardcoded list with `parse_allowed_email_domains()` |
+| `src/llteacher/production.py` | Replace hardcoded list with `parse_allowed_email_domains()` |
+| `src/accounts/forms.py` | Add `_format_allowed_domains_text()` helper; use it for error messages and title; remove hardcoded UW text |
+| `manage.py` | Add `load_dotenv()` call |
+| `.env.example` | New file documenting the env var |
+| `src/accounts/tests/test_domain_validation.py` | Update tests to use `parse_allowed_email_domains()` and match new error messages |
+
+## 5. Test Updates
+
+### 5.1 New Tests for `parse_allowed_email_domains()`
+
+Add to `src/accounts/tests/test_domain_validation.py`:
 
 ```python
 class TestParseAllowedEmailDomains(TestCase):
-    """Test the env var parsing utility."""
+    """Test the env var parsing function."""
 
-    @patch("accounts.utils.os.getenv")
-    def test_single_domain(self, mock_getenv):
-        mock_getenv.return_value = "uw.edu"
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_env_not_set_returns_default(self):
+        """When env var is not set, return default [uw.edu]."""
         result = parse_allowed_email_domains()
         self.assertEqual(result, ["uw.edu"])
 
-    @patch("accounts.utils.os.getenv")
-    def test_multiple_domains(self, mock_getenv):
-        mock_getenv.return_value = "uw.edu,washington.edu,example.org"
-        result = parse_allowed_email_domains()
-        self.assertEqual(result, ["uw.edu", "washington.edu", "example.org"])
-
-    @patch("accounts.utils.os.getenv")
-    def test_whitespace_handling(self, mock_getenv):
-        mock_getenv.return_value = "  uw.edu  ,  washington.edu  "
-        result = parse_allowed_email_domains()
-        self.assertEqual(result, ["uw.edu", "washington.edu"])
-
-    @patch("accounts.utils.os.getenv")
-    def test_empty_env_var(self, mock_getenv):
-        mock_getenv.return_value = ""
+    @mock.patch.dict(os.environ, {"ALLOWED_EMAIL_DOMAINS": ""}, clear=True)
+    def test_empty_string_allows_all(self):
+        """When env var is empty string, return [] (allow all)."""
         result = parse_allowed_email_domains()
         self.assertEqual(result, [])
 
-    @patch("accounts.utils.os.getenv")
-    def test_unset_env_var(self, mock_getenv):
-        # Simulate os.getenv returning default
+    @mock.patch.dict(os.environ, {"ALLOWED_EMAIL_DOMAINS": "uw.edu"}, clear=True)
+    def test_single_domain(self):
         result = parse_allowed_email_domains()
-        # When env var is unset, getenv returns ""
-        self.assertEqual(result, [])
+        self.assertEqual(result, ["uw.edu"])
 
-    @patch("accounts.utils.os.getenv")
-    def test_lowercasing(self, mock_getenv):
-        mock_getenv.return_value = "UW.EDU,Washington.EDU"
+    @mock.patch.dict(os.environ, {"ALLOWED_EMAIL_DOMAINS": "uw.edu,washington.edu"}, clear=True)
+    def test_multiple_domains(self):
         result = parse_allowed_email_domains()
         self.assertEqual(result, ["uw.edu", "washington.edu"])
 
-    @patch("accounts.utils.os.getenv")
-    def test_skips_empty_entries(self, mock_getenv):
-        mock_getenv.return_value = "uw.edu,,washington.edu"
+    @mock.patch.dict(os.environ, {"ALLOWED_EMAIL_DOMAINS": "  UW.EDU ,  "}, clear=True)
+    def test_whitespace_and_trailing_comma(self):
         result = parse_allowed_email_domains()
-        self.assertEqual(result, ["uw.edu", "washington.edu"])
+        self.assertEqual(result, ["uw.edu"])
 
-    @patch("accounts.utils.os.getenv")
-    def test_all_whitespace(self, mock_getenv):
-        mock_getenv.return_value = "  ,  ,  "
+    @mock.patch.dict(os.environ, {"ALLOWED_EMAIL_DOMAINS": "  ,  ,  "}, clear=True)
+    def test_only_commas_falls_back_to_default(self):
+        result = parse_allowed_email_domains()
+        self.assertEqual(result, ["uw.edu"])
+
+    @mock.patch.dict(os.environ, {"ALLOWED_EMAIL_DOMAINS": "  "}, clear=True)
+    def test_whitespace_only_allows_all(self):
         result = parse_allowed_email_domains()
         self.assertEqual(result, [])
+
+    @mock.patch.dict(os.environ, {"ALLOWED_EMAIL_DOMAINS": "UW.EDU"}, clear=True)
+    def test_case_insensitive_normalization(self):
+        result = parse_allowed_email_domains()
+        self.assertEqual(result, ["uw.edu"])
 ```
 
-### 5.2 Existing tests should continue passing
+### 5.2 Update Existing Tests
 
-All existing tests in `test_domain_validation.py` use `self.settings(ALLOWED_EMAIL_DOMAINS=[...])` context managers, which override the Django setting regardless of how its default value is constructed. These tests require zero modification.
+**`TestDomainValidationIntegration.test_settings_configuration`** (line 240-245): Should use `mock.patch.dict` on the env var instead of relying on the hardcoded setting value. However, since `test_settings.py` inherits from `settings.py` via `from .settings import *`, and `settings.py` now calls `parse_allowed_email_domains()` at import time, the test settings will evaluate the env var at import time. During test runs, the env var is typically not set, so the default `["uw.edu"]` will be used. This test should either be removed or adapted.
 
-### 5.3 Manual verification
+**`test_no_allowed_domains_setting`** (line 247-262): Uses `self.settings(ALLOWED_EMAIL_DOMAINS=[])` — this will still work because `self.settings()` overrides at runtime regardless of how the setting was initially defined.
 
-1. Run tests: `uv run coverage run manage.py test --settings=src.llteacher.test_settings src`
-2. Verify with no env var set → `ALLOWED_EMAIL_DOMAINS` resolves to `[]`
-3. Verify with `ALLOWED_EMAIL_DOMAINS=uw.edu` → resolves to `["uw.edu"]`
-4. Verify with `ALLOWED_EMAIL_DOMAINS=uw.edu,washington.edu` → resolves to `["uw.edu", "washington.edu"]`
+**`TestClientSideValidationPatterns`** (line 265+): All tests use `self.settings()` context managers and test the behavior, not the origin of the value. These remain unchanged.
 
-## 6. Error Handling & Edge Cases
+**Tests that check error message text** (lines 123-126, 177-179, 210-212): Must be updated to match the new dynamic error message format. For example:
 
-| Scenario | Behavior |
-|----------|----------|
-| Env var unset | Returns `[]` (empty list — no restrictions) |
-| Env var set to empty string | Returns `[]` |
-| Env var set to whitespace only | Returns `[]` |
-| Malformed commas (`"uw.edu,,foo"`) | Skips empty entries, returns `["uw.edu", "foo"]` |
-| Trailing/leading whitespace | Stripped per domain |
-| Mixed case domains | Lowercased consistently |
+```python
+# Before:
+self.assertIn("Email must be from University of Washington domain", str(form.errors))
+# After:
+self.assertIn("Email must be from an allowed domain", str(form.errors))
+```
 
-## 7. Backward Compatibility
-
-| Aspect | Compatible? | Reason |
-|--------|-------------|--------|
-| Existing `settings.ALLOWED_EMAIL_DOMAINS` consumers | Yes | Value is still a `list[str]` — same type |
-| `getattr(settings, "ALLOWED_EMAIL_DOMAINS", [])` | Yes | `getattr` with default still works |
-| `self.settings()` in tests | Yes | Test context manager overrides work regardless of source |
-| Existing deployments without env var | Yes | Falls back to `[]` (was `["uw.edu"]`) — **note**: this is a behavior change, no restrictions by default |
-
-> **⚠️ Default changes**: The default changes from `["uw.edu"]` to `[]` (no restrictions). To preserve the existing behavior for existing deployments, set `ALLOWED_EMAIL_DOMAINS=uw.edu` in the environment. The `.env.example` documents `uw.edu` as the default, so developers and operators see the expected value.
-
-## 8. Implementation Order
+## 6. Implementation Order
 
 1. Add `parse_allowed_email_domains()` to `src/accounts/utils.py`
-2. Update `src/llteacher/settings.py` to use it
-3. Update `src/llteacher/production.py` to use it
-4. Update hardcoded error message in `src/accounts/forms.py`
-5. (Optional) Add `load_dotenv()` to `manage.py`
+2. Update `src/accounts/forms.py` with `_format_allowed_domains_text()` and dynamic error messages
+3. Update `src/llteacher/settings.py` to use `parse_allowed_email_domains()`
+4. Update `src/llteacher/production.py` to use `parse_allowed_email_domains()`
+5. Add `load_dotenv()` to `manage.py`
 6. Create `.env.example`
-7. Add tests to `test_domain_validation.py`
-8. Run full test suite
-9. Commit
+7. Add new tests for `parse_allowed_email_domains()`
+8. Update existing tests to match new error messages
+9. Run full test suite to verify
