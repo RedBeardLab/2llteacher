@@ -81,7 +81,14 @@ class Command(BaseCommand):
         Teacher.objects.all().delete()
         Student.objects.all().delete()
         User.objects.filter(
-            username__in=["admin", "teacher1", "teacher2", "student1", "student2", "student3"]
+            username__in=[
+                "admin",
+                "teacher1",
+                "teacher2",
+                "student1",
+                "student2",
+                "student3",
+            ]
         ).delete()
         self.stdout.write("  ✓ Database reset complete")
 
