@@ -34,9 +34,7 @@ class CanvasServiceGetOrCreateUserTests(TestCase):
         self.assertTrue(user.is_email_verified)
         self.assertTrue(hasattr(user, "student_profile"))
         self.assertTrue(
-            CanvasProfile.objects.filter(
-                canvas_user_id="100", user=user
-            ).exists()
+            CanvasProfile.objects.filter(canvas_user_id="100", user=user).exists()
         )
 
     def test_returns_existing_user_by_canvas_user_id(self):
@@ -53,9 +51,7 @@ class CanvasServiceGetOrCreateUserTests(TestCase):
         self.assertEqual(result.id, user.id)
 
     def test_links_existing_user_by_email(self):
-        user = User.objects.create_user(
-            username="link@uw.edu", email="link@uw.edu"
-        )
+        user = User.objects.create_user(username="link@uw.edu", email="link@uw.edu")
 
         info = CanvasUserInfo(
             canvas_user_id="300", name="Link User", email="link@uw.edu"
@@ -64,9 +60,7 @@ class CanvasServiceGetOrCreateUserTests(TestCase):
         self.assertFalse(created)
         self.assertEqual(result.id, user.id)
         self.assertTrue(
-            CanvasProfile.objects.filter(
-                canvas_user_id="300", user=user
-            ).exists()
+            CanvasProfile.objects.filter(canvas_user_id="300", user=user).exists()
         )
 
     def test_handles_missing_email_with_login_id(self):
@@ -221,9 +215,7 @@ class CanvasLoginViewTests(TestCase):
         self.assertIn("state=", response.url)
         self.assertIn("redirect_uri=", response.url)
         self.assertIn("scope=", response.url)
-        self.assertIn(
-            "url:GET%7C/api/v1/users/self", response.url
-        )
+        self.assertIn("url:GET%7C/api/v1/users/self", response.url)
 
     def test_redirects_home_when_already_authenticated(self):
         user = User.objects.create_user(username="test@uw.edu", password="pw123")
