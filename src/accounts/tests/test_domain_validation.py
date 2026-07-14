@@ -342,3 +342,42 @@ class TestClientSideValidationPatterns(TestCase):
                 self.assertIn(r"sub\.domain\.edu", pattern)
                 # Should not contain unescaped dots that would match any character
                 self.assertNotIn("test.edu", pattern.replace(r"test\.edu", ""))
+
+
+class TestAllowedEmailDomainsFromEnv(TestCase):
+    """Test that ALLOWED_EMAIL_DOMAINS can be configured via environment variable."""
+
+    def test_unset_env_defaults_to_uw_edu(self):
+        """When env var is not set, default is ['uw.edu']."""
+        from django.conf import settings
+
+        domains = getattr(settings, "ALLOWED_EMAIL_DOMAINS", [])
+        self.assertEqual(domains, ["uw.edu"])
+
+    def test_empty_env_disables_check(self):
+        """When env var is empty string, domains list is empty."""
+        with self.settings(ALLOWED_EMAIL_DOMAINS=[]):
+            from django.conf import settings
+
+            domains = getattr(settings, "ALLOWED_EMAIL_DOMAINS", [])
+            self.assertEqual(domains, [])
+            form_data = {
+                "username": "anyone",
+                "email": "anyone@gmail.com",
+                "first_name": "Any",
+                "last_name": "One",
+                "password1": "complexpassword123",
+                "password2": "complexpassword123",
+                "role": "student",
+            }
+            form = RegistrationForm(data=form_data)
+            self.assertTrue(form.is_valid())
+
+    def test_multi_domain_from_env(self):
+        """Multiple comma-separated domains work."""
+        with self.settings(ALLOWED_EMAIL_DOMAINS=["uw.edu", "washington.edu"]):
+            from django.conf import settings
+
+            domains = getattr(settings, "ALLOWED_EMAIL_DOMAINS", [])
+            self.assertIn("uw.edu", domains)
+            self.assertIn("washington.edu", domains)
