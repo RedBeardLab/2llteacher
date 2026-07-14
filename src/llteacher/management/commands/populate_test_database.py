@@ -218,7 +218,7 @@ And explain the syntaz and how to add values."""
                 api_key=api_key,
                 base_prompt=base_prompt,
                 temperature=0.7,
-                max_completion_tokens=1000,
+                max_completion_tokens=4000,
                 is_default=True,
                 is_active=True,
             )
