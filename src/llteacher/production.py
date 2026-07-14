@@ -154,7 +154,9 @@ _ALLOWED_EMAIL_DOMAINS_ENV = os.getenv("ALLOWED_EMAIL_DOMAINS")
 if _ALLOWED_EMAIL_DOMAINS_ENV == "":
     ALLOWED_EMAIL_DOMAINS = []
 elif _ALLOWED_EMAIL_DOMAINS_ENV is not None:
-    ALLOWED_EMAIL_DOMAINS = [d.strip() for d in _ALLOWED_EMAIL_DOMAINS_ENV.split(",") if d.strip()]
+    ALLOWED_EMAIL_DOMAINS = [
+        d.strip() for d in _ALLOWED_EMAIL_DOMAINS_ENV.split(",") if d.strip()
+    ]
 else:
     ALLOWED_EMAIL_DOMAINS = ["uw.edu"]
 
