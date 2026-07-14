@@ -150,7 +150,13 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
 # Email domain restrictions for new registrations
-ALLOWED_EMAIL_DOMAINS = ["uw.edu"]
+_ALLOWED_EMAIL_DOMAINS_ENV = os.getenv("ALLOWED_EMAIL_DOMAINS")
+if _ALLOWED_EMAIL_DOMAINS_ENV == "":
+    ALLOWED_EMAIL_DOMAINS = []
+elif _ALLOWED_EMAIL_DOMAINS_ENV is not None:
+    ALLOWED_EMAIL_DOMAINS = [d.strip() for d in _ALLOWED_EMAIL_DOMAINS_ENV.split(",") if d.strip()]
+else:
+    ALLOWED_EMAIL_DOMAINS = ["uw.edu"]
 
 # Email configuration
 # Environment-based email configuration for production deployment
