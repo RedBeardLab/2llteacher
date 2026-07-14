@@ -121,15 +121,16 @@ class CanvasOAuth2Service:
     def get_teacher_courses(self, access_token: str) -> list[CanvasCourseInfo]:
         base_url = self._settings.CANVAS_BASE_URL.rstrip("/")
         try:
+            params: dict[str, str | int] = {
+                "enrollment_type": "teacher",
+                "enrollment_state": "active",
+                "per_page": 100,
+                "include[]": "term",
+            }
             response = self._session.get(
                 f"{base_url}/api/v1/courses",
                 headers={"Authorization": f"Bearer {access_token}"},
-                params={
-                    "enrollment_type": "teacher",
-                    "enrollment_state": "active",
-                    "per_page": 100,
-                    "include[]": "term",
-                },
+                params=params,
                 timeout=10,
             )
             response.raise_for_status()
