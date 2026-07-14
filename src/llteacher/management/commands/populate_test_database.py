@@ -81,13 +81,22 @@ class Command(BaseCommand):
         Teacher.objects.all().delete()
         Student.objects.all().delete()
         User.objects.filter(
-            username__in=["teacher1", "teacher2", "student1", "student2", "student3"]
+            username__in=["admin", "teacher1", "teacher2", "student1", "student2", "student3"]
         ).delete()
         self.stdout.write("  ✓ Database reset complete")
 
     def create_users(self):
         """Create test users and profiles."""
         self.stdout.write("Creating users and profiles...")
+
+        # Admin
+        User.objects.create_superuser(
+            username="admin",
+            email="admin@test.com",
+            first_name="Admin",
+            last_name="User",
+            password="testpass123",
+        )
 
         # Teachers
         teacher1_user = User.objects.create_user(
@@ -621,7 +630,8 @@ for category in categories:
 
         self.stdout.write("\nTEST CREDENTIALS:")
         self.stdout.write("All users have password: testpass123")
-        self.stdout.write("\nTeachers: teacher1, teacher2")
+        self.stdout.write("\nAdmin: admin")
+        self.stdout.write("Teachers: teacher1, teacher2")
         self.stdout.write("Students: student1, student2, student3")
 
         self.stdout.write("\nYour database is now ready for manual testing!")
