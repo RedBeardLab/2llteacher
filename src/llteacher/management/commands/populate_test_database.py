@@ -14,6 +14,8 @@ from conversations.models import Conversation, Message, Submission
 
 User = get_user_model()
 
+DEFAULT_TEST_PASSWORD = "passtest123"
+
 
 class Command(BaseCommand):
     help = "Set up demo database with test data. Always resets existing data first."
@@ -99,7 +101,7 @@ class Command(BaseCommand):
             email="admin@test.com",
             first_name="Admin",
             last_name="User",
-            password="passtest123",
+            password=DEFAULT_TEST_PASSWORD,
         )
 
         # Teachers
@@ -108,7 +110,7 @@ class Command(BaseCommand):
             email="teacher1@test.com",
             first_name="John",
             last_name="Doe",
-            password="passtest123",
+            password=DEFAULT_TEST_PASSWORD,
         )
         teacher1 = Teacher.objects.create(user=teacher1_user)
 
@@ -117,7 +119,7 @@ class Command(BaseCommand):
             email="teacher2@test.com",
             first_name="Jane",
             last_name="Smith",
-            password="passtest123",
+            password=DEFAULT_TEST_PASSWORD,
         )
         teacher2 = Teacher.objects.create(user=teacher2_user)
 
@@ -127,7 +129,7 @@ class Command(BaseCommand):
             email="student1@test.com",
             first_name="Alice",
             last_name="Johnson",
-            password="passtest123",
+            password=DEFAULT_TEST_PASSWORD,
         )
         student1 = Student.objects.create(user=student1_user)
 
@@ -136,7 +138,7 @@ class Command(BaseCommand):
             email="student2@test.com",
             first_name="Bob",
             last_name="Wilson",
-            password="passtest123",
+            password=DEFAULT_TEST_PASSWORD,
         )
         student2 = Student.objects.create(user=student2_user)
 
@@ -145,7 +147,7 @@ class Command(BaseCommand):
             email="student3@test.com",
             first_name="Carol",
             last_name="Brown",
-            password="passtest123",
+            password=DEFAULT_TEST_PASSWORD,
         )
         student3 = Student.objects.create(user=student3_user)
 
@@ -647,8 +649,8 @@ for category in categories:
         self.stdout.write(f"Messages: {Message.objects.count()}")
         self.stdout.write(f"Submissions: {Submission.objects.count()}")
 
-        self.stdout.write("\nTEST CREDENTIALS:")
-        self.stdout.write("All users have password: passtest123")
+        self.stdout.write(f"\nTEST CREDENTIALS:")
+        self.stdout.write(f"All users have password: {DEFAULT_TEST_PASSWORD}")
         self.stdout.write("\nAdmin: admin")
         self.stdout.write("Teachers: teacher1, teacher2")
         self.stdout.write("Students: student1, student2, student3")
