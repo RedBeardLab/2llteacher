@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from accounts.models import Teacher, Student
 from courses.models import Course, CourseTeacher, CourseEnrollment
-from llm.models import LLMConfig
+from llm.models import LLMConfig, GlobalLLMDefault
 from homeworks.models import Homework, Section, SectionSolution
 from conversations.models import Conversation, Message, Submission
 
@@ -54,6 +54,9 @@ class Command(BaseCommand):
             # Create courses and enroll everyone
             courses = self.create_courses(users["teachers"], users["students"])
 
+            # Create global LLM default
+            self.create_global_llm_default(api_key)
+
             # Create LLM configuration (scoped to courses)
             llm_configs = self.create_llm_configs(courses, api_key)
 
@@ -75,6 +78,7 @@ class Command(BaseCommand):
         Section.objects.all().delete()
         Homework.objects.all().delete()
         LLMConfig.objects.all().delete()
+        GlobalLLMDefault.objects.all().delete()
         CourseEnrollment.objects.all().delete()
         CourseTeacher.objects.all().delete()
         Course.objects.all().delete()
@@ -179,11 +183,12 @@ class Command(BaseCommand):
         )
         return [course1, course2]
 
-    def create_llm_configs(self, courses, api_key):
-        """Create LLM configurations scoped to each course."""
-        self.stdout.write("Creating LLM configurations...")
-
-        base_prompt = """You are an AI tutor helping students learn programming.
+    def _get_llm_config_values(self, api_key):
+        """Return shared LLM config values."""
+        return {
+            "model_name": "openai/gpt-5",
+            "api_key": api_key,
+            "base_prompt": """You are an AI tutor helping students learn programming.
 
 Be encouraging, ask guiding questions, and help students discover solutions rather than giving direct answers.
 
@@ -207,20 +212,33 @@ But with something generic of lists. Like
 list_name = [1, 2, 3]
 ```
 
-And explain the syntaz and how to add values."""
+And explain the syntaz and how to add values.""",
+            "temperature": 0.7,
+            "max_completion_tokens": 4000,
+            "is_active": True,
+        }
 
+    def create_global_llm_default(self, api_key):
+        """Create a global LLM default template for new courses."""
+        self.stdout.write("Creating global LLM default...")
+
+        values = self._get_llm_config_values(api_key)
+        GlobalLLMDefault.objects.create(name="Default Tutor Config", **values)
+
+        self.stdout.write("  ✓ Created global LLM default")
+
+    def create_llm_configs(self, courses, api_key):
+        """Create LLM configurations scoped to each course."""
+        self.stdout.write("Creating LLM configurations...")
+
+        values = self._get_llm_config_values(api_key)
         configs = []
         for course in courses:
             config = LLMConfig.objects.create(
                 course=course,
                 name=f"Tutor Config for {course.name}",
-                model_name="gpt-5",
-                api_key=api_key,
-                base_prompt=base_prompt,
-                temperature=0.7,
-                max_completion_tokens=4000,
                 is_default=True,
-                is_active=True,
+                **values,
             )
             configs.append(config)
 
@@ -621,6 +639,7 @@ for category in categories:
         self.stdout.write(f"Students: {Student.objects.count()}")
         self.stdout.write(f"Courses: {Course.objects.count()}")
         self.stdout.write(f"LLM Configs: {LLMConfig.objects.count()}")
+        self.stdout.write(f"Global LLM Defaults: {GlobalLLMDefault.objects.count()}")
         self.stdout.write(f"Homeworks: {Homework.objects.count()}")
         self.stdout.write(f"Sections: {Section.objects.count()}")
         self.stdout.write(f"Section Solutions: {SectionSolution.objects.count()}")
