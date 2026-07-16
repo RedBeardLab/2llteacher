@@ -99,7 +99,7 @@ class Command(BaseCommand):
             email="admin@test.com",
             first_name="Admin",
             last_name="User",
-            password="testpass123",
+            password="passtest123",
         )
 
         # Teachers
@@ -108,7 +108,7 @@ class Command(BaseCommand):
             email="teacher1@test.com",
             first_name="John",
             last_name="Doe",
-            password="testpass123",
+            password="passtest123",
         )
         teacher1 = Teacher.objects.create(user=teacher1_user)
 
@@ -117,7 +117,7 @@ class Command(BaseCommand):
             email="teacher2@test.com",
             first_name="Jane",
             last_name="Smith",
-            password="testpass123",
+            password="passtest123",
         )
         teacher2 = Teacher.objects.create(user=teacher2_user)
 
@@ -127,7 +127,7 @@ class Command(BaseCommand):
             email="student1@test.com",
             first_name="Alice",
             last_name="Johnson",
-            password="testpass123",
+            password="passtest123",
         )
         student1 = Student.objects.create(user=student1_user)
 
@@ -136,7 +136,7 @@ class Command(BaseCommand):
             email="student2@test.com",
             first_name="Bob",
             last_name="Wilson",
-            password="testpass123",
+            password="passtest123",
         )
         student2 = Student.objects.create(user=student2_user)
 
@@ -145,7 +145,7 @@ class Command(BaseCommand):
             email="student3@test.com",
             first_name="Carol",
             last_name="Brown",
-            password="testpass123",
+            password="passtest123",
         )
         student3 = Student.objects.create(user=student3_user)
 
@@ -648,7 +648,7 @@ for category in categories:
         self.stdout.write(f"Submissions: {Submission.objects.count()}")
 
         self.stdout.write("\nTEST CREDENTIALS:")
-        self.stdout.write("All users have password: testpass123")
+        self.stdout.write("All users have password: passtest123")
         self.stdout.write("\nAdmin: admin")
         self.stdout.write("Teachers: teacher1, teacher2")
         self.stdout.write("Students: student1, student2, student3")
