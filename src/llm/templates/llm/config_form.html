@@ -93,7 +93,7 @@
                         <div class="mb-3">
                             <label for="api_key" class="form-label">OpenRouter API Key *</label>
                             <input type="password" class="form-control" id="api_key" name="api_key" 
-                                   value="{% if data.config %}{{ data.config.api_key }}{% elif form_data %}{{ form_data.api_key }}{% endif %}" 
+                                   value="{% if data.config %}{{ data.config.api_key }}{% elif form_data %}{{ form_data.api_key }}{% elif data.default_api_key %}{{ data.default_api_key }}{% endif %}" 
                                    required>
                             <div class="form-text">Your OpenRouter API key (will be stored securely)</div>
                         </div>

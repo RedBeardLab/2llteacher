@@ -75,6 +75,7 @@ class LLMConfigFormData:
     form_title: str = "Create LLM Configuration"
     course_id: Optional[UUID] = None
     courses: List[dict] | None = None
+    default_api_key: str = ""
 
 
 @dataclass
@@ -217,6 +218,7 @@ class LLMConfigCreateView(View):
 
     def _get_form_data(self, course_id: UUID) -> LLMConfigFormData:
         from courses.models import Course
+        from .models import GlobalLLMDefault
 
         try:
             course = Course.objects.get(id=course_id)
@@ -224,11 +226,17 @@ class LLMConfigCreateView(View):
         except Course.DoesNotExist:
             courses = []
 
+        default_api_key = ""
+        global_default = GlobalLLMDefault.objects.filter(is_active=True).first()
+        if global_default:
+            default_api_key = global_default.api_key
+
         return LLMConfigFormData(
             is_edit=False,
             form_title="Create LLM Configuration",
             course_id=course_id,
             courses=courses,
+            default_api_key=default_api_key,
         )
 
     def _parse_create_form_data(
