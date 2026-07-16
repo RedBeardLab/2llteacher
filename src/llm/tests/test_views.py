@@ -168,6 +168,45 @@ class TestLLMConfigCreateView(LLMViewsTestCase):
 
         self.assertIn(response.status_code, [302, 403])
 
+    def test_create_form_prefills_api_key_from_global_default(self):
+        """Test that the create form pre-fills API key from GlobalLLMDefault."""
+        self.client.login(username="teacher", password="testpass123")
+
+        response = self.client.get(
+            reverse("llm:config-create", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "global-api-key")
+
+    def test_create_form_no_prefill_without_global_default(self):
+        """Test that the create form has no API key pre-fill without GlobalLLMDefault."""
+        GlobalLLMDefault.objects.all().delete()
+
+        self.client.login(username="teacher", password="testpass123")
+
+        response = self.client.get(
+            reverse("llm:config-create", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # The API key field should be empty (no pre-filled value)
+        self.assertNotContains(response, 'value="global-api-key"')
+
+    def test_create_form_no_prefill_with_inactive_global_default(self):
+        """Test that the create form has no API key pre-fill with inactive GlobalLLMDefault."""
+        self.global_default.is_active = False
+        self.global_default.save()
+
+        self.client.login(username="teacher", password="testpass123")
+
+        response = self.client.get(
+            reverse("llm:config-create", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'value="global-api-key"')
+
 
 class TestLLMConfigDetailView(LLMViewsTestCase):
     """Test cases for LLMConfigDetailView."""
