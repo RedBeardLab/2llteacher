@@ -47,7 +47,7 @@ MODEL_MAPPING = {
 
 # Best-effort inverse for rollback. Many-to-one mappings collapse to the
 # first/representative source model.
-REVERSE_MAPPING = {}
+REVERSE_MAPPING: dict[str, str] = {}
 for _old, _new in MODEL_MAPPING.items():
     REVERSE_MAPPING.setdefault(_new, _old)
 
