@@ -188,7 +188,7 @@ class Command(BaseCommand):
     def _get_llm_config_values(self, api_key):
         """Return shared LLM config values."""
         return {
-            "model_name": "openai/gpt-5",
+            "model_name": "openai/gpt-6.1-sol",
             "api_key": api_key,
             "base_prompt": """You are an AI tutor helping students learn programming.
 
