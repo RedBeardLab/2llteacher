@@ -80,7 +80,6 @@ def backwards(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("llm", "0004_globalllmdefault_llmconfig_course_and_more"),
     ]
