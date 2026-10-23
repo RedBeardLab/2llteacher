@@ -649,7 +649,7 @@ for category in categories:
         self.stdout.write(f"Messages: {Message.objects.count()}")
         self.stdout.write(f"Submissions: {Submission.objects.count()}")
 
-        self.stdout.write(f"\nTEST CREDENTIALS:")
+        self.stdout.write("\nTEST CREDENTIALS:")
         self.stdout.write(f"All users have password: {DEFAULT_TEST_PASSWORD}")
         self.stdout.write("\nAdmin: admin")
         self.stdout.write("Teachers: teacher1, teacher2")
